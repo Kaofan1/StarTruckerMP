@@ -22,6 +22,8 @@ on:
 
 jobs:
   build:
+    # Needs the self-hosted runner (it provides the game interop DLLs).
+    needs: launcher
     runs-on: [self-hosted, docker, dotnet10]
     environment: production
     permissions:
@@ -118,7 +120,9 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   launcher:
-    needs: build
+    # Runs on a GitHub-hosted Windows runner so the launcher and the installer are
+    # always produced, even when the self-hosted docker runner that builds the
+    # game-dependent client is offline or not registered for this repository.
     runs-on: windows-latest
     permissions:
       contents: write
@@ -154,10 +158,12 @@ jobs:
             "/DMyAppVersion=${{ github.event.inputs.version || github.run_number }}" `
             "installer\StarTruckerMP.iss"
 
-      - name: Attach launcher and installer to the release
+      - name: Create/update the release with the launcher and installer
         uses: softprops/action-gh-release@v2
         with:
           tag_name: alpha-v${{ github.event.inputs.version || github.run_number }}
+          name: "Alpha v0.${{ github.event.inputs.version || github.run_number }}"
+          generate_release_notes: true
           files: |
             StarTruckerMP-Launcher-win-x64.zip
             artifacts/installer/StarTruckerMP-Setup.exe
