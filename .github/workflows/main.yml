@@ -1,0 +1,165 @@
+name: Build & Release (alpha)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'StarTruckMP.Client/**'
+      - 'StarTruckMP.Server/**'
+      - 'StarTruckMP.Shared/**'
+      - 'StarTruckMP.Launcher/**'
+      - 'StarTruckMP.Overlay.Browser/**'
+      - 'StarTruckMP.Overlay.Core/**'
+      - 'StarTruckMP.Overlay.Host/**'
+      - 'installer/**'
+      - '.github/workflows/main.yml'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version number'
+        required: false
+        default: ''
+
+jobs:
+  build:
+    runs-on: [self-hosted, docker, dotnet10]
+    environment: production
+    permissions:
+      contents: write
+
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+      StarTruckBepInEx: /dlls
+      StarTruckBepInExSteam: /dlls
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build overlay-ui
+        run: |
+          cd StarTruckMP.Server/overlay-ui
+          npm ci
+          npm run build
+
+      - name: Build Overlay Host win x64
+        # StarTruckMP.Client copies the overlay from StarTruckMP.Overlay.Host\bin\...
+        # into the published plugin, so it has to be built first.
+        run: |
+          dotnet build StarTruckMP.Overlay.Host/StarTruckMP.Overlay.Host.csproj \
+            -c Release \
+            -r win-x64 \
+            -p:EnableWindowsTargeting=true
+
+      - name: Publish Client win x64
+        run: |
+          dotnet publish StarTruckMP.Client/StarTruckMP.Client.csproj \
+            -c Release \
+            -r win-x64 \
+            -p:EnableWindowsTargeting=true \
+            -o ./artifacts/client
+
+      - name: Clean Server before win-x64
+        run: rm -rf StarTruckMP.Server/bin StarTruckMP.Server/obj
+
+      - name: Publish Server win-x64
+        run: |
+          dotnet publish StarTruckMP.Server/StarTruckMP.Server.csproj \
+            -c Release \
+            -r win-x64 \
+            --no-self-contained \
+            -p:PublishSingleFile=true \
+            -p:RunSvelteBuild=false \
+            -o ./artifacts/server-win
+
+      - name: Clean Server before linux-x64
+        run: rm -rf StarTruckMP.Server/bin StarTruckMP.Server/obj
+
+      - name: Publish Server linux-x64
+        run: |
+          dotnet publish StarTruckMP.Server/StarTruckMP.Server.csproj \
+            -c Release \
+            -r linux-x64 \
+            --no-self-contained \
+            -p:PublishSingleFile=true \
+            -p:RunSvelteBuild=false \
+            -o ./artifacts/server-linux
+
+      - name: Clean Server before docker publish
+        run: rm -rf StarTruckMP.Server/bin StarTruckMP.Server/obj
+
+      - name: Publish Server Docker
+        run: |
+          dotnet publish StarTruckMP.Server/StarTruckMP.Server.csproj \
+            -c Release \
+            --no-self-contained \
+            -p:RunSvelteBuild=false \
+            -o ./artifacts/server-docker
+
+      - name: Compress artifacts
+        run: |
+          echo '{}' > ./artifacts/server-docker/settings.json
+          cd ./artifacts/client        && zip -r ../../StarTruckMP-bepinex-plugin-win-x64.zip .   && cd ../..
+          cd ./artifacts/server-win    && zip -r ../../StarTruckMP-server-win-x64.zip .   && cd ../..
+          cd ./artifacts/server-linux  && zip -r ../../StarTruckMP-server-linux-x64.zip . && cd ../..
+          cd ./artifacts/server-docker && zip -r ../../StarTruckMP-server-docker.zip .    && cd ../..
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: alpha-v${{ github.event.inputs.version || github.run_number }}
+          name: "Alpha v0.${{ github.event.inputs.version || github.run_number }}"
+          generate_release_notes: true
+          files: |
+            StarTruckMP-bepinex-plugin-win-x64.zip
+            StarTruckMP-server-win-x64.zip
+            StarTruckMP-server-linux-x64.zip
+            StarTruckMP-server-docker.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  launcher:
+    needs: build
+    runs-on: windows-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Publish Launcher win-x64 (self-contained)
+        run: |
+          dotnet publish StarTruckMP.Launcher/StarTruckMP.Launcher.csproj `
+            -c Release `
+            -r win-x64 `
+            --self-contained true `
+            -p:PublishSingleFile=true `
+            -p:IncludeNativeLibrariesForSelfExtract=true `
+            -p:EnableCompressionInSingleFile=true `
+            -o ./artifacts/launcher
+
+      - name: Compress portable launcher
+        run: Compress-Archive -Path ./artifacts/launcher/* -DestinationPath ./StarTruckerMP-Launcher-win-x64.zip -Force
+
+      - name: Install Inno Setup
+        run: choco install innosetup --no-progress -y
+
+      - name: Build installer (no version in file name)
+        run: |
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" `
+            "/DMyAppVersion=${{ github.event.inputs.version || github.run_number }}" `
+            "installer\StarTruckerMP.iss"
+
+      - name: Attach launcher and installer to the release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: alpha-v${{ github.event.inputs.version || github.run_number }}
+          files: |
+            StarTruckerMP-Launcher-win-x64.zip
+            artifacts/installer/StarTruckerMP-Setup.exe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
