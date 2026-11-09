@@ -22,7 +22,12 @@ on:
 
 jobs:
   build:
-    # Needs the self-hosted runner (it provides the game interop DLLs).
+    # Builds the client/server on the self-hosted runner that provides the game
+    # interop DLLs. Enable it with the repository variable
+    # ENABLE_SELF_HOSTED_BUILD=true once such a runner is registered for this
+    # repository; otherwise the job would stay queued forever and keep the whole
+    # workflow run in progress.
+    if: ${{ vars.ENABLE_SELF_HOSTED_BUILD == 'true' }}
     needs: launcher
     runs-on: [self-hosted, docker, dotnet10]
     environment: production
