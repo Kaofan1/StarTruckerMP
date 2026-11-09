@@ -35,7 +35,45 @@ Job oczekuje ich pod ścieżką `/dlls`:
 
 Ścieżkę można zmienić w `main.yml` (`env: StarTruckBepInEx` / `StarTruckBepInExSteam`).
 
-## 1. Rejestracja runnera
+## Szybka ścieżka: jedna komenda
+
+Repo zawiera gotowy obraz i skrypt: `ci/runner/Dockerfile` oraz `ci/runner/install-runner.sh`.
+
+```bash
+git clone https://github.com/Kaofan1/StarTruckerMP && cd StarTruckerMP
+
+# host z Dockerem (Linux albo WSL2); token pobierze się z zalogowanego gh
+./ci/runner/install-runner.sh --dlls /srv/startrucker/dlls
+```
+
+Skrypt:
+
+1. sprawdza Dockera oraz obecność `/dlls/interop/Assembly-CSharp.dll` i `/dlls/core/0Harmony.dll`,
+2. buduje obraz `startrucker-runner:local` (.NET 10 SDK, Node.js 20, `zip`, `git`, `libicu`),
+3. rejestruje runner z etykietami `docker,dotnet10`,
+4. montuje katalog DLL **tylko do odczytu** pod `/dlls` i ustawia `--restart unless-stopped`,
+5. sprawdza w kontenerze `dotnet`, `node`, `npm`, `zip` i obecność DLL,
+6. ustawia `ENABLE_SELF_HOSTED_BUILD=true` przez `gh variable set`.
+
+| Opcja | Znaczenie |
+| --- | --- |
+| `--dlls PATH` | katalog z `core/` i `interop/` (domyślnie `/srv/startrucker/dlls`) |
+| `--name NAME` | nazwa runnera i kontenera (domyślnie `startrucker-docker`) |
+| `--image TAG` | tag obrazu (domyślnie `startrucker-runner:local`) |
+| `--no-variable` | nie zmieniaj zmiennej repozytorium |
+| `--skip-dlls-check` | start mimo niekompletnego `/dlls` |
+| `--down` | usuń kontener runnera |
+
+Bez `gh` podaj token ręcznie (jednorazowy, ważny około godziny):
+
+```bash
+RUNNER_TOKEN=<token> ./ci/runner/install-runner.sh --dlls /srv/startrucker/dlls --no-variable
+```
+
+Po `--down` trzeba wygenerować nowy token — rejestracja jest jednorazowa. Poniższe kroki 1–3
+opisują wariant ręczny, bez Dockera na hoście.
+
+## 1. Rejestracja runnera (wariant ręczny)
 
 GitHub → repozytorium → **Settings → Actions → Runners → New self-hosted runner → Linux X64**.
 GitHub pokaże komendy z aktualną wersją runnera — skopiuj je; poniżej ich odpowiednik:
@@ -134,7 +172,8 @@ a `/dlls` musi być widoczne **wewnątrz** kontenera.
 
 ## 4. Zmienna `ENABLE_SELF_HOSTED_BUILD`
 
-Bez niej job `build` jest pomijany, nawet gdy runner jest online.
+Bez niej job `build` jest pomijany, nawet gdy runner jest online. `ci/runner/install-runner.sh`
+ustawia ją automatycznie, jeśli `gh` jest zalogowane (chyba że użyjesz `--no-variable`).
 
 **Interfejs:** Settings → **Secrets and variables → Actions → zakładka Variables** →
 **New repository variable**:
