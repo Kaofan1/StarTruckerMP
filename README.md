@@ -56,6 +56,11 @@ build-launcher-winx64.cmd
 build-installer-winx64.cmd
 ```
 
+> [!NOTE]
+> The launcher and installer are built on a GitHub-hosted Windows runner. Building the client and
+> server additionally requires a self-hosted runner with the game interop DLLs — see
+> [docs/ci/self-hosted-runner.md](docs/ci/self-hosted-runner.md) (Polish).
+
 # Credits
 
 - [JayJay34](https://github.com/JayJay34) - who started the project
