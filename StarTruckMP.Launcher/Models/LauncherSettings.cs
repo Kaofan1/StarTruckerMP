@@ -8,6 +8,9 @@ public sealed class LauncherSettings
 {
     public string? GamePath { get; set; }
 
+    /// <summary>UI language code: "en" or "pl". Missing means English.</summary>
+    public string? Language { get; set; }
+
     public bool LaunchThroughSteam { get; set; } = true;
 
     public bool IgnoreSslValidation { get; set; } = true;

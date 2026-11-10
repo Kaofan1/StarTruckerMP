@@ -28,6 +28,17 @@ gracz uruchamia jeden plik `StarTruckerMP-Setup.exe`, a launcher robi resztę:
 > Jeśli w folderze gry był wcześniej BepInEx 5 (Mono), launcher przenosi go do `BepInEx.mono-backup-<data>`
 > zamiast mieszać oba loadery.
 
+## Języki: English / Polski
+
+Launcher jest dwujęzyczny. W prawym górnym roku nagłówka znajduje się przycisk z flagą i nazwą
+aktualnie wybranego języka (**🇬🇧 English** lub **🇵🇱 Polski**). Kliknięcie otwiera menu z oba językami,
+a bieżący jest oznaczony ptaszkiem. Wybór jest zapisywany w `%APPDATA%\StarTruckMP\launcher.json`
+(pole `language`: `en` lub `pl`) i obowiązuje przy kolejnych startach.
+
+Zmiana języka przebudowuje interfejs od razu (launcher otwiera się ponownie w nowym języku),
+zachowując ustawienia, serwery i log sesji. Komunikaty techniczne instalatora moda (np. postęp
+pobierania BepInEx) pozostają po angielsku.
+
 ## Sprawdzanie aktualizacji
 
 Przy starcie launcher pyta GitHub Releases o najnowsze wydanie (`alpha-v<N>`) i porównuje je z własną wersją.

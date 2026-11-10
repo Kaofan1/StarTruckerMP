@@ -9,6 +9,7 @@ using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Platform.Storage;
 using Avalonia.Threading;
+using StarTruckMP.Launcher.Localization;
 using StarTruckMP.Launcher.Models;
 using StarTruckMP.Launcher.Services;
 
@@ -43,7 +44,7 @@ internal sealed class MainWindow : Window
 
     private readonly TextBlock _statusText = new()
     {
-        Text = "Standby",
+        Text = Strings.Standby,
         TextWrapping = TextWrapping.NoWrap,
         Foreground = LauncherTheme.MutedBrush,
         FontSize = 11.5,
@@ -62,9 +63,14 @@ internal sealed class MainWindow : Window
         ActionVariant.Ghost,
         stretch: false);
 
+    private readonly Button _languageButton = LauncherTheme.MakeButton(
+        "English",
+        ActionVariant.Ghost,
+        stretch: false);
+
     private readonly TextBlock _serverSummaryText = new()
     {
-        Text = "No server selected",
+        Text = Strings.NoServerSelected,
         TextWrapping = TextWrapping.Wrap,
         FontSize = 14,
         FontFamily = LauncherTheme.DisplayFont,
@@ -88,29 +94,29 @@ internal sealed class MainWindow : Window
     };
 
     private readonly Button _detectButton = LauncherTheme.MakeButton(
-        "Detect game",
+        Strings.DetectGame,
         ActionVariant.Secondary,
         stretch: false);
 
     private readonly Button _browseButton = LauncherTheme.MakeButton(
-        "Choose folder…",
+        Strings.ChooseFolder,
         ActionVariant.Secondary,
         stretch: false);
 
     private readonly Button _installButton = LauncherTheme.MakeButton(
-        "Install / repair mod",
+        Strings.InstallMod,
         ActionVariant.Accent);
 
     private readonly Button _openGameFolderButton = LauncherTheme.MakeButton(
-        "Open game folder",
+        Strings.OpenGameFolder,
         ActionVariant.Ghost);
 
     private readonly Button _openConfigButton = LauncherTheme.MakeButton(
-        "Open config",
+        Strings.OpenConfig,
         ActionVariant.Ghost);
 
     private readonly Button _playButton = LauncherTheme.MakeButton(
-        "PLAY",
+        Strings.Play,
         ActionVariant.Primary,
         fontSize: 17,
         padding: new Thickness(24, 13));
@@ -122,59 +128,63 @@ internal sealed class MainWindow : Window
     });
 
     private readonly Button _addServerButton = LauncherTheme.MakeButton(
-        "Add",
+        Strings.Add,
         ActionVariant.Secondary,
         stretch: false);
 
     private readonly Button _removeServerButton = LauncherTheme.MakeButton(
-        "Remove",
+        Strings.Remove,
         ActionVariant.Ghost,
         stretch: false);
 
     private readonly Button _applyServerButton = LauncherTheme.MakeButton(
-        "Save server",
+        Strings.SaveServer,
         ActionVariant.Accent);
 
     private readonly TextBox _nameBox = LauncherTheme.StyleInput(new TextBox
     {
-        Watermark = "Server name"
+        Watermark = Strings.ServerNameWatermark
     });
 
     private readonly TextBox _addressBox = LauncherTheme.StyleInput(new TextBox
     {
-        Watermark = "host or IP"
+        Watermark = Strings.HostWatermark
     });
 
     private readonly TextBox _portBox = LauncherTheme.StyleInput(new TextBox
     {
-        Watermark = "port",
+        Watermark = Strings.PortWatermark,
         Width = 110,
         HorizontalAlignment = HorizontalAlignment.Left
     });
 
     private readonly TextBox _microphoneBox = LauncherTheme.StyleInput(new TextBox
     {
-        Watermark = "leave empty for the system default"
+        Watermark = Strings.MicrophoneWatermark
     });
 
     private readonly CheckBox _steamCheck = LauncherTheme.StyleCheck(new CheckBox
     {
-        Content = Wrap("Launch through Steam (recommended — keeps Steam login working)")
+        Content = Wrap(Strings.LaunchThroughSteam)
     });
 
     private readonly CheckBox _sslCheck = LauncherTheme.StyleCheck(new CheckBox
     {
-        Content = Wrap("Ignore SSL certificate errors (needed for self-signed servers)")
+        Content = Wrap(Strings.IgnoreSsl)
     });
 
     private readonly CheckBox _closeCheck = LauncherTheme.StyleCheck(new CheckBox
     {
-        Content = Wrap("Close the launcher after the game starts")
+        Content = Wrap(Strings.CloseAfterLaunch)
     });
 
-    public MainWindow()
+    public MainWindow(LauncherLogger? log = null)
     {
+        if (log is not null)
+            _log = log;
+
         _settings = _store.Load();
+        Strings.Set(Strings.Parse(_settings.Language));
         _installer = new ModInstaller(_log);
 
         Title = "Star Trucker Multiplayer";
@@ -192,6 +202,10 @@ internal sealed class MainWindow : Window
         _versionText.Text = $"Launcher v{GetType().Assembly.GetName().Version?.ToString(3) ?? "1.0.0"}  ·  github.com/Kaofan1/StarTruckerMP";
 
         Content = BuildLayout();
+
+        var history = _log.Snapshot();
+        if (history.Count > 0)
+            _logBox.Text = string.Join(Environment.NewLine, history.Skip(Math.Max(0, history.Count - 300)));
         UpdateServerSummary();
 
         WireEvents();
@@ -202,6 +216,12 @@ internal sealed class MainWindow : Window
         _updateButton.FontSize = 11.5;
         _updateButton.Foreground = LauncherTheme.AmberBrush;
         _updateButton.Click += (_, _) => OpenUpdatePage();
+
+        _languageButton.HorizontalAlignment = HorizontalAlignment.Right;
+        _languageButton.Margin = new Thickness(0, 0, 0, 2);
+        _languageButton.Flyout = BuildLanguageMenu();
+        UpdateLanguageButton();
+        _log.Log(Strings.LanguageActive(Strings.Current));
 
         _log.LineWritten += OnLogLine;
         Opened += (_, _) =>
@@ -287,7 +307,7 @@ internal sealed class MainWindow : Window
                 },
                 new TextBlock
                 {
-                    Text = "Launcher · mod installer · server bookmarks",
+                    Text = Strings.Subtitle,
                     FontSize = 11.5,
                     Foreground = LauncherTheme.MutedBrush
                 }
@@ -333,7 +353,7 @@ internal sealed class MainWindow : Window
             Spacing = 8,
             VerticalAlignment = VerticalAlignment.Center,
             HorizontalAlignment = HorizontalAlignment.Right,
-            Children = { pill, _versionText, _updateButton }
+            Children = { _languageButton, pill, _versionText, _updateButton }
         };
 
         var layout = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto") };
@@ -421,12 +441,11 @@ internal sealed class MainWindow : Window
         };
 
         return LauncherTheme.Card(
-            "GAME INSTALLATION",
+            Strings.CardGame,
             "Steam · appid 2380050",
             _gamePathText,
             actions,
-            LauncherTheme.Caption(
-                "Detected from your Steam libraries. If that fails, choose the folder that contains Star Trucker.exe."));
+            LauncherTheme.Caption(Strings.GameCaption));
     }
 
     private Control BuildServerCard()
@@ -442,45 +461,42 @@ internal sealed class MainWindow : Window
         Grid.SetColumn(_removeServerButton, 2);
 
         return LauncherTheme.Card(
-            "SERVER BOOKMARKS",
+            Strings.CardServers,
             null,
             toolbar,
-            LauncherTheme.Field("Name", _nameBox),
-            LauncherTheme.Field("Host", _addressBox),
-            LauncherTheme.Field("Port", _portBox),
+            LauncherTheme.Field(Strings.FieldName, _nameBox),
+            LauncherTheme.Field(Strings.FieldHost, _addressBox),
+            LauncherTheme.Field(Strings.FieldPort, _portBox),
             _applyServerButton,
-            LauncherTheme.Caption(
-                @"The selected address is written to BepInEx\config\StarTruckMP.Client.cfg before every launch."));
+            LauncherTheme.Caption(Strings.ServerCaption));
     }
 
     private Control BuildLaunchCard()
     {
         return LauncherTheme.Card(
-            "LAUNCH OPTIONS",
+            Strings.CardLaunch,
             null,
             _steamCheck,
             _sslCheck,
             _closeCheck,
-            LauncherTheme.Field("Microphone", _microphoneBox));
+            LauncherTheme.Field(Strings.FieldMicrophone, _microphoneBox));
     }
 
     private Control BuildConnectCard()
     {
         return LauncherTheme.Card(
-            "CONNECTION",
+            Strings.CardConnection,
             null,
             _serverSummaryText,
             _playButton,
-            LauncherTheme.Caption(
-                "PLAY starts Star Trucker through Steam, so Steam login keeps working. The overlay appears once you load into the sector — " +
-                "the very first launch after installing the mod is slower because BepInEx builds its IL2CPP interop assemblies."));
+            LauncherTheme.Caption(Strings.PlayCaption));
     }
 
     private Control BuildModCard()
     {
         return LauncherTheme.Card(
-            "MOD STATUS",
-            "BepInEx + client + overlay",
+            Strings.CardModStatus,
+            Strings.ModNote,
             _modStatusText,
             _installButton);
     }
@@ -488,18 +504,17 @@ internal sealed class MainWindow : Window
     private Control BuildShortcutsCard()
     {
         return LauncherTheme.Card(
-            "SHORTCUTS",
+            Strings.CardShortcuts,
             null,
             _openGameFolderButton,
             _openConfigButton,
-            LauncherTheme.Caption(
-                "Handy for reading BepInEx logs or editing the client config by hand."));
+            LauncherTheme.Caption(Strings.ShortcutsCaption));
     }
 
     private Control BuildLogCard()
     {
         return LauncherTheme.Card(
-            "LAUNCHER LOG",
+            Strings.CardLog,
             null,
             _logBox,
             LauncherTheme.Caption(LauncherLogger.LogPath, 10.5));
@@ -526,19 +541,19 @@ internal sealed class MainWindow : Window
         if (_install is null)
         {
             _settings.GamePath = null;
-            _gamePathText.Text = "Star Trucker was not found. Use “Choose folder…” and pick the folder that contains Star Trucker.exe.";
+            _gamePathText.Text = Strings.GameNotFoundHint;
             _gamePathText.Foreground = LauncherTheme.AmberBrush;
-            _log.Log("Star Trucker was not detected.");
+            _log.Log(Strings.GameNotDetected);
         }
         else
         {
             _settings.GamePath = _install.Path;
             _gamePathText.Text = _install.Path;
             _gamePathText.Foreground = LauncherTheme.TextBrush;
-            _log.Log($"Using Star Trucker at {_install.Path}");
+            _log.Log(Strings.GameDetected(_install.Path));
 
             if (_install.Warning is not null)
-                _log.Log("Warning: " + _install.Warning);
+                _log.Log(Strings.WarningPrefix + _install.Warning);
         }
 
         RefreshModState();
@@ -561,7 +576,7 @@ internal sealed class MainWindow : Window
         var install = GameInstall.FromPath(localPath);
         if (install is null)
         {
-            _log.Log("That folder does not contain Star Trucker.exe.");
+            _log.Log(Strings.FolderHasNoGame);
             return;
         }
 
@@ -575,7 +590,7 @@ internal sealed class MainWindow : Window
         if (_install is null || _busy)
             return;
 
-        SetBusy(true, "Installing mod…");
+        SetBusy(true, Strings.ModInstalling);
 
         var gamePath = _install.Path;
         var progress = new Progress<string>(message => _log.Log(message));
@@ -594,17 +609,63 @@ internal sealed class MainWindow : Window
 
                 await _installer.InstallAsync(gamePath, progress, System.Threading.CancellationToken.None);
             });
-            _log.Log("Mod installation completed.");
+            _log.Log(Strings.ModInstallCompleted);
         }
         catch (Exception exception)
         {
-            _log.Log("Mod installation failed: " + exception.Message);
+            _log.Log(Strings.ModInstallFailed(exception.Message));
         }
         finally
         {
             SetBusy(false, string.Empty);
             RefreshModState();
         }
+    }
+
+    private MenuFlyout BuildLanguageMenu()
+    {
+        var menu = new MenuFlyout();
+
+        foreach (var language in new[] { AppLanguage.English, AppLanguage.Polish })
+        {
+            var isCurrent = Strings.Current == language;
+            var item = new MenuItem
+            {
+                Header = $"{Strings.Flag(language)}  {Strings.LanguageName(language)}{(isCurrent ? "  ✓" : string.Empty)}"
+            };
+
+            var target = language;
+            item.Click += (_, _) => SwitchLanguage(target);
+            menu.Items.Add(item);
+        }
+
+        return menu;
+    }
+
+    /// <summary>Header button always shows the flag and name of the selected language.</summary>
+    private void UpdateLanguageButton()
+    {
+        if (_languageButton.Content is Border { Child: TextBlock text })
+            text.Text = $"{Strings.Flag(Strings.Current)}  {Strings.LanguageName(Strings.Current)}  ▾";
+    }
+
+    /// <summary>
+    /// Every label is built from <see cref="Strings"/> at construction time, so a language
+    /// change recreates the window and hands it the same logger to keep the session log.
+    /// </summary>
+    private void SwitchLanguage(AppLanguage language)
+    {
+        if (Strings.Current == language)
+            return;
+
+        Strings.Set(language);
+        _settings.Language = Strings.StorageCode(language);
+        _store.Save(_settings);
+        _log.Log(Strings.LanguageSwitched(language));
+
+        var replacement = new MainWindow(_log);
+        replacement.Show();
+        Close();
     }
 
     private async System.Threading.Tasks.Task CheckForUpdatesAsync()
@@ -615,19 +676,19 @@ internal sealed class MainWindow : Window
 
             if (update is null)
             {
-                _log.Log($"Launcher v{UpdateChecker.CurrentVersion.ToString(3)} is up to date.");
+                _log.Log(Strings.UpToDate(UpdateChecker.CurrentVersion.ToString(3)));
                 return;
             }
 
             _updateButton.Tag = update.PageUrl;
-            _updateButton.Content = $"Update available · {update.Name}";
+            _updateButton.Content = Strings.UpdateAvailable(update.Name);
             _updateButton.IsVisible = true;
-            _log.Log($"A newer launcher is available: {update.Name} ({update.Tag}). Download: {update.PageUrl}");
+            _log.Log(Strings.UpdateFound(update.Name, update.Tag, update.PageUrl));
         }
         catch (Exception exception)
         {
             // A failed update check must never get in the way of launching the game.
-            _log.Log("Update check skipped: " + exception.Message);
+            _log.Log(Strings.UpdateCheckSkipped(exception.Message));
         }
     }
 
@@ -638,11 +699,11 @@ internal sealed class MainWindow : Window
         try
         {
             System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(url) { UseShellExecute = true });
-            _log.Log("Opened the release page: " + url);
+            _log.Log(Strings.ReleasePageOpened(url));
         }
         catch (Exception exception)
         {
-            _log.Log("Could not open the release page: " + exception.Message);
+            _log.Log(Strings.ReleasePageFailed(exception.Message));
         }
     }
 
@@ -654,27 +715,25 @@ internal sealed class MainWindow : Window
         var server = GetSelectedServer();
         if (server is null)
         {
-            _log.Log("Add a server before launching.");
+            _log.Log(Strings.AddServerFirst);
             return;
         }
 
         if (string.IsNullOrWhiteSpace(server.Address))
         {
-            _log.Log("The selected server has no address.");
+            _log.Log(Strings.ServerHasNoAddress);
             return;
         }
 
         if (!int.TryParse(server.Port, out var port) || port is < 1 or > 65535)
         {
-            _log.Log($"'{server.Port}' is not a valid port.");
+            _log.Log(Strings.InvalidPort(server.Port));
             return;
         }
 
         if (!ModInstaller.HasBepInEx(_install.Path) || !ModInstaller.HasPlugin(_install.Path))
         {
-            _log.Log(
-                "The multiplayer mod is not installed — starting Star Trucker without it. " +
-                "Press “Install / repair mod” to add it.");
+            _log.Log(Strings.ModMissingHint);
         }
 
         try
@@ -686,13 +745,11 @@ internal sealed class MainWindow : Window
                 _sslCheck.IsChecked == true,
                 _microphoneBox.Text?.Trim() ?? string.Empty);
 
-            _log.Log($"Server set to {server.Address.Trim()}:{port}.");
+            _log.Log(Strings.ServerSet(server.Address.Trim(), port.ToString()));
 
             var throughSteam = _steamCheck.IsChecked != false;
             GameLauncher.Launch(_install, throughSteam);
-            _log.Log(throughSteam
-                ? "Asked Steam to start Star Trucker. The overlay appears once you load into the sector."
-                : "Started Star Trucker directly. Steam login may not work this way.");
+            _log.Log(throughSteam ? Strings.LaunchedThroughSteam : Strings.LaunchedDirectly);
 
             if (_closeCheck.IsChecked == true)
             {
@@ -702,7 +759,7 @@ internal sealed class MainWindow : Window
         }
         catch (Exception exception)
         {
-            _log.Log("Launch failed: " + exception.Message);
+            _log.Log(Strings.LaunchFailed(exception.Message));
         }
     }
 
@@ -710,7 +767,7 @@ internal sealed class MainWindow : Window
     {
         if (_install is null)
         {
-            _modStatusText.Text = "Unknown — the game folder is not set.";
+            _modStatusText.Text = Strings.ModUnknown;
             _modStatusText.Foreground = LauncherTheme.MutedBrush;
         }
         else
@@ -722,28 +779,26 @@ internal sealed class MainWindow : Window
 
             if (hasBepInEx && hasPlugin && hasOverlay)
             {
-                _modStatusText.Text = "Installed (BepInEx 6 IL2CPP + client + overlay). Ready to play.";
+                _modStatusText.Text = Strings.ModInstalled;
                 _modStatusText.Foreground = LauncherTheme.TealBrush;
             }
             else if (hasMonoBepInEx)
             {
-                _modStatusText.Text =
-                    "BepInEx 5 (Mono) is installed here. Star Trucker needs BepInEx 6 IL2CPP — press “Install / repair mod” to replace it.";
+                _modStatusText.Text = Strings.ModMono;
                 _modStatusText.Foreground = LauncherTheme.DangerBrush;
             }
             else if (!hasBepInEx && !hasPlugin)
             {
-                _modStatusText.Text =
-                    "Not installed — the launcher still starts Star Trucker normally. The multiplayer mod is optional.";
+                _modStatusText.Text = Strings.ModNotInstalled;
                 _modStatusText.Foreground = LauncherTheme.AmberBrush;
             }
             else
             {
                 var missing = new List<string>();
-                if (!hasBepInEx) missing.Add("BepInEx 6 IL2CPP");
-                if (!hasPlugin) missing.Add("client");
-                if (!hasOverlay) missing.Add("overlay");
-                _modStatusText.Text = $"Partial install — missing: {string.Join(", ", missing)}. Press “Install / repair mod”.";
+                if (!hasBepInEx) missing.Add(Strings.MissingBepInEx);
+                if (!hasPlugin) missing.Add(Strings.MissingClient);
+                if (!hasOverlay) missing.Add(Strings.MissingOverlay);
+                _modStatusText.Text = Strings.ModPartial(string.Join(", ", missing));
                 _modStatusText.Foreground = LauncherTheme.AmberBrush;
             }
         }
@@ -791,13 +846,13 @@ internal sealed class MainWindow : Window
     {
         var server = GetSelectedServer();
         _serverSummaryText.Text = server is null
-            ? "No server selected"
+            ? Strings.NoServerSelected
             : $"{server.Name} · {server.Address}:{server.Port}";
     }
 
     private void AddServer()
     {
-        var server = new ServerEntry { Name = "New server", Address = "127.0.0.1", Port = "7777" };
+        var server = new ServerEntry { Name = Strings.NewServerName, Address = "127.0.0.1", Port = "7777" };
         _settings.Servers.Add(server);
         _settings.SelectedServerId = server.Id;
 
@@ -809,7 +864,7 @@ internal sealed class MainWindow : Window
 
         LoadSelectedServerIntoEditor();
         _store.Save(_settings);
-        _log.Log("Added a new server entry.");
+        _log.Log(Strings.ServerAdded);
     }
 
     private void RemoveServer()
@@ -820,7 +875,7 @@ internal sealed class MainWindow : Window
 
         if (_settings.Servers.Count <= 1)
         {
-            _log.Log("At least one server entry has to stay.");
+            _log.Log(Strings.KeepOneServer);
             return;
         }
 
@@ -828,7 +883,7 @@ internal sealed class MainWindow : Window
         _settings.SelectedServerId = _settings.Servers[0].Id;
         RefreshServerList();
         _store.Save(_settings);
-        _log.Log($"Removed server “{server.Name}”.");
+        _log.Log(Strings.ServerRemoved(server.Name));
     }
 
     private void ApplyServerEdits()
@@ -840,13 +895,13 @@ internal sealed class MainWindow : Window
         var address = _addressBox.Text?.Trim() ?? string.Empty;
         if (address.Length == 0)
         {
-            _log.Log("The server address cannot be empty.");
+            _log.Log(Strings.AddressEmpty);
             return;
         }
 
         if (!int.TryParse(_portBox.Text?.Trim(), out var port) || port is < 1 or > 65535)
         {
-            _log.Log("The port has to be a number between 1 and 65535.");
+            _log.Log(Strings.PortRange);
             return;
         }
 
@@ -856,7 +911,7 @@ internal sealed class MainWindow : Window
 
         RefreshServerList();
         _store.Save(_settings);
-        _log.Log($"Saved server “{server.Name}” ({server.Address}:{server.Port}).");
+        _log.Log(Strings.ServerSaved(server.Name, server.Address, server.Port));
     }
 
     private ServerEntry? GetSelectedServer() =>
@@ -875,7 +930,7 @@ internal sealed class MainWindow : Window
     private void SetBusy(bool busy, string status)
     {
         _busy = busy;
-        _statusText.Text = string.IsNullOrWhiteSpace(status) ? "Standby" : status;
+        _statusText.Text = string.IsNullOrWhiteSpace(status) ? Strings.Standby : status;
 
         if (_statusDot is not null)
             _statusDot.Background = busy ? LauncherTheme.AmberBrush : LauncherTheme.TealBrush;
@@ -900,7 +955,7 @@ internal sealed class MainWindow : Window
     {
         if (string.IsNullOrWhiteSpace(path))
         {
-            _log.Log("Nothing to open yet.");
+            _log.Log(Strings.NothingToOpen);
             return;
         }
 
@@ -910,7 +965,7 @@ internal sealed class MainWindow : Window
         }
         catch (Exception exception)
         {
-            _log.Log($"Could not open {path}: {exception.Message}");
+            _log.Log(Strings.CouldNotOpen(path, exception.Message));
         }
     }
 }
