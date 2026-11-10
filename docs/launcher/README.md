@@ -69,7 +69,7 @@ Nazwa pliku instalatora nie zawiera numeru wersji — zawsze jest to `StarTrucke
 
 | Plik | Znaczenie |
 | --- | --- |
-| `%APPDATA%\StarTruckMP\launcher.json` | lista serwerów, ścieżka do gry, ustawienia startu |
+| `%APPDATA%\StarTruckMP\launcher.json` | lista serwerów, ścieżka do gry, ustawienia startu, język, rozmiar i pozycja okna |
 | `%APPDATA%\StarTruckMP\launcher.log` | log launchera (przydatny przy zgłaszaniu błędów) |
 | `%APPDATA%\StarTruckMP\launcher-crash.log` | zapis wyjątku, jeśli launcher nie wystartuje |
 | `<gra>\BepInEx\config\StarTruckMP.Client.cfg` | adres/port serwera, mikrofon, `IgnoreSslValidation` |

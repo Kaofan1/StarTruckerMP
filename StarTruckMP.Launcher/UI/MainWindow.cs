@@ -192,6 +192,7 @@ internal sealed class MainWindow : Window
         Height = 1000;
         MinWidth = 940;
         MinHeight = 760;
+        RestoreSavedSize();
         WindowStartupLocation = WindowStartupLocation.CenterScreen;
         Background = LauncherTheme.SpaceBrush;
 
@@ -226,6 +227,7 @@ internal sealed class MainWindow : Window
         _log.LineWritten += OnLogLine;
         Opened += (_, _) =>
         {
+            RestoreSavedPosition();
             FitToWorkingArea();
             DetectGame();
             _ = CheckForUpdatesAsync();
@@ -646,6 +648,52 @@ internal sealed class MainWindow : Window
         }
     }
 
+    /// <summary>Reopens the launcher with the size it was left at.</summary>
+    private void RestoreSavedSize()
+    {
+        if (_settings.WindowWidth is not double width || _settings.WindowHeight is not double height)
+            return;
+
+        Width = Math.Max(MinWidth, width);
+        Height = Math.Max(MinHeight, height);
+    }
+
+    /// <summary>
+    /// Reopens the launcher where it was left, but only when that spot is still on a screen —
+    /// a monitor unplugged since the last run must not leave the window off the desktop.
+    /// </summary>
+    private void RestoreSavedPosition()
+    {
+        if (_settings.WindowX is not int x || _settings.WindowY is not int y)
+            return;
+
+        try
+        {
+            var scale = RenderScaling;
+            var rect = new PixelRect(
+                x,
+                y,
+                (int)Math.Round(Width * scale),
+                (int)Math.Round(Height * scale));
+
+            var onScreen = Screens.All.Any(screen =>
+            {
+                var area = screen.WorkingArea;
+                return rect.X < area.Right && rect.Right > area.X && rect.Y < area.Bottom && rect.Bottom > area.Y;
+            });
+
+            if (!onScreen)
+                return;
+
+            WindowStartupLocation = WindowStartupLocation.Manual;
+            Position = new PixelPoint(x, y);
+        }
+        catch
+        {
+            // Placement is a convenience: fall back to the default centred window.
+        }
+    }
+
     /// <summary>
     /// The window is sized for the full dashboard; on a screen with a smaller work area it
     /// shrinks to fit instead of hanging off the desktop, and the columns scroll again.
@@ -769,6 +817,9 @@ internal sealed class MainWindow : Window
         _settings.Language = Strings.StorageCode(language);
         _store.Save(_settings);
         _log.Log(Strings.LanguageSwitched(language));
+
+        // The replacement window restores geometry from the settings, so store it first.
+        SaveSettings();
 
         var replacement = new MainWindow(_log);
         replacement.Show();
@@ -1031,6 +1082,15 @@ internal sealed class MainWindow : Window
         _settings.CloseLauncherAfterLaunch = _closeCheck.IsChecked == true;
         _settings.MicrophoneDeviceName = _microphoneBox.Text?.Trim() ?? string.Empty;
         _settings.SelectedServerId = GetSelectedServer()?.Id ?? _settings.SelectedServerId;
+
+        if (WindowState == WindowState.Normal)
+        {
+            _settings.WindowWidth = Width;
+            _settings.WindowHeight = Height;
+            _settings.WindowX = Position.X;
+            _settings.WindowY = Position.Y;
+        }
+
         _store.Save(_settings);
     }
 

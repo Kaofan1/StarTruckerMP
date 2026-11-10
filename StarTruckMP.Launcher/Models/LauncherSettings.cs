@@ -11,6 +11,16 @@ public sealed class LauncherSettings
     /// <summary>UI language code: "en" or "pl". Missing means English.</summary>
     public string? Language { get; set; }
 
+    /// <summary>Last window size in logical pixels; null means the default size.</summary>
+    public double? WindowWidth { get; set; }
+
+    public double? WindowHeight { get; set; }
+
+    /// <summary>Last window position in physical pixels; null means the default centred window.</summary>
+    public int? WindowX { get; set; }
+
+    public int? WindowY { get; set; }
+
     public bool LaunchThroughSteam { get; set; } = true;
 
     public bool IgnoreSslValidation { get; set; } = true;
