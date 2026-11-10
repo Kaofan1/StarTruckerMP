@@ -1,5 +1,7 @@
 # Star Trucker Multiplayer - launcher i instalator
 
+[English](README.en.md) | **Polski**
+
 ![Launcher Star Trucker Multiplayer](../images/banner.png)
 
 Launcher jest teraz głównym sposobem instalacji moda. Zamiast ręcznego kopiowania BepInEx i pluginu,
