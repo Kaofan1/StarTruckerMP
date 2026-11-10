@@ -68,7 +68,10 @@
             <HintPath>$(StarTruckBepInEx)\interop\UnityEngine.UIModule.dll</HintPath>
             <Private>False</Private>
         </Reference>
-        <Reference Include="XGamingRuntime">
+        <!-- XGamingRuntime interop exists only in the Xbox Game Pass build of the game, so a
+             Steam-only reference folder builds the plugin without it (the Xbox auth path is
+             compiled out; the game never loads that assembly on Steam anyway). -->
+        <Reference Include="XGamingRuntime" Condition="Exists('$(StarTruckBepInEx)\interop\XGamingRuntime.dll')">
             <HintPath>$(StarTruckBepInEx)\interop\XGamingRuntime.dll</HintPath>
             <Private>False</Private>
         </Reference>
@@ -141,6 +144,10 @@
             <Private>False</Private>
         </Reference>
     </ItemGroup>
+
+    <PropertyGroup Condition="!Exists('$(StarTruckBepInEx)\interop\XGamingRuntime.dll')">
+        <DefineConstants>$(DefineConstants);STARTRUCKER_NO_XBOX</DefineConstants>
+    </PropertyGroup>
 
     <ItemGroup>
       <ProjectReference Include="..\StarTruckerMP.Shared\StarTruckerMP.Shared.csproj" />

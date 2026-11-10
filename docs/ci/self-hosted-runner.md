@@ -31,9 +31,32 @@ Job oczekuje ich pod ścieżką `/dlls`:
   `UnityEngine.InputModule.dll`, `UnityEngine.InputLegacyModule.dll`,
   `UnityEngine.PhysicsModule.dll`, `UnityEngine.Physics2DModule.dll`,
   `UnityEngine.TextRenderingModule.dll`, `Unity.TextMeshPro.dll`, `Unity.Addressables.dll`,
-  `com.rlabrecque.steamworks.net.dll`, `XGamingRuntime.dll`
+  `com.rlabrecque.steamworks.net.dll` oraz opcjonalnie `XGamingRuntime.dll`
 
 Ścieżkę można zmienić w `main.yml` (`env: StarTruckBepInEx` / `StarTruckBepInExSteam`).
+
+Katalog `interop` powstaje sam przy pierwszym uruchomieniu gry z zainstalowanym BepInEx 6
+IL2CPP - loader generuje te biblioteki z `GameAssembly.dll` jeszcze przed wczytaniem scen.
+
+## Build bez Xbox (wersja Steam)
+
+`XGamingRuntime.dll` istnieje wyłącznie w wersji Game Pass, więc wersja Steam nie ma z czego
+generować jego interopu. Gdy pliku brakuje, projekt kompiluje się ze stałą `STARTRUCKER_NO_XBOX`:
+`XboxAuthManager` jest wtedy pustą atrapą, a plugin i tak pomija logowanie Xbox w czasie działania
+(sprawdza obecność assembly `XGamingRuntime`). Reszta moda działa bez zmian.
+
+Paczkę klienta da się więc zbudować na komputerze z samą wersją Steam:
+
+```bash
+cd StarTruckerMP.Server/overlay-ui && npm ci && npm run build && cd ../..
+dotnet build StarTruckerMP.Overlay.Host/StarTruckerMP.Overlay.Host.csproj -c Release -r win-x64 -p:EnableWindowsTargeting=true
+StarTruckBepInEx='C:\Program Files (x86)\Steam\steamapps\common\Star Trucker\BepInEx' \
+dotnet publish StarTruckerMP.Client/StarTruckerMP.Client.csproj -c Release -r win-x64 -p:EnableWindowsTargeting=true -o artifacts/client
+powershell -NoProfile -Command "Compress-Archive -Path artifacts/client/* -DestinationPath StarTruckerMP-bepinex-plugin-win-x64.zip -Force"
+```
+
+Gotowy `StarTruckerMP-bepinex-plugin-win-x64.zip` wystarczy dodać jako asset wydania - launcher
+szuka właśnie tej nazwy.
 
 ## Szybka ścieżka: jedna komenda
 

@@ -1,4 +1,35 @@
-﻿using System;
+#if STARTRUCKER_NO_XBOX
+using System;
+
+namespace StarTruckerMP.Client.Authentication;
+
+/// <summary>
+/// The Game Pass build of Star Trucker ships an IL2CPP assembly named XGamingRuntime, and its
+/// BepInEx interop is the only thing that provides the GDK types below. A Steam build has no
+/// such assembly, and the plugin already skips Xbox auth when XGamingRuntime is not loaded, so
+/// this file keeps the build working with a no-op twin instead of a missing reference.
+/// </summary>
+public class XboxAuthManager
+{
+    public bool IsSignedIn => false;
+    public bool IsSigningIn => false;
+    public ulong Xuid => 0;
+    public string Gamertag => string.Empty;
+    public string XblToken => string.Empty;
+
+    // Empty accessors keep the subscribers in Plugin compiling without an unused-event warning.
+    public event Action<ulong, string> OnSignedIn { add { } remove { } }
+    public event Action<string> OnXblToken { add { } remove { } }
+    public event Action<string> OnError { add { } remove { } }
+
+    public void Initialize() { }
+    public void Tick() { }
+    public void Dispose() { }
+    public void SignIn() { }
+    public void RequestXblToken(string serviceUrl = "https://userpresence.xboxlive.com") { }
+}
+#else
+using System;
 using BepInEx.Logging;
 using Il2CppInterop.Runtime.InteropTypes.Arrays;
 using XGamingRuntime;
@@ -147,3 +178,4 @@ public class XboxAuthManager
             "POST", serviceUrl, headers, body, cb);
     }
 }
+#endif
