@@ -81,6 +81,10 @@ internal static class Strings
 
     public static string MicrophoneWatermark => T("leave empty for the system default", "puste = domyślne urządzenie");
 
+    public static string MicSystemDefault => T("System default (Windows)", "Domyślne urządzenie systemowe");
+
+    public static string MicRefresh => T("Refresh", "Odśwież");
+
     public static string FieldName => T("Name", "Nazwa");
 
     public static string FieldHost => T("Host", "Host");

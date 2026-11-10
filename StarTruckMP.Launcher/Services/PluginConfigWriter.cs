@@ -28,8 +28,9 @@ internal static class PluginConfigWriter
         content = SetKey(content, "Connection", "ServerPort", port);
         content = SetKey(content, "Connection", "IgnoreSslValidation", ignoreSslValidation ? "true" : "false");
 
-        if (!string.IsNullOrWhiteSpace(microphoneDeviceName))
-            content = SetKey(content, "Audio", "MicrophoneDeviceName", microphoneDeviceName);
+        // Always written: an empty value is how the client is told to auto-select,
+        // so switching back to the system default really clears the old device.
+        content = SetKey(content, "Audio", "MicrophoneDeviceName", microphoneDeviceName);
 
         File.WriteAllText(configPath, content, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
     }

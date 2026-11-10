@@ -7,6 +7,7 @@ using Avalonia.Controls.Primitives;
 using Avalonia.Controls.Templates;
 using Avalonia.Layout;
 using Avalonia.Media;
+using Avalonia.Media.Imaging;
 using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using StarTruckMP.Launcher.Localization;
@@ -158,10 +159,16 @@ internal sealed class MainWindow : Window
         HorizontalAlignment = HorizontalAlignment.Left
     });
 
-    private readonly TextBox _microphoneBox = LauncherTheme.StyleInput(new TextBox
+    private readonly ComboBox _microphoneCombo = LauncherTheme.StyleCombo(new ComboBox
     {
-        Watermark = Strings.MicrophoneWatermark
+        HorizontalAlignment = HorizontalAlignment.Stretch,
+        MinWidth = 200
     });
+
+    private readonly Button _refreshMicrophoneButton = LauncherTheme.MakeButton(
+        Strings.MicRefresh,
+        ActionVariant.Ghost,
+        stretch: false);
 
     private readonly CheckBox _steamCheck = LauncherTheme.StyleCheck(new CheckBox
     {
@@ -199,7 +206,6 @@ internal sealed class MainWindow : Window
         _steamCheck.IsChecked = _settings.LaunchThroughSteam;
         _sslCheck.IsChecked = _settings.IgnoreSslValidation;
         _closeCheck.IsChecked = _settings.CloseLauncherAfterLaunch;
-        _microphoneBox.Text = _settings.MicrophoneDeviceName;
         _versionText.Text = $"Launcher v{GetType().Assembly.GetName().Version?.ToString(3) ?? "1.0.0"}  ·  github.com/Kaofan1/StarTruckerMP";
 
         Content = BuildLayout();
@@ -207,6 +213,12 @@ internal sealed class MainWindow : Window
         var history = _log.Snapshot();
         if (history.Count > 0)
             _logBox.Text = string.Join(Environment.NewLine, history.Skip(Math.Max(0, history.Count - 300)));
+
+        _microphoneCombo.ItemTemplate = new FuncDataTemplate<MicrophoneEntry>((entry, _) =>
+            new TextBlock { Text = entry?.Display ?? string.Empty });
+
+        RefreshMicrophoneList();
+        TryApplyWindowIcon();
         UpdateServerSummary();
 
         WireEvents();
@@ -274,16 +286,7 @@ internal sealed class MainWindow : Window
             BorderBrush = LauncherTheme.AmberBrush,
             BorderThickness = new Thickness(1),
             VerticalAlignment = VerticalAlignment.Center,
-            Child = new TextBlock
-            {
-                Text = "ST",
-                FontFamily = LauncherTheme.DisplayFont,
-                FontSize = 16,
-                FontWeight = FontWeight.Bold,
-                Foreground = LauncherTheme.AmberBrush,
-                HorizontalAlignment = HorizontalAlignment.Center,
-                VerticalAlignment = VerticalAlignment.Center
-            }
+            Child = LogoMark.Create(34)
         };
 
         var brand = new StackPanel
@@ -499,13 +502,20 @@ internal sealed class MainWindow : Window
 
     private Control BuildLaunchCard()
     {
+        var microphoneRow = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto") };
+        microphoneRow.Children.Add(_microphoneCombo);
+
+        _refreshMicrophoneButton.Margin = new Thickness(8, 0, 0, 0);
+        microphoneRow.Children.Add(_refreshMicrophoneButton);
+        Grid.SetColumn(_refreshMicrophoneButton, 1);
+
         return LauncherTheme.Card(
             Strings.CardLaunch,
             null,
             _steamCheck,
             _sslCheck,
             _closeCheck,
-            LauncherTheme.Field(Strings.FieldMicrophone, _microphoneBox));
+            LauncherTheme.Field(Strings.FieldMicrophone, microphoneRow));
     }
 
     private Control BuildConnectCard()
@@ -558,6 +568,7 @@ internal sealed class MainWindow : Window
     {
         _detectButton.Click += (_, _) => DetectGame();
         _browseButton.Click += async (_, _) => await BrowseGameAsync();
+        _refreshMicrophoneButton.Click += (_, _) => RefreshMicrophoneList();
         _installButton.Click += async (_, _) => await InstallModAsync();
         _playButton.Click += async (_, _) => await PlayAsync();
         _openGameFolderButton.Click += (_, _) => OpenPath(_install?.Path);
@@ -735,6 +746,53 @@ internal sealed class MainWindow : Window
         }
     }
 
+    /// <summary>Rebuilds the microphone picker from the devices Windows currently reports.</summary>
+    private void RefreshMicrophoneList()
+    {
+        var selected = GetSelectedMicrophone();
+        var devices = AudioDevices.CaptureDeviceNames();
+
+        var items = new List<MicrophoneEntry> { new(Strings.MicSystemDefault, string.Empty) };
+        items.AddRange(devices.Select(name => new MicrophoneEntry(name, name)));
+
+        // A device that is unplugged right now stays visible, so the saved choice is not lost.
+        if (selected.Length > 0 && devices.All(name => !string.Equals(name, selected, StringComparison.OrdinalIgnoreCase)))
+            items.Add(new MicrophoneEntry(selected, selected));
+
+        _microphoneCombo.ItemsSource = null;
+        _microphoneCombo.ItemsSource = items;
+        _microphoneCombo.SelectedItem = items.FirstOrDefault(entry =>
+            string.Equals(entry.Value, selected, StringComparison.OrdinalIgnoreCase)) ?? items[0];
+    }
+
+    private string GetSelectedMicrophone() =>
+        (_microphoneCombo.SelectedItem as MicrophoneEntry)?.Value ?? _settings.MicrophoneDeviceName ?? string.Empty;
+
+    /// <summary>Renders the header mark into a window icon so the taskbar is not blank either.</summary>
+    private void TryApplyWindowIcon()
+    {
+        try
+        {
+            const int size = 64;
+            var logo = LogoMark.Create(size);
+            logo.Measure(new Size(size, size));
+            logo.Arrange(new Rect(0, 0, size, size));
+
+            var bitmap = new RenderTargetBitmap(new PixelSize(size, size), new Vector(96, 96));
+            bitmap.Render(logo);
+            Icon = new WindowIcon(bitmap);
+        }
+        catch
+        {
+            // The header mark is the important part; the taskbar icon is a bonus.
+        }
+    }
+
+    private sealed record MicrophoneEntry(string Display, string Value)
+    {
+        public override string ToString() => Display;
+    }
+
     private MenuFlyout BuildLanguageMenu()
     {
         var menu = new MenuFlyout();
@@ -909,7 +967,7 @@ internal sealed class MainWindow : Window
                 server.Address.Trim(),
                 port.ToString(),
                 _sslCheck.IsChecked == true,
-                _microphoneBox.Text?.Trim() ?? string.Empty);
+                GetSelectedMicrophone());
 
             _log.Log(Strings.ServerSet(server.Address.Trim(), port.ToString()));
 
@@ -1088,7 +1146,7 @@ internal sealed class MainWindow : Window
         _settings.LaunchThroughSteam = _steamCheck.IsChecked != false;
         _settings.IgnoreSslValidation = _sslCheck.IsChecked == true;
         _settings.CloseLauncherAfterLaunch = _closeCheck.IsChecked == true;
-        _settings.MicrophoneDeviceName = _microphoneBox.Text?.Trim() ?? string.Empty;
+        _settings.MicrophoneDeviceName = GetSelectedMicrophone();
         _settings.SelectedServerId = GetSelectedServer()?.Id ?? _settings.SelectedServerId;
 
         if (WindowState == WindowState.Normal)

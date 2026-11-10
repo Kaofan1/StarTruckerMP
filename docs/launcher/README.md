@@ -39,6 +39,22 @@ Zmiana języka przebudowuje interfejs od razu (launcher otwiera się ponownie w 
 zachowując ustawienia, serwery i log sesji. Komunikaty techniczne instalatora moda (np. postęp
 pobierania BepInEx) pozostają po angielsku.
 
+## Mikrofon
+
+Pola **Mikrofon** nie trzeba już wypełniać ręcznie. Launcher odczytuje listę urządzeń nagrywających
+prosto z Windows (winmm/MME — te same nazwy, które widać w ustawieniach dźwięku) i pokazuje ją
+w rozwijanej liście:
+
+- **Domyślne urządzenie systemowe** — launcher nie zapisuje nazwy, a klient sam wybiera mikrofon
+  (ustawienie domyślne).
+- **nazwa urządzenia** (np. `Mikrofon (HyperX QuadCast 2 S)`) — trafia do `[Audio] MicrophoneDeviceName`
+  w `StarTruckMP.Client.cfg`, więc klient użyje dokładnie tego mikrofonu.
+
+Przycisk **Odśwież** odświeża listę po podłączeniu lub odłączeniu mikrofonu w trakcie działania launchera.
+Wybór jest pamiętany w `launcher.json` (pole `microphoneDeviceName`). Jeśli zapisane urządzenie zniknie
+z systemu, launcher nadal pokazuje je na liście, żeby wybór nie przepadł, a klient przy braku dopasowania
+sam przechodzi na domyślne urządzenie.
+
 ## Sprawdzanie aktualizacji
 
 Przy starcie launcher pyta GitHub Releases o najnowsze wydanie (`alpha-v<N>`) i porównuje je z własną wersją.
