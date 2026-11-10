@@ -43,6 +43,13 @@ internal sealed class MainWindow : Window
         Foreground = LauncherTheme.MutedBrush
     };
 
+    private readonly TextBlock _loaderStatusText = new()
+    {
+        TextWrapping = TextWrapping.Wrap,
+        FontSize = 12.5,
+        Foreground = LauncherTheme.MutedBrush
+    };
+
     private readonly TextBlock _statusText = new()
     {
         Text = Strings.Standby,
@@ -106,6 +113,10 @@ internal sealed class MainWindow : Window
 
     private readonly Button _installButton = LauncherTheme.MakeButton(
         Strings.InstallMod,
+        ActionVariant.Accent);
+
+    private readonly Button _installLoaderButton = LauncherTheme.MakeButton(
+        Strings.InstallLoader,
         ActionVariant.Accent);
 
     private readonly Button _openGameFolderButton = LauncherTheme.MakeButton(
@@ -405,6 +416,7 @@ internal sealed class MainWindow : Window
             {
                 BuildConnectCard(),
                 BuildModCard(),
+                BuildLoaderCard(),
                 BuildShortcutsCard()
             }
         };
@@ -537,6 +549,20 @@ internal sealed class MainWindow : Window
             _installButton);
     }
 
+    /// <summary>
+    /// Loader-only card: the client package is published by a separate CI job, so a missing client
+    /// must never stop the player from installing the BepInEx that the game needs anyway.
+    /// </summary>
+    private Control BuildLoaderCard()
+    {
+        return LauncherTheme.Card(
+            Strings.CardLoader,
+            Strings.LoaderNote,
+            _loaderStatusText,
+            _installLoaderButton,
+            LauncherTheme.Caption(Strings.LoaderCaption));
+    }
+
     private Control BuildShortcutsCard()
     {
         // Two equal buttons on one row keep the column rhythm tight; stacked full-width bars
@@ -570,6 +596,7 @@ internal sealed class MainWindow : Window
         _browseButton.Click += async (_, _) => await BrowseGameAsync();
         _refreshMicrophoneButton.Click += (_, _) => RefreshMicrophoneList();
         _installButton.Click += async (_, _) => await InstallModAsync();
+        _installLoaderButton.Click += async (_, _) => await InstallLoaderAsync();
         _playButton.Click += async (_, _) => await PlayAsync();
         _openGameFolderButton.Click += (_, _) => OpenPath(_install?.Path);
         _openConfigButton.Click += (_, _) => OpenPath(_install is null ? null : PluginConfigWriter.GetConfigPath(_install.Path));
@@ -659,6 +686,42 @@ internal sealed class MainWindow : Window
         catch (Exception exception)
         {
             _log.Log(Strings.ModInstallFailed(exception.Message));
+        }
+        finally
+        {
+            SetBusy(false, string.Empty);
+            RefreshModState();
+        }
+    }
+
+    /// <summary>
+    /// Installs only the BepInEx loader. Separate from <see cref="InstallModAsync"/> so a missing
+    /// client package, or a player who only wants the loader, never blocks this step.
+    /// </summary>
+    private async System.Threading.Tasks.Task InstallLoaderAsync()
+    {
+        if (_install is null || _busy)
+            return;
+
+        SetBusy(true, Strings.LoaderInstalling);
+
+        var gamePath = _install.Path;
+        var progress = new Progress<string>(message => _log.Log(message));
+
+        try
+        {
+            await System.Threading.Tasks.Task.Run(async () =>
+                await StarTruckerMP.Launcher.Mod.BepInExRuntime.InstallAsync(
+                    gamePath,
+                    StarTruckerMP.Launcher.Mod.BepInExRuntime.DefaultPayloadRoot,
+                    progress,
+                    System.Threading.CancellationToken.None));
+
+            _log.Log(Strings.LoaderInstallCompleted);
+        }
+        catch (Exception exception)
+        {
+            _log.Log(Strings.LoaderInstallFailed(exception.Message));
         }
         finally
         {
@@ -1027,7 +1090,29 @@ internal sealed class MainWindow : Window
             }
         }
 
+        if (_install is null)
+        {
+            _loaderStatusText.Text = Strings.ModUnknown;
+            _loaderStatusText.Foreground = LauncherTheme.MutedBrush;
+        }
+        else if (ModInstaller.HasBepInEx(_install.Path))
+        {
+            _loaderStatusText.Text = Strings.LoaderInstalled;
+            _loaderStatusText.Foreground = LauncherTheme.TealBrush;
+        }
+        else if (ModInstaller.HasMonoBepInEx(_install.Path))
+        {
+            _loaderStatusText.Text = Strings.LoaderMono;
+            _loaderStatusText.Foreground = LauncherTheme.DangerBrush;
+        }
+        else
+        {
+            _loaderStatusText.Text = Strings.LoaderMissing;
+            _loaderStatusText.Foreground = LauncherTheme.AmberBrush;
+        }
+
         _installButton.IsEnabled = _install is not null && !_busy;
+        _installLoaderButton.IsEnabled = _install is not null && !_busy;
         _playButton.IsEnabled = _install is not null && !_busy;
         _openGameFolderButton.IsEnabled = _install is not null;
         _openConfigButton.IsEnabled = _install is not null;
@@ -1169,6 +1254,7 @@ internal sealed class MainWindow : Window
             _statusDot.Background = busy ? LauncherTheme.AmberBrush : LauncherTheme.TealBrush;
 
         _installButton.IsEnabled = !busy && _install is not null;
+        _installLoaderButton.IsEnabled = !busy && _install is not null;
         _playButton.IsEnabled = !busy && _install is not null;
         _detectButton.IsEnabled = !busy;
         _browseButton.IsEnabled = !busy;

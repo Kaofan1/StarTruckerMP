@@ -74,6 +74,11 @@ wpisem w logu (`Update check skipped: …`) i nie blokuje startu ani gry.
 Launcher nie wymaga BepInEx i nie dotyka folderu gry, dopóki nie klikniesz **Install / repair mod**.
 Bez moda przycisk **PLAY** po prostu uruchamia Star Trucker przez Steam.
 
+BepInEx ma też własną kartę w launcherze (**LOADER BEPINEX**): pokazuje, czy w folderze gry jest
+BepInEx 6 IL2CPP, BepInEx 5 (Mono), czy nic, a **Zainstaluj / napraw BepInEx** instaluje wyłącznie
+loader. Działa to nawet wtedy, gdy paczka klienta nie została jeszcze opublikowana w wydaniu, więc
+grę można przygotować pod pluginy niezależnie od moda multiplayer.
+
 BepInEx jest osobnym komponentem (`StarTruckerMP.Launcher/Mod/`) z własnym folderem plików:
 
 | Ścieżka | Zawartość |

@@ -116,6 +116,10 @@ internal static class Strings
 
     public static string CardModStatus => T("MOD STATUS", "STATUS MODA");
 
+    public static string CardLoader => T("BEPINEX LOADER", "LOADER BEPINEX");
+
+    public static string LoaderNote => T("installed separately from the client", "instalowany osobno od klienta");
+
     public static string CardShortcuts => T("SHORTCUTS", "SKRÓTY");
 
     public static string CardLog => T("LAUNCHER LOG", "LOG LAUNCHERA");
@@ -165,6 +169,33 @@ internal static class Strings
     public static string MissingClient => T("client", "klient");
 
     public static string MissingOverlay => T("overlay", "overlay");
+
+    // ----- BepInEx loader card -----
+
+    public static string LoaderInstalled =>
+        T("BepInEx 6 (IL2CPP) is in place. Plugins in BepInEx/plugins load normally.",
+            "BepInEx 6 (IL2CPP) jest na miejscu. Pluginy z BepInEx/plugins wczytują się normalnie.");
+
+    public static string LoaderMissing =>
+        T("Not installed - Star Trucker still starts without mods. Install the loader even when the client package is not published yet.",
+            "Niezainstalowany - Star Trucker nadal startuje bez modów. Zainstaluj loader nawet wtedy, gdy paczka klienta nie jest jeszcze opublikowana.");
+
+    public static string LoaderMono =>
+        T("BepInEx 5 (Mono) detected. Star Trucker needs BepInEx 6 IL2CPP - press “Install / repair BepInEx”.",
+            "Wykryto BepInEx 5 (Mono). Star Trucker wymaga BepInEx 6 IL2CPP - kliknij „Zainstaluj / napraw BepInEx”.");
+
+    public static string InstallLoader => T("Install / repair BepInEx", "Zainstaluj / napraw BepInEx");
+
+    public static string LoaderCaption =>
+        T("Only the loader. The multiplayer client stays optional and can be added later.",
+            "Sam loader. Klient multiplayera pozostaje opcjonalny i można go dodać później.");
+
+    public static string LoaderInstalling => T("Installing the BepInEx loader...", "Instaluję loader BepInEx...");
+
+    public static string LoaderInstallCompleted => T("BepInEx loader is ready.", "Loader BepInEx jest gotowy.");
+
+    public static string LoaderInstallFailed(string message) =>
+        T($"BepInEx installation failed: {message}", $"Instalacja BepInEx nie powiodła się: {message}");
 
     // ----- server editor -----
 
