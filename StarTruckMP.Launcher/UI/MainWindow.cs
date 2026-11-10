@@ -629,10 +629,33 @@ internal sealed class MainWindow : Window
         foreach (var language in new[] { AppLanguage.English, AppLanguage.Polish })
         {
             var isCurrent = Strings.Current == language;
-            var item = new MenuItem
+
+            var header = new StackPanel
             {
-                Header = $"{Strings.Flag(language)}  {Strings.LanguageName(language)}{(isCurrent ? "  ✓" : string.Empty)}"
+                Orientation = Orientation.Horizontal,
+                Spacing = 8,
+                Children =
+                {
+                    FlagIcon.Create(language),
+                    new TextBlock
+                    {
+                        Text = Strings.LanguageName(language),
+                        FontSize = 12.5,
+                        VerticalAlignment = VerticalAlignment.Center
+                    }
+                }
             };
+
+            if (isCurrent)
+                header.Children.Add(new TextBlock
+                {
+                    Text = "✓",
+                    FontSize = 12,
+                    Foreground = LauncherTheme.AmberBrush,
+                    VerticalAlignment = VerticalAlignment.Center
+                });
+
+            var item = new MenuItem { Header = header };
 
             var target = language;
             item.Click += (_, _) => SwitchLanguage(target);
@@ -645,8 +668,35 @@ internal sealed class MainWindow : Window
     /// <summary>Header button always shows the flag and name of the selected language.</summary>
     private void UpdateLanguageButton()
     {
-        if (_languageButton.Content is Border { Child: TextBlock text })
-            text.Text = $"{Strings.Flag(Strings.Current)}  {Strings.LanguageName(Strings.Current)}  ▾";
+        if (_languageButton.Content is not Border surface)
+            return;
+
+        surface.Child = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 7,
+            VerticalAlignment = VerticalAlignment.Center,
+            Children =
+            {
+                FlagIcon.Create(Strings.Current),
+                new TextBlock
+                {
+                    Text = Strings.LanguageName(Strings.Current),
+                    FontSize = 12.5,
+                    FontFamily = LauncherTheme.DisplayFont,
+                    FontWeight = FontWeight.SemiBold,
+                    Foreground = LauncherTheme.MutedBrush,
+                    VerticalAlignment = VerticalAlignment.Center
+                },
+                new TextBlock
+                {
+                    Text = "▾",
+                    FontSize = 10,
+                    Foreground = LauncherTheme.MutedBrush,
+                    VerticalAlignment = VerticalAlignment.Center
+                }
+            }
+        };
     }
 
     /// <summary>
