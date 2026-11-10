@@ -91,12 +91,12 @@ internal sealed class MainWindow : Window
     };
 
     private readonly Button _updateNowButton = LauncherTheme.MakeButton(
-        "Update now",
+        Strings.UpdateNow,
         ActionVariant.Primary,
         stretch: false);
 
     private readonly Button _releasePageButton = LauncherTheme.MakeButton(
-        "Release page",
+        Strings.ReleasePage,
         ActionVariant.Ghost,
         stretch: false);
 
