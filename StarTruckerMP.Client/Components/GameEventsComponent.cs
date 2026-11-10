@@ -91,11 +91,17 @@ public class GameEventsComponent : MonoBehaviour
 
     private void Connected()
     {
-        // we already have something attached
-        if (_starTruck.maglockConnector.hitched)
-        {
-            OnHitchCargo(_starTruck.maglockConnector.hitchedCargo);
-        }
+        // The handshake can finish before the truck exists (or with a connector that has no
+        // cargo attached yet), so every step is optional here.
+        var connector = _starTruck?.maglockConnector;
+        if (connector is null || !connector.hitched)
+            return;
+
+        var cargo = connector.hitchedCargo;
+        if (cargo is null)
+            return;
+
+        OnHitchCargo(cargo);
     }
 
     private void OnUnhitchCargo()
@@ -111,37 +117,60 @@ public class GameEventsComponent : MonoBehaviour
 
     private void OnHitchCargo(CargoContainer cargo)
     {
-        App.Log.LogInfo("Hitched cargo");
-        // we hitched a cargo, we need to retrieve the cargo size, livery and share it to the server
-        var trailersCount = _starTruck.HitchedTrailersCount;
-        var livery = cargo.damageApplier.CurrentLiveryId ?? cargo.damageApplier.AppliedLiveryId;
-
-        if (string.IsNullOrEmpty(livery)) 
-            App.Log.LogError("Couldn't retrieve livery for hitched cargo, sending null");
-
-        var cargoType = cargo.cargoRecord?.cargoType;
-        string cargoTypeId = null;
-        
-        foreach (var kvp in CargoMetadataProvider.instance.cargoCatalogue.lookUp)
+        if (cargo is null)
         {
-            if (kvp.value._displayNameId == cargoType._displayNameId)
-            {
-                cargoTypeId = kvp.key;
-                break;
-            }
+            App.Log.LogWarning("Hitched cargo event without a cargo container, skipping.");
+            return;
         }
-        
-        if (string.IsNullOrWhiteSpace(cargoTypeId))
-            App.Log.LogError("Couldn't retrieve cargoTypeId for hitched cargo, sending null");
-        
-        App.Log.LogInfo($"Cargo data: {trailersCount}, {livery}, {cargoTypeId}");
-        
-        Network.SendServerMessage(new UpdateTrailerCmd()
+
+        // A cargo that is still being initialised has no damage applier or record yet. Throwing
+        // here used to abort the whole OnConnected list, which also killed the sector and livery
+        // updates the server needs, so nothing is allowed to escape this method.
+        try
         {
-            TrailerCount = trailersCount,
-            LiveryId = livery,
-            CargoTypeId = cargoTypeId
-        }, PacketType.UpdateTrailer);
+            App.Log.LogInfo("Hitched cargo");
+
+            var trailersCount = _starTruck?.HitchedTrailersCount ?? 0;
+            var damageApplier = cargo.damageApplier;
+            var livery = damageApplier is null
+                ? null
+                : damageApplier.CurrentLiveryId ?? damageApplier.AppliedLiveryId;
+
+            if (string.IsNullOrEmpty(livery))
+                App.Log.LogError("Couldn't retrieve livery for hitched cargo, sending null");
+
+            var cargoType = cargo.cargoRecord?.cargoType;
+            string cargoTypeId = null;
+
+            var catalogue = CargoMetadataProvider.instance?.cargoCatalogue;
+            if (cargoType is not null && catalogue is not null)
+            {
+                foreach (var kvp in catalogue.lookUp)
+                {
+                    if (kvp.value._displayNameId == cargoType._displayNameId)
+                    {
+                        cargoTypeId = kvp.key;
+                        break;
+                    }
+                }
+            }
+
+            if (string.IsNullOrWhiteSpace(cargoTypeId))
+                App.Log.LogError("Couldn't retrieve cargoTypeId for hitched cargo, sending null");
+
+            App.Log.LogInfo($"Cargo data: {trailersCount}, {livery}, {cargoTypeId}");
+
+            Network.SendServerMessage(new UpdateTrailerCmd()
+            {
+                TrailerCount = trailersCount,
+                LiveryId = livery,
+                CargoTypeId = cargoTypeId
+            }, PacketType.UpdateTrailer);
+        }
+        catch (Exception exception)
+        {
+            App.Log.LogError("Could not report the hitched cargo: " + exception.Message);
+        }
     }
 
     private bool _subscribedToSectorArrival = false;

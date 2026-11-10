@@ -370,8 +370,32 @@ public class Network
 
         _handshakeCompleted = true;
         _netId = welcome.NetId;
-        OnConnected?.Invoke(_netId);
+        RaiseConnected(_netId);
         App.Log.LogInfo("Handshake completed with server. NetId: " + _netId);
+    }
+
+    /// <summary>
+    /// A plain multicast invoke stops at the first handler that throws, and that used to leave
+    /// the handshake half-finished: the sector and livery updates never reached the server.
+    /// Each subscriber is isolated so one broken component cannot break the session.
+    /// </summary>
+    private static void RaiseConnected(int netId)
+    {
+        var handlers = OnConnected;
+        if (handlers is null)
+            return;
+
+        foreach (var handler in handlers.GetInvocationList())
+        {
+            try
+            {
+                ((Action<int>)handler)(netId);
+            }
+            catch (Exception exception)
+            {
+                App.Log.LogError("An OnConnected handler failed: " + exception);
+            }
+        }
     }
 
     private static void HandleTrailerUpdate(UpdateTrailerDto trailer)
