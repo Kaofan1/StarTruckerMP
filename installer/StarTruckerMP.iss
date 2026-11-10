@@ -12,7 +12,7 @@
 #define MyAppUrl "https://github.com/Kaofan1/StarTruckerMP"
 #define MyAppExeName "StarTruckerMP.Launcher.exe"
 ; Same mark as the launcher window/header, so Setup, shortcuts and Apps & features match.
-#define MyAppIcon "..\StarTruckMP.Launcher\Assets\StarTruckerMP.ico"
+#define MyAppIcon "..\StarTruckerMP.Launcher\Assets\StarTruckerMP.ico"
 
 #ifndef MyAppVersion
   #define MyAppVersion "1.0.0"
@@ -83,6 +83,6 @@ Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#MyAppName}}
 ; {app} only ever contains the launcher itself, so removing the whole folder keeps the
 ; uninstall complete even if a file was locked while Setup ran.
 Type: filesandordirs; Name: "{app}"
-; The launcher stores its settings and logs in %APPDATA%\StarTruckMP; they are removed here
+; The launcher stores its settings and logs in %APPDATA%\StarTruckerMP; they are removed here
 ; so that a reinstall starts clean. The mod files inside the game folder are left alone.
-Type: filesandordirs; Name: "{userappdata}\StarTruckMP"
+Type: filesandordirs; Name: "{userappdata}\StarTruckerMP"

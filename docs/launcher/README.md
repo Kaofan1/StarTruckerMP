@@ -1,16 +1,16 @@
-# Star Trucker Multiplayer — launcher i instalator
+# Star Trucker Multiplayer - launcher i instalator
 
 ![Launcher Star Trucker Multiplayer](../images/banner.png)
 
 Launcher jest teraz głównym sposobem instalacji moda. Zamiast ręcznego kopiowania BepInEx i pluginu,
 gracz uruchamia jeden plik `StarTruckerMP-Setup.exe`, a launcher robi resztę:
 
-1. wykrywa zainstalowaną przez Steam grę **Star Trucker** (`appid 2380050`) — rejestr, `libraryfolders.vdf`, `appmanifest_2380050.acf`, dodatkowe biblioteki Steam,
-2. dokłada **BepInEx 6 (IL2CPP, win-x64)** do folderu gry — z lokalnego payloadu `payload\bepinex`, a gdy jest pusty,
+1. wykrywa zainstalowaną przez Steam grę **Star Trucker** (`appid 2380050`) - rejestr, `libraryfolders.vdf`, `appmanifest_2380050.acf`, dodatkowe biblioteki Steam,
+2. dokłada **BepInEx 6 (IL2CPP, win-x64)** do folderu gry - z lokalnego payloadu `payload\bepinex`, a gdy jest pusty,
    z [BepInEx Bleeding Edge](https://builds.bepinex.dev/projects/bepinex_be)
-   (stabilne wydania BepInEx 5 obsługują wyłącznie gry Mono — nie potrafią wczytać tego pluginu),
-3. pobiera i rozpakowuje **klienta StarTruckMP** do `BepInEx/plugins/StarTruckMP`,
-4. zapisuje wybrany serwer do `BepInEx/config/StarTruckMP.Client.cfg`,
+   (stabilne wydania BepInEx 5 obsługują wyłącznie gry Mono - nie potrafią wczytać tego pluginu),
+3. pobiera i rozpakowuje **klienta StarTruckerMP** do `BepInEx/plugins/StarTruckerMP`,
+4. zapisuje wybrany serwer do `BepInEx/config/StarTruckerMP.Client.cfg`,
 5. uruchamia grę **przez Steam** (`steam://rungameid/2380050`), dzięki czemu logowanie SteamWorks działa normalnie.
 
 ![Okno launchera](../images/launcher-pl.png)
@@ -20,14 +20,14 @@ gracz uruchamia jeden plik `StarTruckerMP-Setup.exe`, a launcher robi resztę:
 1. Pobierz `StarTruckerMP-Setup.exe` z zakładki [Releases](https://github.com/Kaofan1/StarTruckerMP/releases).
 2. Uruchom instalator. Instaluje się **per-user** (`%LOCALAPPDATA%\StarTruckerMP`), więc nie wymaga uprawnień administratora.
 3. Uruchom **Star Trucker Multiplayer** z menu Start (skrót na pulpicie jest opcjonalny).
-4. Sprawdź, czy launcher poprawnie wykrył grę. Jeśli nie — kliknij **Choose folder…** i wskaż katalog z `Star Trucker.exe`.
+4. Sprawdź, czy launcher poprawnie wykrył grę. Jeśli nie - kliknij **Choose folder…** i wskaż katalog z `Star Trucker.exe`.
 5. Dodaj serwer (**Add**), wpisz nazwę, host i port, zapisz (**Save server**).
 6. Zamknij grę i kliknij **Install / repair mod**. Launcher zawsze pobiera świeżego klienta, więc ten sam przycisk
    naprawia częściową instalację i aktualizuje starą wersję moda. Poczekaj na komunikat „Multiplayer mod is ready.”.
 7. Kliknij **PLAY**. Gra wystartuje przez Steam, a po wejściu do sektora pojawi się overlay i połączenie z serwerem.
 
 > [!NOTE]
-> Pierwsze uruchomienie po instalacji moda trwa dłużej — BepInEx generuje wtedy biblioteki interop dla IL2CPP
+> Pierwsze uruchomienie po instalacji moda trwa dłużej - BepInEx generuje wtedy biblioteki interop dla IL2CPP
 > (katalog `BepInEx\interop`). Jeśli overlay nie pojawi się za pierwszym razem, uruchom grę ponownie.
 > Jeśli w folderze gry był wcześniej BepInEx 5 (Mono), launcher przenosi go do `BepInEx.mono-backup-<data>`
 > zamiast mieszać oba loadery.
@@ -36,7 +36,7 @@ gracz uruchamia jeden plik `StarTruckerMP-Setup.exe`, a launcher robi resztę:
 
 Launcher jest dwujęzyczny. W prawym górnym roku nagłówka znajduje się przycisk z flagą i nazwą
 aktualnie wybranego języka (**🇬🇧 English** lub **🇵🇱 Polski**). Kliknięcie otwiera menu z oba językami,
-a bieżący jest oznaczony ptaszkiem. Wybór jest zapisywany w `%APPDATA%\StarTruckMP\launcher.json`
+a bieżący jest oznaczony ptaszkiem. Wybór jest zapisywany w `%APPDATA%\StarTruckerMP\launcher.json`
 (pole `language`: `en` lub `pl`) i obowiązuje przy kolejnych startach.
 
 Zmiana języka przebudowuje interfejs od razu (launcher otwiera się ponownie w nowym języku),
@@ -46,13 +46,13 @@ pobierania BepInEx) pozostają po angielsku.
 ## Mikrofon
 
 Pola **Mikrofon** nie trzeba już wypełniać ręcznie. Launcher odczytuje listę urządzeń nagrywających
-prosto z Windows (winmm/MME — te same nazwy, które widać w ustawieniach dźwięku) i pokazuje ją
+prosto z Windows (winmm/MME - te same nazwy, które widać w ustawieniach dźwięku) i pokazuje ją
 w rozwijanej liście:
 
-- **Domyślne urządzenie systemowe** — launcher nie zapisuje nazwy, a klient sam wybiera mikrofon
+- **Domyślne urządzenie systemowe** - launcher nie zapisuje nazwy, a klient sam wybiera mikrofon
   (ustawienie domyślne).
-- **nazwa urządzenia** (np. `Mikrofon (HyperX QuadCast 2 S)`) — trafia do `[Audio] MicrophoneDeviceName`
-  w `StarTruckMP.Client.cfg`, więc klient użyje dokładnie tego mikrofonu.
+- **nazwa urządzenia** (np. `Mikrofon (HyperX QuadCast 2 S)`) - trafia do `[Audio] MicrophoneDeviceName`
+  w `StarTruckerMP.Client.cfg`, więc klient użyje dokładnie tego mikrofonu.
 
 Przycisk **Odśwież** odświeża listę po podłączeniu lub odłączeniu mikrofonu w trakcie działania launchera.
 Wybór jest pamiętany w `launcher.json` (pole `microphoneDeviceName`). Jeśli zapisane urządzenie zniknie
@@ -63,7 +63,7 @@ sam przechodzi na domyślne urządzenie.
 
 Przy starcie launcher pyta GitHub Releases o najnowsze wydanie (`alpha-v<N>`) i porównuje je z własną wersją.
 CI buduje launcher jako `1.0.<N>`, więc numer wydania i numer builda są zgodne. Gdy dostępne jest nowsze
-wydanie, pod numerem wersji w nagłówku pojawia się przycisk **Update available · Alpha v0.N** — kliknięcie
+wydanie, pod numerem wersji w nagłówku pojawia się przycisk **Update available · Alpha v0.N** - kliknięcie
 otwiera stronę wydania w przeglądarce. Sprawdzenie jest ciche: brak internetu lub limit GitHub API kończy się
 wpisem w logu (`Update check skipped: …`) i nie blokuje startu ani gry.
 
@@ -72,29 +72,29 @@ wpisem w logu (`Update check skipped: …`) i nie blokuje startu ani gry.
 Launcher nie wymaga BepInEx i nie dotyka folderu gry, dopóki nie klikniesz **Install / repair mod**.
 Bez moda przycisk **PLAY** po prostu uruchamia Star Trucker przez Steam.
 
-BepInEx jest osobnym komponentem (`StarTruckMP.Launcher/Mod/`) z własnym folderem plików:
+BepInEx jest osobnym komponentem (`StarTruckerMP.Launcher/Mod/`) z własnym folderem plików:
 
 | Ścieżka | Zawartość |
 | --- | --- |
 | `%LOCALAPPDATA%\StarTruckerMP\payload\bepinex` | opcjonalny payload offline: rozpakowane pliki BepInEx (`winhttp.dll`, `doorstop_config.ini`, `BepInEx\`, `dotnet\`) albo jeden plik `.zip` |
-| `<gra>\BepInEx` | loader dopiero po instalacji moda — tylko tutaj trafiają pliki BepInEx |
+| `<gra>\BepInEx` | loader dopiero po instalacji moda - tylko tutaj trafiają pliki BepInEx |
 
 Gdy `payload\bepinex` jest pusty, launcher pobiera najnowszy build IL2CPP z builds.bepinex.dev.
 Dzięki temu instalator jest lekki i nie zawiera plików BepInEx, a mimo to działa w pełni offline,
 jeśli włożysz payload do tego folderu.
 
-Nazwa pliku instalatora nie zawiera numeru wersji — zawsze jest to `StarTruckerMP-Setup.exe`.
+Nazwa pliku instalatora nie zawiera numeru wersji - zawsze jest to `StarTruckerMP-Setup.exe`.
 
 ## Co launcher zapisuje i gdzie
 
 | Plik | Znaczenie |
 | --- | --- |
-| `%APPDATA%\StarTruckMP\launcher.json` | lista serwerów, ścieżka do gry, ustawienia startu, język, rozmiar i pozycja okna |
-| `%APPDATA%\StarTruckMP\launcher.log` | log launchera (przydatny przy zgłaszaniu błędów) |
-| `%APPDATA%\StarTruckMP\launcher-crash.log` | zapis wyjątku, jeśli launcher nie wystartuje |
-| `<gra>\BepInEx\config\StarTruckMP.Client.cfg` | adres/port serwera, mikrofon, `IgnoreSslValidation` |
+| `%APPDATA%\StarTruckerMP\launcher.json` | lista serwerów, ścieżka do gry, ustawienia startu, język, rozmiar i pozycja okna |
+| `%APPDATA%\StarTruckerMP\launcher.log` | log launchera (przydatny przy zgłaszaniu błędów) |
+| `%APPDATA%\StarTruckerMP\launcher-crash.log` | zapis wyjątku, jeśli launcher nie wystartuje |
+| `<gra>\BepInEx\config\StarTruckerMP.Client.cfg` | adres/port serwera, mikrofon, `IgnoreSslValidation` |
 
-Launcher nie nadpisuje pozostałych ustawień w pliku `.cfg` — zmienia tylko klucze, którymi zarządza.
+Launcher nie nadpisuje pozostałych ustawień w pliku `.cfg` - zmienia tylko klucze, którymi zarządza.
 
 ## Wymagania
 
@@ -135,14 +135,14 @@ ISCC.exe /DMyAppVersion=1.2.0 installer\StarTruckerMP.iss
 | --- | --- |
 | „Star Trucker was not found” | Kliknij **Choose folder…** i wskaż katalog z `Star Trucker.exe` (np. `…\steamapps\common\Star Trucker`). |
 | Instalacja moda kończy się błędem pobierania | Sprawdź dostęp do `api.github.com`, `github.com` i `builds.bepinex.dev` (proxy/firewall). GitHub API ma limit 60 zapytań na godzinę na adres IP. |
-| Launcher: „BepInEx 5 (Mono) is installed here” | W folderze gry był BepInEx 5, który nie obsługuje IL2CPP. Kliknij **Install / repair mod** — launcher odsunie stary loader i wgra BepInEx 6 IL2CPP. |
+| Launcher: „BepInEx 5 (Mono) is installed here” | W folderze gry był BepInEx 5, który nie obsługuje IL2CPP. Kliknij **Install / repair mod** - launcher odsunie stary loader i wgra BepInEx 6 IL2CPP. |
 | Pierwszy start gry trwa kilka minut | To normalne: BepInEx buduje `BepInEx\interop`. Kolejne starty są szybkie. |
 | Gra startuje, ale nie ma połączenia | Sprawdź port i adres serwera; przy własnym serwerze z certyfikatem self-signed pozostaw włączone **Ignore SSL certificate errors**. |
 | Overlay się nie pojawia | Zamknij grę, kliknij **Install / repair mod** (uzupełni brakujący overlay), sprawdź `BepInEx\LogOutput.log`. |
-| Launcher nie startuje | Zajrzyj do `%APPDATA%\StarTruckMP\launcher-crash.log`. |
+| Launcher nie startuje | Zajrzyj do `%APPDATA%\StarTruckerMP\launcher-crash.log`. |
 
 ## Odinstalowanie
 
-- Instalator usuwa launcher, skróty oraz `%APPDATA%\StarTruckMP`.
+- Instalator usuwa launcher, skróty oraz `%APPDATA%\StarTruckerMP`.
 - Pliki moda w folderze gry usuwa się ręcznie: `winhttp.dll`, `doorstop_config.ini`, `.doorstop_version`, katalog `BepInEx`.
   (Usunięcie `winhttp.dll` wystarcza, żeby gra startowała bez moda.)

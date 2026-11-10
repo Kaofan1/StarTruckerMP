@@ -399,7 +399,7 @@ FodyWeavers.xsd
 # JetBrains Rider
 *.sln.iml
 
-/docs/server-hosting/StarTruckMP-server/
+/docs/server-hosting/StarTruckerMP-server/
 
 # Local tooling / workspace marker
 .freebuff/

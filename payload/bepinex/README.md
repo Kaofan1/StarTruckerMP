@@ -1,6 +1,6 @@
 # BepInEx payload (optional)
 
-Ten folder jest **osobny** od launchera i od pluginu. Launcher instaluje się i działa bez niego —
+Ten folder jest **osobny** od launchera i od pluginu. Launcher instaluje się i działa bez niego -
 BepInEx jest czytany tylko wtedy, gdy klikniesz **Install / repair mod**.
 
 ## Jak używać
@@ -16,7 +16,7 @@ payload/bepinex/
   dotnet/...
 ```
 
-Możesz też wrzucić pojedynczy plik `.zip` z tym buildem — launcher rozpakuje go sam.
+Możesz też wrzucić pojedynczy plik `.zip` z tym buildem - launcher rozpakuje go sam.
 
 Po instalacji launchera ten folder znajduje się w
 `%LOCALAPPDATA%\StarTruckerMP\payload\bepinex`.
@@ -27,4 +27,4 @@ Launcher pobiera najnowszy build IL2CPP z
 [BepInEx Bleeding Edge](https://builds.bepinex.dev/projects/bepinex_be), więc payload jest
 wyłącznie wygodą offline (instalacja bez internetu albo przypięta, znana wersja loadera).
 
-> Pliki BepInEx nie są commitowane do repozytorium — ten folder jest w `.gitignore`.
+> Pliki BepInEx nie są commitowane do repozytorium - ten folder jest w `.gitignore`.

@@ -4,13 +4,13 @@ on:
   push:
     branches: [main]
     paths:
-      - 'StarTruckMP.Client/**'
-      - 'StarTruckMP.Server/**'
-      - 'StarTruckMP.Shared/**'
-      - 'StarTruckMP.Launcher/**'
-      - 'StarTruckMP.Overlay.Browser/**'
-      - 'StarTruckMP.Overlay.Core/**'
-      - 'StarTruckMP.Overlay.Host/**'
+      - 'StarTruckerMP.Client/**'
+      - 'StarTruckerMP.Server/**'
+      - 'StarTruckerMP.Shared/**'
+      - 'StarTruckerMP.Launcher/**'
+      - 'StarTruckerMP.Overlay.Browser/**'
+      - 'StarTruckerMP.Overlay.Core/**'
+      - 'StarTruckerMP.Overlay.Host/**'
       - 'installer/**'
       - '.github/workflows/main.yml'
   workflow_dispatch:
@@ -44,33 +44,33 @@ jobs:
 
       - name: Build overlay-ui
         run: |
-          cd StarTruckMP.Server/overlay-ui
+          cd StarTruckerMP.Server/overlay-ui
           npm ci
           npm run build
 
       - name: Build Overlay Host win x64
-        # StarTruckMP.Client copies the overlay from StarTruckMP.Overlay.Host\bin\...
+        # StarTruckerMP.Client copies the overlay from StarTruckerMP.Overlay.Host\bin\...
         # into the published plugin, so it has to be built first.
         run: |
-          dotnet build StarTruckMP.Overlay.Host/StarTruckMP.Overlay.Host.csproj \
+          dotnet build StarTruckerMP.Overlay.Host/StarTruckerMP.Overlay.Host.csproj \
             -c Release \
             -r win-x64 \
             -p:EnableWindowsTargeting=true
 
       - name: Publish Client win x64
         run: |
-          dotnet publish StarTruckMP.Client/StarTruckMP.Client.csproj \
+          dotnet publish StarTruckerMP.Client/StarTruckerMP.Client.csproj \
             -c Release \
             -r win-x64 \
             -p:EnableWindowsTargeting=true \
             -o ./artifacts/client
 
       - name: Clean Server before win-x64
-        run: rm -rf StarTruckMP.Server/bin StarTruckMP.Server/obj
+        run: rm -rf StarTruckerMP.Server/bin StarTruckerMP.Server/obj
 
       - name: Publish Server win-x64
         run: |
-          dotnet publish StarTruckMP.Server/StarTruckMP.Server.csproj \
+          dotnet publish StarTruckerMP.Server/StarTruckerMP.Server.csproj \
             -c Release \
             -r win-x64 \
             --no-self-contained \
@@ -79,11 +79,11 @@ jobs:
             -o ./artifacts/server-win
 
       - name: Clean Server before linux-x64
-        run: rm -rf StarTruckMP.Server/bin StarTruckMP.Server/obj
+        run: rm -rf StarTruckerMP.Server/bin StarTruckerMP.Server/obj
 
       - name: Publish Server linux-x64
         run: |
-          dotnet publish StarTruckMP.Server/StarTruckMP.Server.csproj \
+          dotnet publish StarTruckerMP.Server/StarTruckerMP.Server.csproj \
             -c Release \
             -r linux-x64 \
             --no-self-contained \
@@ -92,11 +92,11 @@ jobs:
             -o ./artifacts/server-linux
 
       - name: Clean Server before docker publish
-        run: rm -rf StarTruckMP.Server/bin StarTruckMP.Server/obj
+        run: rm -rf StarTruckerMP.Server/bin StarTruckerMP.Server/obj
 
       - name: Publish Server Docker
         run: |
-          dotnet publish StarTruckMP.Server/StarTruckMP.Server.csproj \
+          dotnet publish StarTruckerMP.Server/StarTruckerMP.Server.csproj \
             -c Release \
             --no-self-contained \
             -p:RunSvelteBuild=false \
@@ -105,10 +105,10 @@ jobs:
       - name: Compress artifacts
         run: |
           echo '{}' > ./artifacts/server-docker/settings.json
-          cd ./artifacts/client        && zip -r ../../StarTruckMP-bepinex-plugin-win-x64.zip .   && cd ../..
-          cd ./artifacts/server-win    && zip -r ../../StarTruckMP-server-win-x64.zip .   && cd ../..
-          cd ./artifacts/server-linux  && zip -r ../../StarTruckMP-server-linux-x64.zip . && cd ../..
-          cd ./artifacts/server-docker && zip -r ../../StarTruckMP-server-docker.zip .    && cd ../..
+          cd ./artifacts/client        && zip -r ../../StarTruckerMP-bepinex-plugin-win-x64.zip .   && cd ../..
+          cd ./artifacts/server-win    && zip -r ../../StarTruckerMP-server-win-x64.zip .   && cd ../..
+          cd ./artifacts/server-linux  && zip -r ../../StarTruckerMP-server-linux-x64.zip . && cd ../..
+          cd ./artifacts/server-docker && zip -r ../../StarTruckerMP-server-docker.zip .    && cd ../..
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
@@ -117,10 +117,10 @@ jobs:
           name: "Alpha v0.${{ github.event.inputs.version || github.run_number }}"
           generate_release_notes: true
           files: |
-            StarTruckMP-bepinex-plugin-win-x64.zip
-            StarTruckMP-server-win-x64.zip
-            StarTruckMP-server-linux-x64.zip
-            StarTruckMP-server-docker.zip
+            StarTruckerMP-bepinex-plugin-win-x64.zip
+            StarTruckerMP-server-win-x64.zip
+            StarTruckerMP-server-linux-x64.zip
+            StarTruckerMP-server-docker.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -142,7 +142,7 @@ jobs:
 
       - name: Publish Launcher win-x64 (self-contained)
         run: |
-          dotnet publish StarTruckMP.Launcher/StarTruckMP.Launcher.csproj `
+          dotnet publish StarTruckerMP.Launcher/StarTruckerMP.Launcher.csproj `
             -c Release `
             -r win-x64 `
             -p:Version=1.0.${{ github.event.inputs.version || github.run_number }} `

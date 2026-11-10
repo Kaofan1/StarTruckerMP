@@ -1,4 +1,4 @@
-# StarTruckMP
+# StarTruckerMP
 
 ![Star Trucker Multiplayer launcher](docs/images/banner.png)
 
@@ -17,7 +17,7 @@ so Steam authentication keeps working.
 ![Star Trucker Multiplayer launcher window](docs/images/launcher.png)
 
 1. Download `StarTruckerMP-Setup.exe` from [Releases](https://github.com/Kaofan1/StarTruckerMP/releases)
-2. Run it — it installs per user, no administrator rights required
+2. Run it - it installs per user, no administrator rights required
 3. Open **Star Trucker Multiplayer** from the Start menu
 4. Pick a server, press **Install / repair mod**, then **PLAY**
 
@@ -30,7 +30,7 @@ For the manual installation instructions check out the [Wiki](https://github.com
 > [!NOTE]
 > When the plugin is loaded it will try to authenticate and connect to the server.
 > The launcher writes the server address into the BepInEx config for you; you can also edit
-> `BepInEx/config/StarTruckMP.Client.cfg` by hand.
+> `BepInEx/config/StarTruckerMP.Client.cfg` by hand.
 
 https://github.com/user-attachments/assets/3bb23b56-a32f-426d-af84-c9c058741ef4
 
@@ -41,7 +41,7 @@ https://github.com/user-attachments/assets/3bb23b56-a32f-426d-af84-c9c058741ef4
 
 1. Download latest build of the Server
 2. Install [.NET 10.0 Runtime](https://dotnet.microsoft.com/download/dotnet/10.0)
-2. Run the `StarTruckMP.Server.exe`!
+2. Run the `StarTruckerMP.Server.exe`!
 
 > [!NOTE]
 > Check the [server hosting wiki](https://github.com/Kaofan1/StarTruckerMP/wiki/%F0%9F%8C%90-Server-hosting)
@@ -63,7 +63,7 @@ build-installer-winx64.cmd
 
 > [!NOTE]
 > The launcher and installer are built on a GitHub-hosted Windows runner. Building the client and
-> server additionally requires a self-hosted runner with the game interop DLLs — see
+> server additionally requires a self-hosted runner with the game interop DLLs - see
 > [docs/ci/self-hosted-runner.md](docs/ci/self-hosted-runner.md) (Polish).
 
 # Credits

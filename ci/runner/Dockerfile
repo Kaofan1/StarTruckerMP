@@ -40,7 +40,7 @@ RUN curl -fsSL https://dot.net/v1/dotnet-install.sh -o /tmp/dotnet-install.sh \
     && rm -f /tmp/dotnet-install.sh \
     && ln -sf "${DOTNET_ROOT}/dotnet" /usr/local/bin/dotnet
 
-# Node.js 20 - `npm ci` in StarTruckMP.Server/overlay-ui.
+# Node.js 20 - `npm ci` in StarTruckerMP.Server/overlay-ui.
 RUN curl -fsSLO "https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-x64.tar.xz" \
     && tar -xJf "node-v${NODE_VERSION}-linux-x64.tar.xz" -C /usr/local --strip-components=1 \
     && rm -f "node-v${NODE_VERSION}-linux-x64.tar.xz"

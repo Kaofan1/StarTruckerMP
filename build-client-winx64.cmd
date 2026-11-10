@@ -1,11 +1,11 @@
-﻿dotnet publish StarTruckMP.Client/StarTruckMP.Client.csproj ^
+﻿dotnet publish StarTruckerMP.Client/StarTruckerMP.Client.csproj ^
     -c Debug ^
     -r win-x64 ^
     -p:EnableWindowsTargeting=true ^
-    -o "%StarTruckBepInEx%/plugins/StarTruckMP"
+    -o "%StarTruckBepInEx%/plugins/StarTruckerMP"
 
-dotnet publish StarTruckMP.Client/StarTruckMP.Client.csproj ^
+dotnet publish StarTruckerMP.Client/StarTruckerMP.Client.csproj ^
     -c Debug ^
     -r win-x64 ^
     -p:EnableWindowsTargeting=true ^
-    -o "%StarTruckBepInExSteam%/plugins/StarTruckMP"
+    -o "%StarTruckBepInExSteam%/plugins/StarTruckerMP"

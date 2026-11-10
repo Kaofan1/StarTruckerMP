@@ -5,7 +5,7 @@ set "ROOT=%~dp0"
 set "OUT=%ROOT%artifacts\launcher"
 
 echo Publishing StarTruckerMP launcher (win-x64, self-contained)...
-dotnet publish "%ROOT%StarTruckMP.Launcher\StarTruckMP.Launcher.csproj" ^
+dotnet publish "%ROOT%StarTruckerMP.Launcher\StarTruckerMP.Launcher.csproj" ^
     -c Release ^
     -r win-x64 ^
     --self-contained true ^

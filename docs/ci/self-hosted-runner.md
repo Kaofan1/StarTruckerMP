@@ -7,7 +7,7 @@ Workflow `.github/workflows/main.yml` ma dwa joby:
 | `launcher` | `windows-latest` (hostowany przez GitHub) | launcher + `StarTruckerMP-Setup.exe` → release |
 | `build` | `self-hosted, docker, dotnet10` | klient BepInEx, overlay, serwer (win / linux / docker) → release |
 
-Job `launcher` nie potrzebuje żadnej infrastruktury — działa zawsze.
+Job `launcher` nie potrzebuje żadnej infrastruktury - działa zawsze.
 
 Job `build` jest **opt-in**. Uruchomi się tylko wtedy, gdy jednocześnie:
 
@@ -18,13 +18,13 @@ Bez tego job jest pomijany (`skipped`), a release zawiera wyłącznie launcher i
 
 ## Dlaczego potrzebny jest osobny runner
 
-`StarTruckMP.Client` kompiluje się przeciwko plikom wyciągniętym z gry (`Assembly-CSharp.dll`,
+`StarTruckerMP.Client` kompiluje się przeciwko plikom wyciągniętym z gry (`Assembly-CSharp.dll`,
 `UnityEngine.*`, `Il2Cppmscorlib.dll` itd.), których nie ma i nie może być w repozytorium.
 Job oczekuje ich pod ścieżką `/dlls`:
 
-- `/dlls/core` — `0Harmony.dll`, `BepInEx.Core.dll`, `BepInEx.Preloader.Core.dll`,
+- `/dlls/core` - `0Harmony.dll`, `BepInEx.Core.dll`, `BepInEx.Preloader.Core.dll`,
   `BepInEx.Unity.Common.dll`, `BepInEx.Unity.IL2CPP.dll`, `Il2CppInterop.Runtime.dll`
-- `/dlls/interop` — `Assembly-CSharp.dll`, `Il2Cppmscorlib.dll`, `UnityEngine.dll`,
+- `/dlls/interop` - `Assembly-CSharp.dll`, `Il2Cppmscorlib.dll`, `UnityEngine.dll`,
   `UnityEngine.CoreModule.dll`, `UnityEngine.AudioModule.dll`, `UnityEngine.UI.dll`,
   `UnityEngine.UIModule.dll`, `UnityEngine.UIElementsModule.dll`,
   `UnityEngine.UIElementsNativeModule.dll`, `UnityEngine.AssetBundleModule.dll`,
@@ -70,13 +70,13 @@ Bez `gh` podaj token ręcznie (jednorazowy, ważny około godziny):
 RUNNER_TOKEN=<token> ./ci/runner/install-runner.sh --dlls /srv/startrucker/dlls --no-variable
 ```
 
-Po `--down` trzeba wygenerować nowy token — rejestracja jest jednorazowa. Poniższe kroki 1–3
+Po `--down` trzeba wygenerować nowy token - rejestracja jest jednorazowa. Poniższe kroki 1–3
 opisują wariant ręczny, bez Dockera na hoście.
 
 ## 1. Rejestracja runnera (wariant ręczny)
 
 GitHub → repozytorium → **Settings → Actions → Runners → New self-hosted runner → Linux X64**.
-GitHub pokaże komendy z aktualną wersją runnera — skopiuj je; poniżej ich odpowiednik:
+GitHub pokaże komendy z aktualną wersją runnera - skopiuj je; poniżej ich odpowiednik:
 
 ```bash
 mkdir -p ~/actions-runner && cd ~/actions-runner
@@ -190,7 +190,7 @@ gh variable list --repo Kaofan1/StarTruckerMP
 
 Uwagi:
 
-- to **zmienna**, nie sekret — wartość jest widoczna w logach i w UI, i tak ma być;
+- to **zmienna**, nie sekret - wartość jest widoczna w logach i w UI, i tak ma być;
 - zmiana działa od następnego uruchomienia workflow, bez commita;
 - ustawienie `true` bez zarejestrowanego runnera przywraca stary objaw: job wisi w `queued`
   i blokuje zakończenie całego przebiegu. Wtedy albo podłącz runner, albo ustaw `false`.
@@ -204,7 +204,7 @@ gh variable set ENABLE_SELF_HOSTED_BUILD --repo Kaofan1/StarTruckerMP --body fal
 ## 5. Environment `production`
 
 Job `build` ma `environment: production`. Jeśli w Settings → **Environments** nie ma takiego
-środowiska, utwórz je (New environment → `production`). Możesz dodać required reviewers —
+środowiska, utwórz je (New environment → `production`). Możesz dodać required reviewers -
 wtedy każde wydanie serwera będzie czekać na zatwierdzenie.
 
 Jeśli nie chcesz żadnej bramki, usuń linię `environment: production` z `main.yml`.
@@ -252,4 +252,4 @@ gh release view alpha-v<N> --repo Kaofan1/StarTruckerMP
 
 Runner zarejestrowany na poziomie repozytorium wykonuje kod z tego repozytorium na Twojej
 maszynie. Nie zmieniaj workflow tak, aby uruchamiał self-hosted joby na kodzie z pull requestów
-z forków — wtedy niepowołany kod może trafić na hosta z dostępem do `/dlls` i sieci.
+z forków - wtedy niepowołany kod może trafić na hosta z dostępem do `/dlls` i sieci.
