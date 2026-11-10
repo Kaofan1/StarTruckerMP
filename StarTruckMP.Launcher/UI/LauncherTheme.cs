@@ -129,7 +129,7 @@ internal static class LauncherTheme
             Grid.SetColumn(noteText, 1);
         }
 
-        var content = new StackPanel { Spacing = 12 };
+        var content = new StackPanel { Spacing = 10 };
         content.Children.Add(heading);
         content.Children.Add(new Border { Height = 1, Background = EdgeBrush, Margin = new Thickness(0, 1) });
 
@@ -142,7 +142,7 @@ internal static class LauncherTheme
             BorderBrush = EdgeBrush,
             BorderThickness = new Thickness(1),
             CornerRadius = new CornerRadius(12),
-            Padding = new Thickness(18, 16),
+            Padding = new Thickness(16, 14),
             Child = content
         };
     }

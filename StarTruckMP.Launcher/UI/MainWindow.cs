@@ -85,7 +85,7 @@ internal sealed class MainWindow : Window
         TextWrapping = TextWrapping.Wrap,
         FontFamily = LauncherTheme.MonoFont,
         FontSize = 11.5,
-        Height = 150,
+        Height = 110,
         Background = LauncherTheme.FieldBrush,
         Foreground = LauncherTheme.LogBrush,
         BorderBrush = LauncherTheme.EdgeBrush,
@@ -188,10 +188,10 @@ internal sealed class MainWindow : Window
         _installer = new ModInstaller(_log);
 
         Title = "Star Trucker Multiplayer";
-        Width = 1080;
-        Height = 840;
-        MinWidth = 900;
-        MinHeight = 720;
+        Width = 1120;
+        Height = 1000;
+        MinWidth = 940;
+        MinHeight = 760;
         WindowStartupLocation = WindowStartupLocation.CenterScreen;
         Background = LauncherTheme.SpaceBrush;
 
@@ -226,6 +226,7 @@ internal sealed class MainWindow : Window
         _log.LineWritten += OnLogLine;
         Opened += (_, _) =>
         {
+            FitToWorkingArea();
             DetectGame();
             _ = CheckForUpdatesAsync();
         };
@@ -440,11 +441,19 @@ internal sealed class MainWindow : Window
             Children = { _detectButton, _browseButton }
         };
 
+        // Path and buttons share one row so the card stays short enough to fit the window.
+        actions.VerticalAlignment = VerticalAlignment.Center;
+        actions.Margin = new Thickness(12, 0, 0, 0);
+
+        var pathRow = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto") };
+        pathRow.Children.Add(_gamePathText);
+        pathRow.Children.Add(actions);
+        Grid.SetColumn(actions, 1);
+
         return LauncherTheme.Card(
             Strings.CardGame,
             "Steam · appid 2380050",
-            _gamePathText,
-            actions,
+            pathRow,
             LauncherTheme.Caption(Strings.GameCaption));
     }
 
@@ -460,14 +469,29 @@ internal sealed class MainWindow : Window
         Grid.SetColumn(_addServerButton, 1);
         Grid.SetColumn(_removeServerButton, 2);
 
+        // Name and host sit side by side, and the port keeps the save button company:
+        // three short rows instead of five keep the card inside the window height.
+        var nameHostRow = new Grid { ColumnDefinitions = new ColumnDefinitions("*,*") };
+        nameHostRow.Children.Add(LauncherTheme.Field(Strings.FieldName, _nameBox));
+
+        var hostField = LauncherTheme.Field(Strings.FieldHost, _addressBox);
+        hostField.Margin = new Thickness(12, 0, 0, 0);
+        nameHostRow.Children.Add(hostField);
+        Grid.SetColumn(hostField, 1);
+
+        var portRow = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*") };
+        portRow.Children.Add(LauncherTheme.Field(Strings.FieldPort, _portBox));
+
+        _applyServerButton.Margin = new Thickness(12, 0, 0, 0);
+        portRow.Children.Add(_applyServerButton);
+        Grid.SetColumn(_applyServerButton, 1);
+
         return LauncherTheme.Card(
             Strings.CardServers,
             null,
             toolbar,
-            LauncherTheme.Field(Strings.FieldName, _nameBox),
-            LauncherTheme.Field(Strings.FieldHost, _addressBox),
-            LauncherTheme.Field(Strings.FieldPort, _portBox),
-            _applyServerButton,
+            nameHostRow,
+            portRow,
             LauncherTheme.Caption(Strings.ServerCaption));
     }
 
@@ -619,6 +643,39 @@ internal sealed class MainWindow : Window
         {
             SetBusy(false, string.Empty);
             RefreshModState();
+        }
+    }
+
+    /// <summary>
+    /// The window is sized for the full dashboard; on a screen with a smaller work area it
+    /// shrinks to fit instead of hanging off the desktop, and the columns scroll again.
+    /// </summary>
+    private void FitToWorkingArea()
+    {
+        try
+        {
+            var screen = Screens.ScreenFromWindow(this) ?? Screens.Primary;
+            if (screen is null)
+                return;
+
+            var scale = RenderScaling;
+            var area = screen.WorkingArea;
+            var available = area.Height / scale;
+
+            if (Height > available - 40)
+                Height = Math.Max(MinHeight, available - 40);
+
+            // Keep the title bar reachable when the window is as tall as the work area.
+            var physicalHeight = (int)Math.Round(Height * scale);
+            var maxTop = area.Y + area.Height - physicalHeight - 4;
+            var top = Math.Max(area.Y, Math.Min(Position.Y, maxTop));
+
+            if (top != Position.Y)
+                Position = new PixelPoint(Position.X, top);
+        }
+        catch
+        {
+            // Screen information is best effort; the fixed size is a safe fallback.
         }
     }
 
