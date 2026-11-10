@@ -1,5 +1,7 @@
 # Star Trucker Multiplayer — launcher i instalator
 
+![Launcher Star Trucker Multiplayer](../images/banner.png)
+
 Launcher jest teraz głównym sposobem instalacji moda. Zamiast ręcznego kopiowania BepInEx i pluginu,
 gracz uruchamia jeden plik `StarTruckerMP-Setup.exe`, a launcher robi resztę:
 
@@ -10,6 +12,8 @@ gracz uruchamia jeden plik `StarTruckerMP-Setup.exe`, a launcher robi resztę:
 3. pobiera i rozpakowuje **klienta StarTruckMP** do `BepInEx/plugins/StarTruckMP`,
 4. zapisuje wybrany serwer do `BepInEx/config/StarTruckMP.Client.cfg`,
 5. uruchamia grę **przez Steam** (`steam://rungameid/2380050`), dzięki czemu logowanie SteamWorks działa normalnie.
+
+![Okno launchera](../images/launcher-pl.png)
 
 ## Instalacja dla gracza
 
