@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.RegularExpressions;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
@@ -72,6 +73,34 @@ internal sealed class MainWindow : Window
         "Update available",
         ActionVariant.Ghost,
         stretch: false);
+
+    private readonly TextBlock _updateTitleText = new()
+    {
+        TextWrapping = TextWrapping.Wrap,
+        FontSize = 14,
+        FontFamily = LauncherTheme.DisplayFont,
+        FontWeight = FontWeight.SemiBold,
+        Foreground = LauncherTheme.TextBrush
+    };
+
+    private readonly TextBlock _updateNotesText = new()
+    {
+        TextWrapping = TextWrapping.Wrap,
+        FontSize = 12,
+        Foreground = LauncherTheme.MutedBrush
+    };
+
+    private readonly Button _updateNowButton = LauncherTheme.MakeButton(
+        "Update now",
+        ActionVariant.Primary,
+        stretch: false);
+
+    private readonly Button _releasePageButton = LauncherTheme.MakeButton(
+        "Release page",
+        ActionVariant.Ghost,
+        stretch: false);
+
+    private Border? _updateCard;
 
     private readonly Button _languageButton = LauncherTheme.MakeButton(
         "English",
@@ -427,6 +456,7 @@ internal sealed class MainWindow : Window
             Margin = new Thickness(12, 0, 0, 0),
             Children =
             {
+                BuildUpdateCard(),
                 BuildConnectCard(),
                 BuildModCard(),
                 BuildLoaderCard(),
@@ -543,6 +573,39 @@ internal sealed class MainWindow : Window
             LauncherTheme.Field(Strings.FieldMicrophone, microphoneRow));
     }
 
+    /// <summary>
+    /// Release notes for the pending update. The card stays hidden until a newer build
+    /// is found, so the column keeps its normal height when the launcher is current.
+    /// </summary>
+    private Control BuildUpdateCard()
+    {
+        var notes = new ScrollViewer
+        {
+            Content = _updateNotesText,
+            MaxHeight = 132,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled
+        };
+
+        var actions = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto") };
+        actions.Children.Add(_updateNowButton);
+        _releasePageButton.Margin = new Thickness(8, 0, 0, 0);
+        actions.Children.Add(_releasePageButton);
+        Grid.SetColumn(_releasePageButton, 1);
+
+        var card = LauncherTheme.Card(
+            Strings.CardUpdate,
+            null,
+            _updateTitleText,
+            notes,
+            actions,
+            LauncherTheme.Caption(Strings.UpdateNotesCaption));
+
+        card.IsVisible = false;
+        _updateCard = card;
+        return card;
+    }
+
     private Control BuildConnectCard()
     {
         return LauncherTheme.Card(
@@ -610,6 +673,8 @@ internal sealed class MainWindow : Window
         _refreshMicrophoneButton.Click += (_, _) => RefreshMicrophoneList();
         _installButton.Click += async (_, _) => await InstallModAsync();
         _installLoaderButton.Click += async (_, _) => await InstallLoaderAsync();
+        _updateNowButton.Click += async (_, _) => await UpdateLauncherAsync();
+        _releasePageButton.Click += (_, _) => OpenUpdatePage();
         _playButton.Click += async (_, _) => await PlayAsync();
         _openGameFolderButton.Click += (_, _) => OpenPath(_install?.Path);
         _openConfigButton.Click += (_, _) => OpenPath(_install is null ? null : PluginConfigWriter.GetConfigPath(_install.Path));
@@ -983,6 +1048,9 @@ internal sealed class MainWindow : Window
                 _pendingUpdate = null;
                 _updateButton.IsVisible = false;
 
+                if (_updateCard is not null)
+                    _updateCard.IsVisible = false;
+
                 if (logUpToDate)
                     _log.Log(Strings.UpToDate(UpdateChecker.CurrentVersion.ToString(3)));
 
@@ -995,6 +1063,12 @@ internal sealed class MainWindow : Window
             _updateButton.IsVisible = true;
             _updateButton.IsEnabled = !_busy;
 
+            _updateTitleText.Text = update.Name;
+            _updateNotesText.Text = FormatNotes(update.Notes);
+
+            if (_updateCard is not null)
+                _updateCard.IsVisible = true;
+
             if (logUpToDate)
                 _log.Log(Strings.UpdateFound(update.Name, update.Tag, update.PageUrl));
         }
@@ -1004,6 +1078,49 @@ internal sealed class MainWindow : Window
             if (logUpToDate)
                 _log.Log(Strings.UpdateCheckSkipped(exception.Message));
         }
+    }
+
+    /// <summary>
+    /// GitHub writes the release notes as Markdown with author and commit links. The card
+    /// has one narrow column, so headings, bullets and links are reduced to plain lines.
+    /// </summary>
+    private static string FormatNotes(string? notes)
+    {
+        if (string.IsNullOrWhiteSpace(notes))
+            return Strings.UpdateNoNotes;
+
+        var lines = new List<string>();
+
+        foreach (var raw in notes.Replace("\r\n", "\n").Split('\n'))
+        {
+            var line = raw.Trim();
+
+            if (line.StartsWith("## ", StringComparison.Ordinal) || line.StartsWith("### ", StringComparison.Ordinal))
+                line = line.TrimStart('#').Trim();
+            else if (line.StartsWith("* ", StringComparison.Ordinal) || line.StartsWith("- ", StringComparison.Ordinal))
+                line = "• " + line[2..].Trim();
+
+            line = line.Replace("**", string.Empty).Replace("`", string.Empty);
+
+            // Generated notes end each entry with "by @author in <commit url>" - useless here.
+            line = Regex.Replace(line, @"\s+by\s+@\S+\s+in\s+https?://\S+$", string.Empty).Trim();
+
+            // GitHub's own "Full Changelog" line points at this repository, so only the tags stay.
+            line = Regex.Replace(line, @"^Full Changelog:\s*", Strings.UpdateCompareLabel + " ", RegexOptions.IgnoreCase);
+            line = line.Replace("https://github.com/Kaofan1/StarTruckerMP/compare/", string.Empty)
+                .Replace("https://github.com/Kaofan1/StarTruckerMP/", string.Empty)
+                .Replace("https://github.com/", string.Empty)
+                .Trim();
+
+            if (line.Length > 0)
+                lines.Add(line);
+        }
+
+        var text = string.Join(Environment.NewLine, lines);
+        if (text.Length == 0)
+            return Strings.UpdateNoNotes;
+
+        return text.Length > 1200 ? text[..1200].TrimEnd() + "…" : text;
     }
 
     /// <summary>

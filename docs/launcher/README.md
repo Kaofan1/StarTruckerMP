@@ -65,7 +65,9 @@ sam przechodzi na domyślne urządzenie.
 
 Przy starcie launcher pyta GitHub Releases o najnowsze wydanie (`alpha-v<N>`) i porównuje je z własną wersją.
 CI buduje launcher jako `1.0.<N>`, więc numer wydania i numer builda są zgodne. Gdy dostępne jest nowsze
-wydanie, pod numerem wersji w nagłówku pojawia się przycisk **Dostępna aktualizacja · Alpha v0.N**.
+wydanie, pod numerem wersji w nagłówku pojawia się przycisk **Dostępna aktualizacja · Alpha v0.N**,
+a w prawej kolumnie karta **NOWA WERSJA** z listą zmian przepisaną z opisu wydania na GitHubie
+(nagłówki, punkty i linki do commitów są skrócone, żeby zmieściły się w wąskiej kolumnie).
 
 Kliknięcie tego przycisku aktualizuje launcher bez odwiedzania GitHuba: launcher pobiera paczkę
 `StarTruckerMP-Launcher-win-x64.zip` (postęp widać w pasku statusu i w logu), zamyka się, podmienia własne

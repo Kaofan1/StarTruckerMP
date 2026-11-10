@@ -13,7 +13,8 @@ internal sealed record LauncherUpdate(
     int Number,
     string PageUrl,
     string? PortableUrl,
-    string? InstallerUrl);
+    string? InstallerUrl,
+    string? Notes);
 
 /// <summary>
 /// Checks GitHub releases for a newer launcher build. CI stamps the launcher assembly as
@@ -81,6 +82,7 @@ internal static class UpdateChecker
             var pageUrl = release.TryGetProperty("html_url", out var urlElement) ? urlElement.GetString() : null;
 
             var (portableUrl, installerUrl) = ReadAssetUrls(release);
+            var notes = release.TryGetProperty("body", out var bodyElement) ? bodyElement.GetString() : null;
 
             newest = new LauncherUpdate(
                 tag,
@@ -88,7 +90,8 @@ internal static class UpdateChecker
                 number,
                 string.IsNullOrWhiteSpace(pageUrl) ? ReleasesPageUrl : pageUrl,
                 portableUrl,
-                installerUrl);
+                installerUrl,
+                notes);
         }
 
         return newest;

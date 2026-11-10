@@ -280,6 +280,20 @@ internal static class Strings
         T($"A newer launcher is available: {name} ({tag}). Download: {url}",
             $"Dostępny jest nowszy launcher: {name} ({tag}). Pobierz: {url}");
 
+    public static string CardUpdate => T("NEW RELEASE", "NOWA WERSJA");
+
+    public static string UpdateNow => T("Update now", "Zaktualizuj teraz");
+
+    public static string ReleasePage => T("Release page", "Strona wydania");
+
+    public static string UpdateNoNotes =>
+        T("This release has no changelog.", "To wydanie nie ma listy zmian.");
+
+    public static string UpdateCompareLabel => T("Changes:", "Zmiany:");
+
+    public static string UpdateNotesCaption =>
+        T("Changelog from the GitHub release.", "Lista zmian pochodzi z opisu wydania na GitHubie.");
+
     public static string UpdateHint =>
         T("Download and install this update now", "Pobierz i zainstaluj tę aktualizację teraz");
 

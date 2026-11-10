@@ -67,7 +67,9 @@ back to the default device when it cannot match the name.
 
 On startup the launcher asks GitHub Releases for the latest build (`alpha-v<N>`) and compares it with its own
 version. CI builds the launcher as `1.0.<N>`, so the release number and the build number match. When a newer
-release exists, an **Update available · Alpha v0.N** button appears under the version in the header.
+release exists, an **Update available · Alpha v0.N** button appears under the version in the header and a
+**NEW RELEASE** card in the right column shows the changelog taken from the GitHub release description
+(headings, bullets and commit links are shortened to fit the narrow column).
 
 Clicking that button updates the launcher without visiting GitHub: it downloads
 `StarTruckerMP-Launcher-win-x64.zip` (progress shows in the status pill and the log), closes itself, swaps its
