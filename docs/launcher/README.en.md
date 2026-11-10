@@ -67,9 +67,17 @@ back to the default device when it cannot match the name.
 
 On startup the launcher asks GitHub Releases for the latest build (`alpha-v<N>`) and compares it with its own
 version. CI builds the launcher as `1.0.<N>`, so the release number and the build number match. When a newer
-release exists, an **Update available · Alpha v0.N** button appears under the version in the header - clicking
-it opens the release page in the browser. The check is silent: no internet or a GitHub API rate limit only adds
-a line to the log (`Update check skipped: …`) and never blocks the launcher or the game.
+release exists, an **Update available · Alpha v0.N** button appears under the version in the header.
+
+Clicking that button updates the launcher without visiting GitHub: it downloads
+`StarTruckerMP-Launcher-win-x64.zip` (progress shows in the status pill and the log), closes itself, swaps its
+own files in the background and starts the new build. When the launcher folder is not writable (for example a
+machine-wide install), the portable zip is replaced by `StarTruckerMP-Setup.exe` running silently
+(`/SILENT`), which also swaps the files after the window closed.
+
+The check repeats every 5 minutes while the window is open, so a new release shows up without closing and
+reopening the launcher. The check is silent: no internet or a GitHub API rate limit only adds a line to the log
+(`Update check skipped: …`) and never blocks the launcher or the game.
 
 ## The launcher works on its own, BepInEx is optional
 

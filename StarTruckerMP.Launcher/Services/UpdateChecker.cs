@@ -7,7 +7,13 @@ using System.Threading.Tasks;
 namespace StarTruckerMP.Launcher.Services;
 
 /// <summary>A newer launcher release found on GitHub.</summary>
-internal sealed record LauncherUpdate(string Tag, string Name, int Number, string PageUrl);
+internal sealed record LauncherUpdate(
+    string Tag,
+    string Name,
+    int Number,
+    string PageUrl,
+    string? PortableUrl,
+    string? InstallerUrl);
 
 /// <summary>
 /// Checks GitHub releases for a newer launcher build. CI stamps the launcher assembly as
@@ -18,6 +24,12 @@ internal sealed record LauncherUpdate(string Tag, string Name, int Number, strin
 internal static class UpdateChecker
 {
     public const string ReleasesPageUrl = "https://github.com/Kaofan1/StarTruckerMP/releases";
+
+    /// <summary>Asset with the portable launcher, used for an in-place update.</summary>
+    public const string PortableAssetName = "StarTruckerMP-Launcher-win-x64.zip";
+
+    /// <summary>Fallback asset when the launcher folder cannot be written in place.</summary>
+    public const string InstallerAssetName = "StarTruckerMP-Setup.exe";
 
     private const string RequestUri = "https://api.github.com/repos/Kaofan1/StarTruckerMP/releases?per_page=30";
 
@@ -68,13 +80,42 @@ internal static class UpdateChecker
             var name = release.TryGetProperty("name", out var nameElement) ? nameElement.GetString() : null;
             var pageUrl = release.TryGetProperty("html_url", out var urlElement) ? urlElement.GetString() : null;
 
+            var (portableUrl, installerUrl) = ReadAssetUrls(release);
+
             newest = new LauncherUpdate(
                 tag,
                 string.IsNullOrWhiteSpace(name) ? tag : name,
                 number,
-                string.IsNullOrWhiteSpace(pageUrl) ? ReleasesPageUrl : pageUrl);
+                string.IsNullOrWhiteSpace(pageUrl) ? ReleasesPageUrl : pageUrl,
+                portableUrl,
+                installerUrl);
         }
 
         return newest;
+    }
+
+    private static (string? Portable, string? Installer) ReadAssetUrls(JsonElement release)
+    {
+        if (!release.TryGetProperty("assets", out var assets) || assets.ValueKind != JsonValueKind.Array)
+            return (null, null);
+
+        string? portable = null;
+        string? installer = null;
+
+        foreach (var asset in assets.EnumerateArray())
+        {
+            var name = asset.TryGetProperty("name", out var nameElement) ? nameElement.GetString() : null;
+            var url = asset.TryGetProperty("browser_download_url", out var urlElement) ? urlElement.GetString() : null;
+
+            if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(url))
+                continue;
+
+            if (string.Equals(name, PortableAssetName, StringComparison.OrdinalIgnoreCase))
+                portable = url;
+            else if (string.Equals(name, InstallerAssetName, StringComparison.OrdinalIgnoreCase))
+                installer = url;
+        }
+
+        return (portable, installer);
     }
 }

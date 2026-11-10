@@ -26,6 +26,8 @@ internal sealed class MainWindow : Window
     private GameInstall? _install;
     private bool _busy;
     private bool _refreshingServerList;
+    private LauncherUpdate? _pendingUpdate;
+    private readonly DispatcherTimer _updateTimer = new() { Interval = TimeSpan.FromMinutes(5) };
 
     private Border? _statusDot;
 
@@ -239,7 +241,8 @@ internal sealed class MainWindow : Window
         _updateButton.Margin = new Thickness(0, 2, 0, 0);
         _updateButton.FontSize = 11.5;
         _updateButton.Foreground = LauncherTheme.AmberBrush;
-        _updateButton.Click += (_, _) => OpenUpdatePage();
+        _updateButton.Click += (_, _) => _ = UpdateLauncherAsync();
+        ToolTip.SetTip(_updateButton, Strings.UpdateHint);
 
         _languageButton.HorizontalAlignment = HorizontalAlignment.Right;
         _languageButton.Margin = new Thickness(0, 0, 0, 2);
@@ -248,14 +251,24 @@ internal sealed class MainWindow : Window
         _log.Log(Strings.LanguageActive(Strings.Current));
 
         _log.LineWritten += OnLogLine;
+
+        // The release list is polled while the window is open, so a new build shows up
+        // without closing and reopening the launcher.
+        _updateTimer.Tick += (_, _) => _ = CheckForUpdatesAsync(logUpToDate: false);
+
         Opened += (_, _) =>
         {
             RestoreSavedPosition();
             FitToWorkingArea();
             DetectGame();
             _ = CheckForUpdatesAsync();
+            _updateTimer.Start();
         };
-        Closing += (_, _) => SaveSettings();
+        Closing += (_, _) =>
+        {
+            _updateTimer.Stop();
+            SaveSettings();
+        };
     }
 
     private static TextBlock Wrap(string text) => new()
@@ -955,27 +968,79 @@ internal sealed class MainWindow : Window
         Close();
     }
 
-    private async System.Threading.Tasks.Task CheckForUpdatesAsync()
+    private async System.Threading.Tasks.Task CheckForUpdatesAsync(bool logUpToDate = true)
     {
+        // Installing the mod or updating the launcher keeps the network and the log to itself.
+        if (_busy)
+            return;
+
         try
         {
             var update = await UpdateChecker.FindUpdateAsync(System.Threading.CancellationToken.None);
 
             if (update is null)
             {
-                _log.Log(Strings.UpToDate(UpdateChecker.CurrentVersion.ToString(3)));
+                _pendingUpdate = null;
+                _updateButton.IsVisible = false;
+
+                if (logUpToDate)
+                    _log.Log(Strings.UpToDate(UpdateChecker.CurrentVersion.ToString(3)));
+
                 return;
             }
 
+            _pendingUpdate = update;
             _updateButton.Tag = update.PageUrl;
             _updateButton.Content = Strings.UpdateAvailable(update.Name);
             _updateButton.IsVisible = true;
-            _log.Log(Strings.UpdateFound(update.Name, update.Tag, update.PageUrl));
+            _updateButton.IsEnabled = !_busy;
+
+            if (logUpToDate)
+                _log.Log(Strings.UpdateFound(update.Name, update.Tag, update.PageUrl));
         }
         catch (Exception exception)
         {
             // A failed update check must never get in the way of launching the game.
-            _log.Log(Strings.UpdateCheckSkipped(exception.Message));
+            if (logUpToDate)
+                _log.Log(Strings.UpdateCheckSkipped(exception.Message));
+        }
+    }
+
+    /// <summary>
+    /// Clicks on the update banner download the release and let a helper replace the
+    /// launcher files after this window closes, so the new build starts on its own.
+    /// </summary>
+    private async System.Threading.Tasks.Task UpdateLauncherAsync()
+    {
+        if (_pendingUpdate is null)
+        {
+            OpenUpdatePage();
+            return;
+        }
+
+        if (_busy)
+            return;
+
+        var update = _pendingUpdate;
+        SetBusy(true, Strings.UpdateDownloading(update.Name));
+        _updateButton.IsEnabled = false;
+
+        try
+        {
+            await LauncherUpdater.StageAsync(update, new Progress<string>(_log.Log), System.Threading.CancellationToken.None);
+
+            _log.Log(Strings.UpdateReady(update.Name));
+            SetBusy(false, Strings.UpdateReady(update.Name));
+
+            // Give the helper a moment to arm itself before the files get unlocked.
+            await System.Threading.Tasks.Task.Delay(900);
+            Close();
+        }
+        catch (Exception exception)
+        {
+            _log.Log(Strings.UpdateFailed(exception.Message));
+            SetBusy(false, string.Empty);
+            _updateButton.IsEnabled = true;
         }
     }
 
@@ -1052,6 +1117,8 @@ internal sealed class MainWindow : Window
 
     private void RefreshModState()
     {
+        _updateButton.IsEnabled = !_busy && _pendingUpdate is not null;
+
         if (_install is null)
         {
             _modStatusText.Text = Strings.ModUnknown;
@@ -1258,6 +1325,7 @@ internal sealed class MainWindow : Window
         _playButton.IsEnabled = !busy && _install is not null;
         _detectButton.IsEnabled = !busy;
         _browseButton.IsEnabled = !busy;
+        _updateButton.IsEnabled = !busy && _pendingUpdate is not null;
     }
 
     private void OnLogLine(string line)

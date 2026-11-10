@@ -280,6 +280,26 @@ internal static class Strings
         T($"A newer launcher is available: {name} ({tag}). Download: {url}",
             $"Dostępny jest nowszy launcher: {name} ({tag}). Pobierz: {url}");
 
+    public static string UpdateHint =>
+        T("Download and install this update now", "Pobierz i zainstaluj tę aktualizację teraz");
+
+    public static string UpdateDownloading(string release) =>
+        T($"Downloading {release}…", $"Pobieram {release}…");
+
+    public static string UpdateReady(string release) =>
+        T($"{release} is downloaded - the launcher restarts itself in a moment.",
+            $"{release} jest pobrany - launcher uruchomi się ponownie za chwilę.");
+
+    public static string UpdateFailed(string reason) =>
+        T($"Update failed: {reason}", $"Aktualizacja nie powiodła się: {reason}");
+
+    public static string UpdateAssetMissing =>
+        T("This release has no launcher package to download.",
+            "To wydanie nie ma paczki launchera do pobrania.");
+
+    public static string UpdateHelperFailed =>
+        T("Could not start the update helper.", "Nie udało się uruchomić programu aktualizującego.");
+
     public static string UpdateCheckSkipped(string reason) =>
         T($"Update check skipped: {reason}", $"Pominięto sprawdzanie aktualizacji: {reason}");
 
