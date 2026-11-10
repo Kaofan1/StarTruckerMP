@@ -15,6 +15,7 @@
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <SelfContained>false</SelfContained>
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    <ApplicationIcon>Assets\StarTruckerMP.ico</ApplicationIcon>
     <AssemblyTitle>Star Trucker Multiplayer Launcher</AssemblyTitle>
     <Description>Launcher and mod installer for the Star Trucker multiplayer mod.</Description>
   </PropertyGroup>

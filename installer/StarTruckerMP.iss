@@ -11,6 +11,8 @@
 #define MyAppPublisher "Kaofan"
 #define MyAppUrl "https://github.com/Kaofan1/StarTruckerMP"
 #define MyAppExeName "StarTruckerMP.Launcher.exe"
+; Same mark as the launcher window/header, so Setup, shortcuts and Apps & features match.
+#define MyAppIcon "..\StarTruckMP.Launcher\Assets\StarTruckerMP.ico"
 
 #ifndef MyAppVersion
   #define MyAppVersion "1.0.0"
@@ -45,6 +47,7 @@ WizardStyle=modern
 SetupLogging=yes
 UninstallDisplayName={#MyAppName}
 UninstallDisplayIcon={app}\{#MyAppExeName}
+SetupIconFile={#MyAppIcon}
 ; An upgrade has to replace the launcher executable, so Setup closes a running launcher
 ; instead of failing on the locked file. It is not restarted automatically.
 AllowNoIcons=yes
