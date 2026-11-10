@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Controls.Templates;
 using Avalonia.Layout;
 using Avalonia.Media;
@@ -15,10 +16,6 @@ namespace StarTruckMP.Launcher.UI;
 
 internal sealed class MainWindow : Window
 {
-    private static readonly IBrush CardBackground = new SolidColorBrush(Color.Parse("#1B2030"));
-    private static readonly IBrush AccentBrush = new SolidColorBrush(Color.Parse("#7FB4FF"));
-    private static readonly IBrush MutedBrush = new SolidColorBrush(Color.Parse("#A7B0C0"));
-
     private readonly LauncherLogger _log = new();
     private readonly SettingsStore _store = new();
     private readonly ModInstaller _installer;
@@ -28,48 +25,147 @@ internal sealed class MainWindow : Window
     private bool _busy;
     private bool _refreshingServerList;
 
-    private readonly TextBlock _gamePathText = new() { TextWrapping = TextWrapping.Wrap };
-    private readonly TextBlock _modStatusText = new() { TextWrapping = TextWrapping.Wrap };
-    private readonly TextBlock _statusText = new() { TextWrapping = TextWrapping.Wrap, Foreground = MutedBrush };
-    private readonly TextBlock _versionText = new() { Foreground = MutedBrush, FontSize = 12 };
+    private Border? _statusDot;
+
+    private readonly TextBlock _gamePathText = new()
+    {
+        TextWrapping = TextWrapping.Wrap,
+        FontSize = 12.5,
+        Foreground = LauncherTheme.TextBrush
+    };
+
+    private readonly TextBlock _modStatusText = new()
+    {
+        TextWrapping = TextWrapping.Wrap,
+        FontSize = 12.5,
+        Foreground = LauncherTheme.MutedBrush
+    };
+
+    private readonly TextBlock _statusText = new()
+    {
+        Text = "Standby",
+        TextWrapping = TextWrapping.NoWrap,
+        Foreground = LauncherTheme.MutedBrush,
+        FontSize = 11.5,
+        VerticalAlignment = VerticalAlignment.Center
+    };
+
+    private readonly TextBlock _versionText = new()
+    {
+        Foreground = LauncherTheme.MutedBrush,
+        FontSize = 11.5,
+        HorizontalAlignment = HorizontalAlignment.Right
+    };
+
+    private readonly TextBlock _serverSummaryText = new()
+    {
+        Text = "No server selected",
+        TextWrapping = TextWrapping.Wrap,
+        FontSize = 14,
+        FontFamily = LauncherTheme.DisplayFont,
+        FontWeight = FontWeight.SemiBold,
+        Foreground = LauncherTheme.TextBrush
+    };
 
     private readonly TextBox _logBox = new()
     {
         IsReadOnly = true,
         AcceptsReturn = true,
         TextWrapping = TextWrapping.Wrap,
-        FontFamily = new FontFamily("Consolas, Courier New, monospace"),
-        FontSize = 12,
-        Height = 160
+        FontFamily = LauncherTheme.MonoFont,
+        FontSize = 11.5,
+        Height = 150,
+        Background = LauncherTheme.FieldBrush,
+        Foreground = LauncherTheme.LogBrush,
+        BorderBrush = LauncherTheme.EdgeBrush,
+        BorderThickness = new Thickness(1),
+        Padding = new Thickness(10, 8)
     };
 
-    private readonly Button _detectButton = MakeButton("Detect game");
-    private readonly Button _browseButton = MakeButton("Choose folder…");
-    private readonly Button _installButton = MakeButton("Install / repair mod");
-    private readonly Button _openGameFolderButton = MakeButton("Open game folder");
-    private readonly Button _openConfigButton = MakeButton("Open config");
-    private readonly Button _playButton = new()
+    private readonly Button _detectButton = LauncherTheme.MakeButton(
+        "Detect game",
+        ActionVariant.Secondary,
+        stretch: false);
+
+    private readonly Button _browseButton = LauncherTheme.MakeButton(
+        "Choose folder…",
+        ActionVariant.Secondary,
+        stretch: false);
+
+    private readonly Button _installButton = LauncherTheme.MakeButton(
+        "Install / repair mod",
+        ActionVariant.Accent);
+
+    private readonly Button _openGameFolderButton = LauncherTheme.MakeButton(
+        "Open game folder",
+        ActionVariant.Ghost);
+
+    private readonly Button _openConfigButton = LauncherTheme.MakeButton(
+        "Open config",
+        ActionVariant.Ghost);
+
+    private readonly Button _playButton = LauncherTheme.MakeButton(
+        "PLAY",
+        ActionVariant.Primary,
+        fontSize: 17,
+        padding: new Thickness(24, 13));
+
+    private readonly ComboBox _serverCombo = LauncherTheme.StyleCombo(new ComboBox
     {
-        Content = "PLAY",
-        FontSize = 18,
-        FontWeight = FontWeight.Bold,
-        Padding = new Thickness(28, 14),
         HorizontalAlignment = HorizontalAlignment.Stretch,
-        HorizontalContentAlignment = HorizontalAlignment.Center
-    };
+        MinWidth = 240
+    });
 
-    private readonly ComboBox _serverCombo = new() { HorizontalAlignment = HorizontalAlignment.Stretch, MinWidth = 260 };
-    private readonly Button _addServerButton = MakeButton("Add");
-    private readonly Button _removeServerButton = MakeButton("Remove");
-    private readonly Button _applyServerButton = MakeButton("Save server");
-    private readonly TextBox _nameBox = new() { Watermark = "Server name" };
-    private readonly TextBox _addressBox = new() { Watermark = "host or IP" };
-    private readonly TextBox _portBox = new() { Watermark = "port", Width = 90 };
-    private readonly TextBox _microphoneBox = new() { Watermark = "leave empty for the system default" };
+    private readonly Button _addServerButton = LauncherTheme.MakeButton(
+        "Add",
+        ActionVariant.Secondary,
+        stretch: false);
 
-    private readonly CheckBox _steamCheck = new() { Content = "Launch through Steam (recommended - keeps Steam login working)" };
-    private readonly CheckBox _sslCheck = new() { Content = "Ignore SSL certificate errors (needed for self-signed servers)" };
-    private readonly CheckBox _closeCheck = new() { Content = "Close the launcher after the game starts" };
+    private readonly Button _removeServerButton = LauncherTheme.MakeButton(
+        "Remove",
+        ActionVariant.Ghost,
+        stretch: false);
+
+    private readonly Button _applyServerButton = LauncherTheme.MakeButton(
+        "Save server",
+        ActionVariant.Accent);
+
+    private readonly TextBox _nameBox = LauncherTheme.StyleInput(new TextBox
+    {
+        Watermark = "Server name"
+    });
+
+    private readonly TextBox _addressBox = LauncherTheme.StyleInput(new TextBox
+    {
+        Watermark = "host or IP"
+    });
+
+    private readonly TextBox _portBox = LauncherTheme.StyleInput(new TextBox
+    {
+        Watermark = "port",
+        Width = 110,
+        HorizontalAlignment = HorizontalAlignment.Left
+    });
+
+    private readonly TextBox _microphoneBox = LauncherTheme.StyleInput(new TextBox
+    {
+        Watermark = "leave empty for the system default"
+    });
+
+    private readonly CheckBox _steamCheck = LauncherTheme.StyleCheck(new CheckBox
+    {
+        Content = Wrap("Launch through Steam (recommended — keeps Steam login working)")
+    });
+
+    private readonly CheckBox _sslCheck = LauncherTheme.StyleCheck(new CheckBox
+    {
+        Content = Wrap("Ignore SSL certificate errors (needed for self-signed servers)")
+    });
+
+    private readonly CheckBox _closeCheck = LauncherTheme.StyleCheck(new CheckBox
+    {
+        Content = Wrap("Close the launcher after the game starts")
+    });
 
     public MainWindow()
     {
@@ -77,11 +173,12 @@ internal sealed class MainWindow : Window
         _installer = new ModInstaller(_log);
 
         Title = "Star Trucker Multiplayer";
-        Width = 900;
-        Height = 780;
-        MinWidth = 720;
-        MinHeight = 620;
+        Width = 1080;
+        Height = 840;
+        MinWidth = 900;
+        MinHeight = 720;
         WindowStartupLocation = WindowStartupLocation.CenterScreen;
+        Background = LauncherTheme.SpaceBrush;
 
         _steamCheck.IsChecked = _settings.LaunchThroughSteam;
         _sslCheck.IsChecked = _settings.IgnoreSslValidation;
@@ -90,6 +187,8 @@ internal sealed class MainWindow : Window
         _versionText.Text = $"Launcher v{GetType().Assembly.GetName().Version?.ToString(3) ?? "1.0.0"}  ·  github.com/Kaofan1/StarTruckerMP";
 
         Content = BuildLayout();
+        UpdateServerSummary();
+
         WireEvents();
 
         _log.LineWritten += OnLogLine;
@@ -97,50 +196,297 @@ internal sealed class MainWindow : Window
         Closing += (_, _) => SaveSettings();
     }
 
+    private static TextBlock Wrap(string text) => new()
+    {
+        Text = text,
+        TextWrapping = TextWrapping.Wrap,
+        FontSize = 12.5,
+        Foreground = LauncherTheme.MutedBrush,
+        VerticalAlignment = VerticalAlignment.Center
+    };
+
     private Control BuildLayout()
     {
-        var header = new StackPanel
+        var header = BuildHeader();
+        var body = BuildBody();
+
+        var shell = new Grid { RowDefinitions = new RowDefinitions("Auto,*") };
+        shell.Children.Add(header);
+        shell.Children.Add(body);
+        Grid.SetRow(body, 1);
+
+        // The starfield is the window backdrop; every panel above it paints its
+        // own surface, so no extra blending is needed between them.
+        var root = new Grid();
+        root.Children.Add(new StarfieldPanel());
+        root.Children.Add(shell);
+
+        return root;
+    }
+
+    private Control BuildHeader()
+    {
+        var mark = new Border
         {
-            Spacing = 2,
-            Children =
+            Width = 46,
+            Height = 46,
+            CornerRadius = new CornerRadius(10),
+            Background = LauncherTheme.FieldBrush,
+            BorderBrush = LauncherTheme.AmberBrush,
+            BorderThickness = new Thickness(1),
+            VerticalAlignment = VerticalAlignment.Center,
+            Child = new TextBlock
             {
-                new TextBlock { Text = "STAR TRUCKER MULTIPLAYER", FontSize = 24, FontWeight = FontWeight.Bold },
-                new TextBlock { Text = "Launcher, mod installer and server bookmarks", Foreground = MutedBrush },
-                _versionText
+                Text = "ST",
+                FontFamily = LauncherTheme.DisplayFont,
+                FontSize = 16,
+                FontWeight = FontWeight.Bold,
+                Foreground = LauncherTheme.AmberBrush,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center
             }
         };
 
-        var gameSection = Card("GAME INSTALLATION",
+        var brand = new StackPanel
+        {
+            Spacing = 1,
+            VerticalAlignment = VerticalAlignment.Center,
+            Children =
+            {
+                new TextBlock
+                {
+                    Text = "STAR TRUCKER MULTIPLAYER",
+                    FontFamily = LauncherTheme.DisplayFont,
+                    FontSize = 10.5,
+                    FontWeight = FontWeight.SemiBold,
+                    Foreground = LauncherTheme.AmberBrush
+                },
+                new TextBlock
+                {
+                    Text = "Star Trucker Multiplayer",
+                    FontFamily = LauncherTheme.DisplayFont,
+                    FontSize = 23,
+                    FontWeight = FontWeight.Bold,
+                    Foreground = LauncherTheme.TextBrush
+                },
+                new TextBlock
+                {
+                    Text = "Launcher · mod installer · server bookmarks",
+                    FontSize = 11.5,
+                    Foreground = LauncherTheme.MutedBrush
+                }
+            }
+        };
+
+        var brandRow = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 14,
+            Children = { mark, brand }
+        };
+
+        var statusDot = new Border
+        {
+            Width = 7,
+            Height = 7,
+            CornerRadius = new CornerRadius(4),
+            Background = LauncherTheme.TealBrush,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+
+        _statusDot = statusDot;
+
+        var pill = new Border
+        {
+            Background = LauncherTheme.FieldBrush,
+            BorderBrush = LauncherTheme.EdgeBrush,
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(10),
+            Padding = new Thickness(10, 5),
+            HorizontalAlignment = HorizontalAlignment.Right,
+            Child = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                Spacing = 7,
+                Children = { statusDot, _statusText }
+            }
+        };
+
+        var statusColumn = new StackPanel
+        {
+            Spacing = 8,
+            VerticalAlignment = VerticalAlignment.Center,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            Children = { pill, _versionText }
+        };
+
+        var layout = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto") };
+        layout.Children.Add(brandRow);
+        layout.Children.Add(statusColumn);
+        Grid.SetColumn(statusColumn, 1);
+
+        return new Border
+        {
+            Background = LauncherTheme.HeaderBrush,
+            BorderBrush = LauncherTheme.EdgeBrush,
+            BorderThickness = new Thickness(0, 0, 0, 1),
+            Padding = new Thickness(24, 16),
+            Child = layout
+        };
+    }
+
+    private Control BuildBody()
+    {
+        var left = new StackPanel
+        {
+            Spacing = 14,
+            Children =
+            {
+                BuildInstallCard(),
+                BuildServerCard(),
+                BuildLaunchCard()
+            }
+        };
+
+        var leftScroll = new ScrollViewer
+        {
+            Content = left,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled
+        };
+
+        var right = new StackPanel
+        {
+            Spacing = 14,
+            Margin = new Thickness(14, 0, 0, 0),
+            Children =
+            {
+                BuildConnectCard(),
+                BuildModCard(),
+                BuildShortcutsCard()
+            }
+        };
+
+        var rightScroll = new ScrollViewer
+        {
+            Content = right,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled
+        };
+
+        var split = new Grid { ColumnDefinitions = new ColumnDefinitions("*,340") };
+        split.Children.Add(leftScroll);
+        split.Children.Add(rightScroll);
+        Grid.SetColumn(rightScroll, 1);
+
+        var log = BuildLogCard();
+        log.Margin = new Thickness(0, 14, 0, 0);
+
+        var body = new Grid
+        {
+            RowDefinitions = new RowDefinitions("*,Auto"),
+            Margin = new Thickness(20, 18)
+        };
+
+        body.Children.Add(split);
+        body.Children.Add(log);
+        Grid.SetRow(log, 1);
+
+        return body;
+    }
+
+    private Control BuildInstallCard()
+    {
+        var actions = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 8,
+            Children = { _detectButton, _browseButton }
+        };
+
+        return LauncherTheme.Card(
+            "GAME INSTALLATION",
+            "Steam · appid 2380050",
             _gamePathText,
-            Row(_detectButton, _browseButton, _openGameFolderButton, _openConfigButton),
-            new TextBlock { Text = "MOD", FontWeight = FontWeight.SemiBold, Foreground = MutedBrush, Margin = new Thickness(0, 6, 0, 0) },
-            _modStatusText,
-            Row(_installButton, _statusText));
+            actions,
+            LauncherTheme.Caption(
+                "Detected from your Steam libraries. If that fails, choose the folder that contains Star Trucker.exe."));
+    }
 
-        var serverSection = Card("SERVER",
-            Row(_serverCombo, _addServerButton, _removeServerButton),
-            Row(new TextBlock { Text = "Name", Width = 60, VerticalAlignment = VerticalAlignment.Center }, _nameBox),
-            Row(new TextBlock { Text = "Host", Width = 60, VerticalAlignment = VerticalAlignment.Center }, _addressBox),
-            Row(new TextBlock { Text = "Port", Width = 60, VerticalAlignment = VerticalAlignment.Center }, _portBox),
-            Row(_applyServerButton));
+    private Control BuildServerCard()
+    {
+        _addServerButton.Margin = new Thickness(8, 0, 0, 0);
+        _removeServerButton.Margin = new Thickness(8, 0, 0, 0);
 
-        var launchSection = Card("LAUNCH",
+        var toolbar = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto,Auto") };
+        toolbar.Children.Add(_serverCombo);
+        toolbar.Children.Add(_addServerButton);
+        toolbar.Children.Add(_removeServerButton);
+        Grid.SetColumn(_addServerButton, 1);
+        Grid.SetColumn(_removeServerButton, 2);
+
+        return LauncherTheme.Card(
+            "SERVER BOOKMARKS",
+            null,
+            toolbar,
+            LauncherTheme.Field("Name", _nameBox),
+            LauncherTheme.Field("Host", _addressBox),
+            LauncherTheme.Field("Port", _portBox),
+            _applyServerButton,
+            LauncherTheme.Caption(
+                @"The selected address is written to BepInEx\config\StarTruckMP.Client.cfg before every launch."));
+    }
+
+    private Control BuildLaunchCard()
+    {
+        return LauncherTheme.Card(
+            "LAUNCH OPTIONS",
+            null,
             _steamCheck,
             _sslCheck,
             _closeCheck,
-            Row(new TextBlock { Text = "Microphone", Width = 90, VerticalAlignment = VerticalAlignment.Center }, _microphoneBox),
-            _playButton);
+            LauncherTheme.Field("Microphone", _microphoneBox));
+    }
 
-        var logSection = Card("LOG", _logBox,
-            Row(new TextBlock { Text = LauncherLogger.LogPath, Foreground = MutedBrush, FontSize = 11 }));
+    private Control BuildConnectCard()
+    {
+        return LauncherTheme.Card(
+            "CONNECTION",
+            null,
+            _serverSummaryText,
+            _playButton,
+            LauncherTheme.Caption(
+                "PLAY starts Star Trucker through Steam, so Steam login keeps working. The overlay appears once you load into the sector — " +
+                "the very first launch after installing the mod is slower because BepInEx builds its IL2CPP interop assemblies."));
+    }
 
-        var stack = new StackPanel
-        {
-            Spacing = 12,
-            Children = { header, gameSection, serverSection, launchSection, logSection }
-        };
+    private Control BuildModCard()
+    {
+        return LauncherTheme.Card(
+            "MOD STATUS",
+            "BepInEx + client + overlay",
+            _modStatusText,
+            _installButton);
+    }
 
-        return new ScrollViewer { Content = stack, Padding = new Thickness(20) };
+    private Control BuildShortcutsCard()
+    {
+        return LauncherTheme.Card(
+            "SHORTCUTS",
+            null,
+            _openGameFolderButton,
+            _openConfigButton,
+            LauncherTheme.Caption(
+                "Handy for reading BepInEx logs or editing the client config by hand."));
+    }
+
+    private Control BuildLogCard()
+    {
+        return LauncherTheme.Card(
+            "LAUNCHER LOG",
+            null,
+            _logBox,
+            LauncherTheme.Caption(LauncherLogger.LogPath, 10.5));
     }
 
     private void WireEvents()
@@ -165,14 +511,14 @@ internal sealed class MainWindow : Window
         {
             _settings.GamePath = null;
             _gamePathText.Text = "Star Trucker was not found. Use “Choose folder…” and pick the folder that contains Star Trucker.exe.";
-            _gamePathText.Foreground = Brushes.Orange;
+            _gamePathText.Foreground = LauncherTheme.AmberBrush;
             _log.Log("Star Trucker was not detected.");
         }
         else
         {
             _settings.GamePath = _install.Path;
             _gamePathText.Text = _install.Path;
-            _gamePathText.Foreground = Brushes.White;
+            _gamePathText.Foreground = LauncherTheme.TextBrush;
             _log.Log($"Using Star Trucker at {_install.Path}");
 
             if (_install.Warning is not null)
@@ -213,14 +559,25 @@ internal sealed class MainWindow : Window
         if (_install is null || _busy)
             return;
 
-        SetBusy(true, "Installing…");
+        SetBusy(true, "Installing mod…");
 
         var gamePath = _install.Path;
         var progress = new Progress<string>(message => _log.Log(message));
 
         try
         {
-            await System.Threading.Tasks.Task.Run(() => _installer.InstallAsync(gamePath, progress, System.Threading.CancellationToken.None));
+            // The loader is a separate, optional component: the client installer never downloads
+            // BepInEx, and the launcher itself works without either of them.
+            await System.Threading.Tasks.Task.Run(async () =>
+            {
+                await StarTruckMP.Launcher.Mod.BepInExRuntime.InstallAsync(
+                    gamePath,
+                    StarTruckMP.Launcher.Mod.BepInExRuntime.DefaultPayloadRoot,
+                    progress,
+                    System.Threading.CancellationToken.None);
+
+                await _installer.InstallAsync(gamePath, progress, System.Threading.CancellationToken.None);
+            });
             _log.Log("Mod installation completed.");
         }
         catch (Exception exception)
@@ -258,10 +615,11 @@ internal sealed class MainWindow : Window
             return;
         }
 
-        if (!ModInstaller.HasPlugin(_install.Path))
+        if (!ModInstaller.HasBepInEx(_install.Path) || !ModInstaller.HasPlugin(_install.Path))
         {
-            _log.Log("The StarTruckMP client is not installed yet — press “Install / repair mod” first.");
-            return;
+            _log.Log(
+                "The multiplayer mod is not installed — starting Star Trucker without it. " +
+                "Press “Install / repair mod” to add it.");
         }
 
         try
@@ -298,32 +656,40 @@ internal sealed class MainWindow : Window
         if (_install is null)
         {
             _modStatusText.Text = "Unknown — the game folder is not set.";
-            _modStatusText.Foreground = MutedBrush;
+            _modStatusText.Foreground = LauncherTheme.MutedBrush;
         }
         else
         {
             var hasBepInEx = ModInstaller.HasBepInEx(_install.Path);
             var hasPlugin = ModInstaller.HasPlugin(_install.Path);
             var hasOverlay = ModInstaller.HasOverlay(_install.Path);
+            var hasMonoBepInEx = ModInstaller.HasMonoBepInEx(_install.Path);
 
             if (hasBepInEx && hasPlugin && hasOverlay)
             {
-                _modStatusText.Text = "Installed (BepInEx + client + overlay). Ready to play.";
-                _modStatusText.Foreground = Brushes.LightGreen;
+                _modStatusText.Text = "Installed (BepInEx 6 IL2CPP + client + overlay). Ready to play.";
+                _modStatusText.Foreground = LauncherTheme.TealBrush;
+            }
+            else if (hasMonoBepInEx)
+            {
+                _modStatusText.Text =
+                    "BepInEx 5 (Mono) is installed here. Star Trucker needs BepInEx 6 IL2CPP — press “Install / repair mod” to replace it.";
+                _modStatusText.Foreground = LauncherTheme.DangerBrush;
             }
             else if (!hasBepInEx && !hasPlugin)
             {
-                _modStatusText.Text = "Not installed.";
-                _modStatusText.Foreground = Brushes.Orange;
+                _modStatusText.Text =
+                    "Not installed — the launcher still starts Star Trucker normally. The multiplayer mod is optional.";
+                _modStatusText.Foreground = LauncherTheme.AmberBrush;
             }
             else
             {
                 var missing = new List<string>();
-                if (!hasBepInEx) missing.Add("BepInEx");
+                if (!hasBepInEx) missing.Add("BepInEx 6 IL2CPP");
                 if (!hasPlugin) missing.Add("client");
                 if (!hasOverlay) missing.Add("overlay");
                 _modStatusText.Text = $"Partial install — missing: {string.Join(", ", missing)}. Press “Install / repair mod”.";
-                _modStatusText.Foreground = Brushes.Orange;
+                _modStatusText.Foreground = LauncherTheme.AmberBrush;
             }
         }
 
@@ -346,6 +712,7 @@ internal sealed class MainWindow : Window
 
         _refreshingServerList = false;
         LoadSelectedServerIntoEditor();
+        UpdateServerSummary();
     }
 
     private void LoadSelectedServerIntoEditor()
@@ -362,6 +729,15 @@ internal sealed class MainWindow : Window
         _portBox.Text = server.Port;
         _settings.SelectedServerId = server.Id;
         _store.Save(_settings);
+        UpdateServerSummary();
+    }
+
+    private void UpdateServerSummary()
+    {
+        var server = GetSelectedServer();
+        _serverSummaryText.Text = server is null
+            ? "No server selected"
+            : $"{server.Name} · {server.Address}:{server.Port}";
     }
 
     private void AddServer()
@@ -444,7 +820,11 @@ internal sealed class MainWindow : Window
     private void SetBusy(bool busy, string status)
     {
         _busy = busy;
-        _statusText.Text = status;
+        _statusText.Text = string.IsNullOrWhiteSpace(status) ? "Standby" : status;
+
+        if (_statusDot is not null)
+            _statusDot.Background = busy ? LauncherTheme.AmberBrush : LauncherTheme.TealBrush;
+
         _installButton.IsEnabled = !busy && _install is not null;
         _playButton.IsEnabled = !busy && _install is not null;
         _detectButton.IsEnabled = !busy;
@@ -477,37 +857,5 @@ internal sealed class MainWindow : Window
         {
             _log.Log($"Could not open {path}: {exception.Message}");
         }
-    }
-
-    private static Button MakeButton(string text) => new() { Content = text, Padding = new Thickness(12, 6) };
-
-    private static StackPanel Row(params Control[] children)
-    {
-        var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
-        foreach (var child in children)
-            row.Children.Add(child);
-        return row;
-    }
-
-    private static Border Card(string title, params Control[] children)
-    {
-        var panel = new StackPanel { Spacing = 8 };
-        panel.Children.Add(new TextBlock
-        {
-            Text = title,
-            FontWeight = FontWeight.SemiBold,
-            Foreground = AccentBrush
-        });
-
-        foreach (var child in children)
-            panel.Children.Add(child);
-
-        return new Border
-        {
-            Background = CardBackground,
-            CornerRadius = new CornerRadius(10),
-            Padding = new Thickness(16),
-            Child = panel
-        };
     }
 }

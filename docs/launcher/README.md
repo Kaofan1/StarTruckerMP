@@ -4,7 +4,9 @@ Launcher jest teraz głównym sposobem instalacji moda. Zamiast ręcznego kopiow
 gracz uruchamia jeden plik `StarTruckerMP-Setup.exe`, a launcher robi resztę:
 
 1. wykrywa zainstalowaną przez Steam grę **Star Trucker** (`appid 2380050`) — rejestr, `libraryfolders.vdf`, `appmanifest_2380050.acf`, dodatkowe biblioteki Steam,
-2. pobiera i rozpakowuje **BepInEx 6 (IL2CPP, win-x64)** do folderu gry,
+2. dokłada **BepInEx 6 (IL2CPP, win-x64)** do folderu gry — z lokalnego payloadu `payload\bepinex`, a gdy jest pusty,
+   z [BepInEx Bleeding Edge](https://builds.bepinex.dev/projects/bepinex_be)
+   (stabilne wydania BepInEx 5 obsługują wyłącznie gry Mono — nie potrafią wczytać tego pluginu),
 3. pobiera i rozpakowuje **klienta StarTruckMP** do `BepInEx/plugins/StarTruckMP`,
 4. zapisuje wybrany serwer do `BepInEx/config/StarTruckMP.Client.cfg`,
 5. uruchamia grę **przez Steam** (`steam://rungameid/2380050`), dzięki czemu logowanie SteamWorks działa normalnie.
@@ -16,8 +18,31 @@ gracz uruchamia jeden plik `StarTruckerMP-Setup.exe`, a launcher robi resztę:
 3. Uruchom **Star Trucker Multiplayer** z menu Start (skrót na pulpicie jest opcjonalny).
 4. Sprawdź, czy launcher poprawnie wykrył grę. Jeśli nie — kliknij **Choose folder…** i wskaż katalog z `Star Trucker.exe`.
 5. Dodaj serwer (**Add**), wpisz nazwę, host i port, zapisz (**Save server**).
-6. Kliknij **Install / repair mod**, poczekaj na komunikat „Multiplayer mod is ready.”.
+6. Zamknij grę i kliknij **Install / repair mod**. Launcher zawsze pobiera świeżego klienta, więc ten sam przycisk
+   naprawia częściową instalację i aktualizuje starą wersję moda. Poczekaj na komunikat „Multiplayer mod is ready.”.
 7. Kliknij **PLAY**. Gra wystartuje przez Steam, a po wejściu do sektora pojawi się overlay i połączenie z serwerem.
+
+> [!NOTE]
+> Pierwsze uruchomienie po instalacji moda trwa dłużej — BepInEx generuje wtedy biblioteki interop dla IL2CPP
+> (katalog `BepInEx\interop`). Jeśli overlay nie pojawi się za pierwszym razem, uruchom grę ponownie.
+> Jeśli w folderze gry był wcześniej BepInEx 5 (Mono), launcher przenosi go do `BepInEx.mono-backup-<data>`
+> zamiast mieszać oba loadery.
+
+## Launcher działa samodzielnie, BepInEx jest opcjonalny
+
+Launcher nie wymaga BepInEx i nie dotyka folderu gry, dopóki nie klikniesz **Install / repair mod**.
+Bez moda przycisk **PLAY** po prostu uruchamia Star Trucker przez Steam.
+
+BepInEx jest osobnym komponentem (`StarTruckMP.Launcher/Mod/`) z własnym folderem plików:
+
+| Ścieżka | Zawartość |
+| --- | --- |
+| `%LOCALAPPDATA%\StarTruckerMP\payload\bepinex` | opcjonalny payload offline: rozpakowane pliki BepInEx (`winhttp.dll`, `doorstop_config.ini`, `BepInEx\`, `dotnet\`) albo jeden plik `.zip` |
+| `<gra>\BepInEx` | loader dopiero po instalacji moda — tylko tutaj trafiają pliki BepInEx |
+
+Gdy `payload\bepinex` jest pusty, launcher pobiera najnowszy build IL2CPP z builds.bepinex.dev.
+Dzięki temu instalator jest lekki i nie zawiera plików BepInEx, a mimo to działa w pełni offline,
+jeśli włożysz payload do tego folderu.
 
 Nazwa pliku instalatora nie zawiera numeru wersji — zawsze jest to `StarTruckerMP-Setup.exe`.
 
@@ -70,7 +95,9 @@ ISCC.exe /DMyAppVersion=1.2.0 installer\StarTruckerMP.iss
 | Objaw | Co zrobić |
 | --- | --- |
 | „Star Trucker was not found” | Kliknij **Choose folder…** i wskaż katalog z `Star Trucker.exe` (np. `…\steamapps\common\Star Trucker`). |
-| Instalacja moda kończy się błędem pobierania | Sprawdź dostęp do `api.github.com` i `github.com` (proxy/firewall). GitHub API ma limit 60 zapytań na godzinę na adres IP. |
+| Instalacja moda kończy się błędem pobierania | Sprawdź dostęp do `api.github.com`, `github.com` i `builds.bepinex.dev` (proxy/firewall). GitHub API ma limit 60 zapytań na godzinę na adres IP. |
+| Launcher: „BepInEx 5 (Mono) is installed here” | W folderze gry był BepInEx 5, który nie obsługuje IL2CPP. Kliknij **Install / repair mod** — launcher odsunie stary loader i wgra BepInEx 6 IL2CPP. |
+| Pierwszy start gry trwa kilka minut | To normalne: BepInEx buduje `BepInEx\interop`. Kolejne starty są szybkie. |
 | Gra startuje, ale nie ma połączenia | Sprawdź port i adres serwera; przy własnym serwerze z certyfikatem self-signed pozostaw włączone **Ignore SSL certificate errors**. |
 | Overlay się nie pojawia | Zamknij grę, kliknij **Install / repair mod** (uzupełni brakujący overlay), sprawdź `BepInEx\LogOutput.log`. |
 | Launcher nie startuje | Zajrzyj do `%APPDATA%\StarTruckMP\launcher-crash.log`. |

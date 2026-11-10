@@ -45,8 +45,10 @@ WizardStyle=modern
 SetupLogging=yes
 UninstallDisplayName={#MyAppName}
 UninstallDisplayIcon={app}\{#MyAppExeName}
+; An upgrade has to replace the launcher executable, so Setup closes a running launcher
+; instead of failing on the locked file. It is not restarted automatically.
 AllowNoIcons=yes
-CloseApplications=no
+CloseApplications=yes
 RestartApplications=no
 
 [Languages]
@@ -56,8 +58,15 @@ Name: "polish"; MessagesFile: "compiler:Languages\Polish.isl"
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 
+[InstallDelete]
+; A complete reinstall: files from an older launcher build never survive an upgrade.
+Type: filesandordirs; Name: "{app}\*"
+
 [Files]
 Source: "{#SourceDir}\*"; DestDir: "{app}"; Excludes: "*.pdb"; Flags: ignoreversion recursesubdirs createallsubdirs
+; The BepInEx drop-in lives in its own folder next to the launcher. It is optional: the
+; launcher installs and runs without it and only reads it when the user installs the mod.
+Source: "..\payload\*"; DestDir: "{app}\payload"; Excludes: ".gitignore"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
