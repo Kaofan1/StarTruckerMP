@@ -29,6 +29,8 @@ internal sealed class MainWindow : Window
     private bool _refreshingServerList;
     private LauncherUpdate? _pendingUpdate;
     private readonly DispatcherTimer _updateTimer = new() { Interval = TimeSpan.FromMinutes(5) };
+    private LocalServerStatus? _localServer;
+    private readonly DispatcherTimer _serverTimer = new() { Interval = TimeSpan.FromSeconds(3) };
 
     private Border? _statusDot;
 
@@ -52,6 +54,17 @@ internal sealed class MainWindow : Window
         FontSize = 12.5,
         Foreground = LauncherTheme.MutedBrush
     };
+
+    private readonly TextBlock _localServerStatusText = new()
+    {
+        TextWrapping = TextWrapping.Wrap,
+        FontSize = 12.5,
+        Foreground = LauncherTheme.MutedBrush
+    };
+
+    private readonly Button _serverToggleButton = LauncherTheme.MakeButton(
+        Strings.StartLocalServer,
+        ActionVariant.Secondary);
 
     private readonly TextBlock _statusText = new()
     {
@@ -284,6 +297,7 @@ internal sealed class MainWindow : Window
         // The release list is polled while the window is open, so a new build shows up
         // without closing and reopening the launcher.
         _updateTimer.Tick += (_, _) => _ = CheckForUpdatesAsync(logUpToDate: false);
+        _serverTimer.Tick += (_, _) => RefreshLocalServerState();
 
         Opened += (_, _) =>
         {
@@ -292,10 +306,13 @@ internal sealed class MainWindow : Window
             DetectGame();
             _ = CheckForUpdatesAsync();
             _updateTimer.Start();
+            RefreshLocalServerState();
+            _serverTimer.Start();
         };
         Closing += (_, _) =>
         {
             _updateTimer.Stop();
+            _serverTimer.Stop();
             SaveSettings();
         };
     }
@@ -439,6 +456,7 @@ internal sealed class MainWindow : Window
             {
                 BuildInstallCard(),
                 BuildServerCard(),
+                BuildLocalServerCard(),
                 BuildLaunchCard()
             }
         };
@@ -553,6 +571,20 @@ internal sealed class MainWindow : Window
             nameHostRow,
             portRow,
             LauncherTheme.Caption(Strings.ServerCaption));
+    }
+
+    /// <summary>
+    /// Hosting is a separate concern from joining: the card only starts or stops the server
+    /// on this PC and never touches the client, the game folder or the bookmarks.
+    /// </summary>
+    private Control BuildLocalServerCard()
+    {
+        return LauncherTheme.Card(
+            Strings.CardLocalServer,
+            Strings.LocalServerNote,
+            _localServerStatusText,
+            _serverToggleButton,
+            LauncherTheme.Caption(Strings.LocalServerCaption));
     }
 
     private Control BuildLaunchCard()
@@ -681,6 +713,7 @@ internal sealed class MainWindow : Window
         _addServerButton.Click += (_, _) => AddServer();
         _removeServerButton.Click += (_, _) => RemoveServer();
         _applyServerButton.Click += (_, _) => ApplyServerEdits();
+        _serverToggleButton.Click += async (_, _) => await ToggleLocalServerAsync();
         _serverCombo.SelectionChanged += (_, _) => LoadSelectedServerIntoEditor();
     }
 
@@ -1161,6 +1194,94 @@ internal sealed class MainWindow : Window
         }
     }
 
+    /// <summary>Reads the live server state; a timer keeps it current even if the server was started outside the launcher.</summary>
+    private void RefreshLocalServerState()
+    {
+        if (_busy)
+            return;
+
+        var status = LocalServer.Detect();
+        _localServer = status;
+
+        switch (status.State)
+        {
+            case LocalServerState.Running:
+                _localServerStatusText.Text = Strings.LocalServerRunning(status.ProcessId);
+                _localServerStatusText.Foreground = LauncherTheme.TealBrush;
+                SetButtonText(_serverToggleButton, Strings.StopLocalServer);
+                break;
+
+            case LocalServerState.Stopped:
+                _localServerStatusText.Text = Strings.LocalServerStopped;
+                _localServerStatusText.Foreground = LauncherTheme.AmberBrush;
+                SetButtonText(_serverToggleButton, Strings.StartLocalServer);
+                break;
+
+            default:
+                _localServerStatusText.Text = Strings.LocalServerMissing;
+                _localServerStatusText.Foreground = LauncherTheme.MutedBrush;
+                SetButtonText(_serverToggleButton, Strings.StartLocalServer);
+                break;
+        }
+    }
+
+    private async System.Threading.Tasks.Task ToggleLocalServerAsync()
+    {
+        if (_busy)
+            return;
+
+        var status = _localServer ?? LocalServer.Detect();
+
+        if (status.State == LocalServerState.Running)
+        {
+            SetBusy(true, Strings.StopLocalServer);
+
+            try
+            {
+                if (LocalServer.Stop())
+                    _log.Log(Strings.LocalServerStoppedLog);
+                else
+                    _log.Log(Strings.LocalServerStopFailed);
+            }
+            catch (Exception exception)
+            {
+                _log.Log(Strings.LocalServerStopFailed + " " + exception.Message);
+            }
+            finally
+            {
+                SetBusy(false, string.Empty);
+                RefreshLocalServerState();
+            }
+
+            return;
+        }
+
+        SetBusy(true, Strings.LocalServerLookingUp);
+
+        try
+        {
+            var started = await LocalServer.StartAsync(new Progress<string>(_log.Log), System.Threading.CancellationToken.None);
+            _log.Log(Strings.LocalServerStarted(started.ExecutablePath ?? string.Empty));
+            SetBusy(false, Strings.LocalServerRunning(started.ProcessId));
+        }
+        catch (Exception exception)
+        {
+            _log.Log(Strings.LocalServerStartFailed(exception.Message));
+            SetBusy(false, string.Empty);
+        }
+
+        RefreshLocalServerState();
+    }
+
+    /// <summary>Swaps the label of a themed button without losing its border and palette.</summary>
+    private static void SetButtonText(Button button, string text)
+    {
+        if (button.Content is Border { Child: TextBlock block })
+            block.Text = text;
+        else
+            button.Content = text;
+    }
+
     private void OpenUpdatePage()
     {
         var url = _updateButton.Tag as string ?? UpdateChecker.ReleasesPageUrl;
@@ -1443,6 +1564,7 @@ internal sealed class MainWindow : Window
         _detectButton.IsEnabled = !busy;
         _browseButton.IsEnabled = !busy;
         _updateButton.IsEnabled = !busy && _pendingUpdate is not null;
+        _serverToggleButton.IsEnabled = !busy;
     }
 
     private void OnLogLine(string line)

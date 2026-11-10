@@ -91,6 +91,17 @@ BepInEx 5 (Mono) or nothing is in the game folder, and **Install / repair BepInE
 loader. That works even when the client package has not been published in a release yet, so the game
 can be prepared for plugins independently from the multiplayer mod.
 
+## Local server
+
+The **LOCAL SERVER** card starts and stops the multiplayer server on this PC and shows its state
+(running with a PID, stopped, files missing). The state refreshes every 3 seconds, so a server
+started outside the launcher shows up too.
+
+The server is looked up in `payload\server` next to the launcher (offline); when that folder is
+missing, the launcher downloads `StarTruckerMP-server-win-x64.zip` from GitHub Releases and
+extracts it to `%APPDATA%\StarTruckerMP\server`. `server.json` and the certificate live there as
+well; the server itself listens on `https://0.0.0.0:7777` and prints its log in a console window.
+
 BepInEx is a separate component (`StarTruckerMP.Launcher/Mod/`) with its own file folder:
 
 | Path | Contents |

@@ -89,6 +89,17 @@ BepInEx 6 IL2CPP, BepInEx 5 (Mono), czy nic, a **Zainstaluj / napraw BepInEx** i
 loader. Działa to nawet wtedy, gdy paczka klienta nie została jeszcze opublikowana w wydaniu, więc
 grę można przygotować pod pluginy niezależnie od moda multiplayer.
 
+## Lokalny serwer
+
+Karta **SERWER LOKALNY** uruchamia i zatrzymuje serwer multiplayera na tym komputerze oraz
+pokazuje jego stan (działa z PID-em, zatrzymany, brak plików). Stan odświeża się co 3 sekundy,
+więc widać też serwer uruchomiony poza launcherem.
+
+Serwer jest szukany w `payload\server` obok launchera (offline), a gdy tego folderu nie ma,
+launcher pobiera `StarTruckerMP-server-win-x64.zip` z GitHub Releases i rozpakowuje go do
+`%APPDATA%\StarTruckerMP\server`. Tam też trafiają `server.json` i certyfikat; sam serwer
+działa na `https://0.0.0.0:7777` i pokazuje log w oknie konsoli.
+
 BepInEx jest osobnym komponentem (`StarTruckerMP.Launcher/Mod/`) z własnym folderem plików:
 
 | Ścieżka | Zawartość |

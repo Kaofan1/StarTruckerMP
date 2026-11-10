@@ -124,6 +124,64 @@ internal static class Strings
 
     public static string CardLog => T("LAUNCHER LOG", "LOG LAUNCHERA");
 
+    public static string CardLocalServer => T("LOCAL SERVER", "SERWER LOKALNY");
+
+    public static string LocalServerNote =>
+        T("lets this PC host the session", "pozwala temu komputerowi hostować sesję");
+
+    public static string StartLocalServer => T("Start server", "Uruchom serwer");
+
+    public static string StopLocalServer => T("Stop server", "Zatrzymaj serwer");
+
+    public static string LocalServerRunning(int processId) =>
+        T($"Running (PID {processId}). The client logs in to this PC.",
+            $"Działa (PID {processId}). Klient loguje się na tym komputerze.");
+
+    public static string LocalServerStopped =>
+        T("Stopped - without a server the client gets no login and the overlay stays empty.",
+            "Zatrzymany - bez serwera klient nie zaloguje się i overlay pozostanie pusty.");
+
+    public static string LocalServerMissing =>
+        T("Server files not found yet - start downloads them once.",
+            "Brak plików serwera - uruchomienie pobierze je raz.");
+
+    public static string LocalServerCopying(string path) =>
+        T($"Copying the bundled server from {path}…", $"Kopiuję dołączony serwer z {path}…");
+
+    public static string LocalServerLookingUp =>
+        T("Looking up the server package…", "Szukam paczki serwera…");
+
+    public static string LocalServerDownloading(string name) =>
+        T($"Downloading {name}…", $"Pobieram {name}…");
+
+    public static string LocalServerExtracting =>
+        T("Extracting the server…", "Rozpakowuję serwer…");
+
+    public static string LocalServerPackageMissing =>
+        T("This release has no server package (StarTruckerMP-server-win-x64.zip).",
+            "To wydanie nie ma paczki serwera (StarTruckerMP-server-win-x64.zip).");
+
+    public static string LocalServerInstallFailed(string reason) =>
+        T($"Could not prepare the server: {reason}", $"Nie udało się przygotować serwera: {reason}");
+
+    public static string LocalServerStartFailed(string reason) =>
+        T($"The server did not start: {reason}", $"Serwer nie wystartował: {reason}");
+
+    public static string LocalServerPortHint =>
+        T("port 7777 may already be in use", "port 7777 może być już zajęty");
+
+    public static string LocalServerStarted(string path) =>
+        T($"Local server started from {path}.", $"Uruchomiono lokalny serwer z {path}.");
+
+    public static string LocalServerStoppedLog => T("Local server stopped.", "Zatrzymano lokalny serwer.");
+
+    public static string LocalServerStopFailed =>
+        T("The server could not be stopped.", "Nie udało się zatrzymać serwera.");
+
+    public static string LocalServerCaption =>
+        T(@"The server keeps server.json and its certificate in %APPDATA%\StarTruckerMP\server and shows its log in the console window.",
+            @"Serwer trzyma server.json i certyfikat w %APPDATA%\StarTruckerMP\server, a log pokazuje w oknie konsoli.");
+
     public static string ModNote => T("BepInEx + client + overlay", "BepInEx + klient + overlay");
 
     public static string GameCaption =>
