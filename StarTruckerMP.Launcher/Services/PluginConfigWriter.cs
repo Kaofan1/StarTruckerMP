@@ -13,10 +13,43 @@ internal static class PluginConfigWriter
 {
     public const string ConfigRelativePath = @"BepInEx\config\StarTruckerMP.Client.cfg";
 
+    /// <summary>Config file written by the client before the StarTruckMP -> StarTruckerMP rename.</summary>
+    public const string LegacyConfigRelativePath = @"BepInEx\config\StarTruckMP.Client.cfg";
+
     public static string GetConfigPath(string gamePath) => Path.Combine(gamePath, ConfigRelativePath);
+
+    /// <summary>
+    /// Moves the pre-rename config into place once, keeping settings the launcher does not manage
+    /// (radio gain, microphone preference, anything edited by hand).
+    /// </summary>
+    public static bool MigrateLegacyConfig(string gamePath)
+    {
+        try
+        {
+            var legacyPath = Path.Combine(gamePath, LegacyConfigRelativePath);
+            var configPath = GetConfigPath(gamePath);
+
+            if (File.Exists(configPath) || !File.Exists(legacyPath))
+                return false;
+
+            var directory = Path.GetDirectoryName(configPath);
+            if (!string.IsNullOrWhiteSpace(directory))
+                Directory.CreateDirectory(directory);
+
+            File.Move(legacyPath, configPath);
+            return true;
+        }
+        catch
+        {
+            // A read-only game folder must not stop a launch; a fresh config is written below.
+            return false;
+        }
+    }
 
     public static void Apply(string gamePath, string address, string port, bool ignoreSslValidation, string microphoneDeviceName)
     {
+        MigrateLegacyConfig(gamePath);
+
         var configPath = GetConfigPath(gamePath);
         var directory = Path.GetDirectoryName(configPath);
         if (!string.IsNullOrWhiteSpace(directory))

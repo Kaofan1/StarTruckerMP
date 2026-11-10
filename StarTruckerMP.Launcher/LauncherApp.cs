@@ -20,8 +20,12 @@ internal sealed class LauncherApp : Application
     {
         // Buttons and inputs are created in field initializers, which run before the window
         // constructor, so the language has to be selected before the window is built.
+        var migrated = SettingsStore.MigrateLegacySettings();
         var settings = new SettingsStore().Load();
         Strings.Set(Strings.Parse(settings.Language));
+
+        if (migrated)
+            new LauncherLogger().Log(Strings.SettingsMigrated);
 
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
             desktop.MainWindow = new MainWindow();

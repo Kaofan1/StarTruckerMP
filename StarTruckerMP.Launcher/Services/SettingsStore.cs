@@ -22,8 +22,38 @@ internal sealed class SettingsStore
 
     public static string SettingsPath => Path.Combine(DataDirectory, "launcher.json");
 
+    /// <summary>Folder used before the launcher was renamed from StarTruckMP.</summary>
+    public static string LegacyDataDirectory => Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+        "StarTruckMP");
+
+    /// <summary>
+    /// Copies the previous launcher.json once, so an upgrade keeps servers, language, launch options
+    /// and window geometry instead of silently starting from defaults. The old folder is left alone.
+    /// </summary>
+    public static bool MigrateLegacySettings()
+    {
+        try
+        {
+            var legacySettings = Path.Combine(LegacyDataDirectory, "launcher.json");
+            if (File.Exists(SettingsPath) || !File.Exists(legacySettings))
+                return false;
+
+            Directory.CreateDirectory(DataDirectory);
+            File.Copy(legacySettings, SettingsPath);
+            return true;
+        }
+        catch
+        {
+            // Settings are convenience state only; a failed copy must never block startup.
+            return false;
+        }
+    }
+
     public LauncherSettings Load()
     {
+        MigrateLegacySettings();
+
         try
         {
             if (File.Exists(SettingsPath))

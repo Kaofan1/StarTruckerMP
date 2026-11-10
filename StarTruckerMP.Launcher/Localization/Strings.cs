@@ -353,6 +353,14 @@ internal static class Strings
     public static string ClientInstallFinished =>
         T("Client installation finished.", "Instalacja klienta zakończona.");
 
+    public static string SettingsMigrated =>
+        T("Settings imported from the previous StarTruckMP folder.",
+            "Zaimportowano ustawienia ze starego folderu StarTruckMP.");
+
+    public static string LegacyPluginRemoved =>
+        T("Removed the old StarTruckMP plugin folder left by the previous version.",
+            "Usunięto stary folder pluginu StarTruckMP po poprzedniej wersji.");
+
     public static string ClientInstalledFrom(string url) =>
         T($"Client plugin installed from {url}", $"Plugin klienta zainstalowany z {url}");
 }

@@ -87,6 +87,15 @@ jeśli włożysz payload do tego folderu.
 
 Nazwa pliku instalatora nie zawiera numeru wersji - zawsze jest to `StarTruckerMP-Setup.exe`.
 
+## Aktualizacja ze starej nazwy
+
+Wcześniejsze buildy nazywały się `StarTruckMP`. Przy pierwszym starcie po zmianie nazwy launcher kopiuje
+`%APPDATA%\StarTruckMP\launcher.json` do nowego folderu, więc serwery, język, opcje startu i geometria
+okna przetrwają aktualizację. Stary folder zostaje nietknięty. Przy instalacji lub naprawie moda launcher
+przenosi pozostały `BepInEx/config/StarTruckMP.Client.cfg` do `StarTruckerMP.Client.cfg` (zachowując
+wartości, których nie zarządza, np. wzmocnienie radia) i usuwa stary folder `BepInEx/plugins/StarTruckMP`,
+żeby mod nie wczytywał się dwa razy.
+
 ## Co launcher zapisuje i gdzie
 
 | Plik | Znaczenie |

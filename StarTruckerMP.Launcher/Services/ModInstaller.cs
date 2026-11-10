@@ -31,6 +31,28 @@ internal sealed class ModInstaller
 
     public static string PluginDirectory(string gamePath) => Path.Combine(gamePath, "BepInEx", "plugins", "StarTruckerMP");
 
+    /// <summary>Plugin folder written before the rename; left in place it loads a second copy of the mod.</summary>
+    public static string LegacyPluginDirectory(string gamePath) => Path.Combine(gamePath, "BepInEx", "plugins", "StarTruckMP");
+
+    /// <summary>Best effort cleanup of the pre-rename plugin folder after a successful install.</summary>
+    public static bool RemoveLegacyPluginDirectory(string gamePath)
+    {
+        try
+        {
+            var legacyDirectory = LegacyPluginDirectory(gamePath);
+            if (!Directory.Exists(legacyDirectory))
+                return false;
+
+            Directory.Delete(legacyDirectory, recursive: true);
+            return true;
+        }
+        catch
+        {
+            // Locked files only leave the old copy behind; the install itself already succeeded.
+            return false;
+        }
+    }
+
     public static string ClientAssemblyPath(string gamePath) =>
         Path.Combine(PluginDirectory(gamePath), "StarTruckerMP.Client.dll");
 
@@ -125,6 +147,9 @@ internal sealed class ModInstaller
             progress.Report(Strings.ClientWithoutOverlay);
             _log.Log(Strings.OverlayMissingFromArchive);
         }
+
+        if (RemoveLegacyPluginDirectory(gamePath))
+            _log.Log(Strings.LegacyPluginRemoved);
 
         _log.Log(Strings.ClientInstalledFrom(url));
     }
