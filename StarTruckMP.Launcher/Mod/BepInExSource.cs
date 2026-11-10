@@ -3,6 +3,7 @@ using System.Net;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
+using StarTruckMP.Launcher.Localization;
 using StarTruckMP.Launcher.Services;
 
 namespace StarTruckMP.Launcher.Mod;
@@ -69,7 +70,6 @@ internal static class BepInExSource
             return (url, build);
         }
 
-        throw new InvalidOperationException(
-            "No BepInEx 6 IL2CPP win-x64 archive was found on builds.bepinex.dev.");
+        throw new InvalidOperationException(Strings.BepInExNoBuild);
     }
 }

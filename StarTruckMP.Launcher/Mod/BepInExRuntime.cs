@@ -4,6 +4,7 @@ using System.IO.Compression;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using StarTruckMP.Launcher.Localization;
 using StarTruckMP.Launcher.Services;
 
 namespace StarTruckMP.Launcher.Mod;
@@ -54,7 +55,7 @@ internal static class BepInExRuntime
 
         if (HasBepInEx(gamePath))
         {
-            progress.Report("BepInEx 6 (IL2CPP) is already installed.");
+            progress.Report(Strings.BepInExAlreadyInstalled);
             return;
         }
 
@@ -63,7 +64,7 @@ internal static class BepInExRuntime
             // Mixing BepInEx 5 with the IL2CPP loader leaves two loaders fighting over the
             // same folder, so the old one is moved aside instead of being overwritten.
             var backup = Path.Combine(gamePath, $"BepInEx.mono-backup-{DateTime.Now:yyyyMMddHHmmss}");
-            progress.Report($"BepInEx 5 (Mono) found — it cannot load this mod. Moving it to {Path.GetFileName(backup)}…");
+            progress.Report(Strings.BepInExMonoBackup(Path.GetFileName(backup)));
             Directory.Move(Path.Combine(gamePath, "BepInEx"), backup);
         }
 
@@ -71,7 +72,7 @@ internal static class BepInExRuntime
 
         if (payload is not null)
         {
-            progress.Report($"Using the local BepInEx payload in {payloadRoot}…");
+            progress.Report(Strings.BepInExUsingPayload(payloadRoot));
 
             try
             {
@@ -85,35 +86,31 @@ internal static class BepInExRuntime
             catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
             {
                 throw new InvalidOperationException(
-                    "The BepInEx payload could not be copied into the game folder. If the game is installed under " +
-                    "Program Files, run the launcher as administrator or move the Steam library to another drive. Details: " +
-                    exception.Message,
+                    Strings.BepInExPayloadWriteFailed(exception.Message),
                     exception);
             }
         }
         else
         {
-            progress.Report("Looking up the latest BepInEx 6 (IL2CPP, win-x64) build…");
+            progress.Report(Strings.BepInExLookingUp);
 
             var (url, build) = await BepInExSource
                 .FindLatestAsync(cancellationToken)
                 .ConfigureAwait(false);
 
-            progress.Report($"Downloading BepInEx 6.0.0-be.{build}…");
+            progress.Report(Strings.BepInExDownloading(build));
             var archive = await Downloader.DownloadToTempAsync(url, progress, cancellationToken).ConfigureAwait(false);
 
             try
             {
-                progress.Report("Extracting BepInEx into the game folder…");
+                progress.Report(Strings.BepInExExtracting);
                 ZipFile.ExtractToDirectory(archive, gamePath, overwriteFiles: true);
                 FlattenSingleTopLevelFolder(gamePath);
             }
             catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
             {
                 throw new InvalidOperationException(
-                    "BepInEx could not be written into the game folder. If the game is installed under Program Files, " +
-                    "run the launcher as administrator or move the Steam library to another drive. Details: " +
-                    exception.Message,
+                    Strings.BepInExWriteFailed(exception.Message),
                     exception);
             }
             finally
@@ -123,10 +120,9 @@ internal static class BepInExRuntime
         }
 
         if (!HasBepInEx(gamePath))
-            throw new InvalidOperationException(
-                "BepInEx was extracted but the IL2CPP loader files are missing. The build layout may have changed.");
+            throw new InvalidOperationException(Strings.BepInExLayoutChanged);
 
-        progress.Report("BepInEx 6 (IL2CPP) is in place.");
+        progress.Report(Strings.BepInExReady);
     }
 
     /// <summary>

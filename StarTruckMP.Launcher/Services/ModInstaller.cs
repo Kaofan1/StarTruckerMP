@@ -4,6 +4,7 @@ using System.IO;
 using System.IO.Compression;
 using System.Threading;
 using System.Threading.Tasks;
+using StarTruckMP.Launcher.Localization;
 using StarTruckMP.Launcher.Mod;
 
 namespace StarTruckMP.Launcher.Services;
@@ -68,16 +69,13 @@ internal sealed class ModInstaller
         Directory.CreateDirectory(gamePath);
 
         if (IsGameRunning())
-            throw new InvalidOperationException(
-                "Star Trucker is running. Close the game first — Windows keeps the mod files locked while it is open.");
+            throw new InvalidOperationException(Strings.GameRunningBlock);
 
         await InstallClientAsync(gamePath, progress, cancellationToken).ConfigureAwait(false);
 
-        progress.Report("Multiplayer client is ready.");
-        progress.Report(
-            "The first launch after installing generates the BepInEx IL2CPP interop assemblies and can take a few minutes. " +
-            "If the overlay does not appear the first time, restart the game once.");
-        _log.Log("Client installation finished.");
+        progress.Report(Strings.ClientReady);
+        progress.Report(Strings.FirstLaunchNote);
+        _log.Log(Strings.ClientInstallFinished);
     }
 
     private async Task InstallClientAsync(
@@ -87,26 +85,23 @@ internal sealed class ModInstaller
     {
         // The client is always refreshed: that is what makes the same button repair a
         // half-copied install and update an outdated plugin.
-        progress.Report("Looking up the latest StarTruckMP client release…");
+        progress.Report(Strings.ClientLookingUp);
 
         var url = await GitHubReleases
             .FindAssetUrlAsync(RepositoryOwner, RepositoryName, IsPluginAsset, cancellationToken)
             .ConfigureAwait(false);
 
         if (string.IsNullOrWhiteSpace(url))
-            throw new InvalidOperationException(
-                $"None of the {RepositoryOwner}/{RepositoryName} releases contains the mod package yet " +
-                "(StarTruckMP-bepinex-plugin-win-x64.zip). The launcher keeps working without it, but the multiplayer " +
-                "client has to be published in a release before the launcher can add it — please report this in the Issues tab.");
+            throw new InvalidOperationException(Strings.ClientPackageMissing);
 
-        progress.Report($"Downloading {url[(url.LastIndexOf('/') + 1)..]}…");
+        progress.Report(Strings.ClientDownloading(url[(url.LastIndexOf('/') + 1)..]));
         var archive = await Downloader.DownloadToTempAsync(url, progress, cancellationToken).ConfigureAwait(false);
 
         var pluginDirectory = PluginDirectory(gamePath);
 
         try
         {
-            progress.Report($"Installing the client into {pluginDirectory}…");
+            progress.Report(Strings.ClientInstalling(pluginDirectory));
             if (Directory.Exists(pluginDirectory))
                 Directory.Delete(pluginDirectory, recursive: true);
 
@@ -115,10 +110,7 @@ internal sealed class ModInstaller
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {
-            throw new InvalidOperationException(
-                "The client files could not be written into the game folder. Make sure the game is closed; if it is " +
-                "installed under Program Files, run the launcher as administrator. Details: " + exception.Message,
-                exception);
+            throw new InvalidOperationException(Strings.ClientWriteFailed(exception.Message), exception);
         }
         finally
         {
@@ -126,15 +118,15 @@ internal sealed class ModInstaller
         }
 
         if (!HasPlugin(gamePath))
-            throw new InvalidOperationException("The client archive was extracted but StarTruckMP.Client.dll is missing.");
+            throw new InvalidOperationException(Strings.ClientAssemblyMissing);
 
         if (!HasOverlay(gamePath))
         {
-            progress.Report("Warning: the release does not contain the overlay. The radio UI will not be available.");
-            _log.Log("Warning: overlay/StarTruckMP.Overlay.exe is missing from the client archive.");
+            progress.Report(Strings.ClientWithoutOverlay);
+            _log.Log(Strings.OverlayMissingFromArchive);
         }
 
-        _log.Log("Client plugin installed from " + url);
+        _log.Log(Strings.ClientInstalledFrom(url));
     }
 
     private static bool IsPluginAsset(string name) =>

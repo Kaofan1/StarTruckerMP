@@ -253,4 +253,102 @@ internal static class Strings
 
     public static string ReleasePageFailed(string reason) =>
         T($"Could not open the release page: {reason}", $"Nie udało się otworzyć strony wydania: {reason}");
+
+    // ----- mod installation progress -----
+
+    public static string BepInExAlreadyInstalled =>
+        T("BepInEx 6 (IL2CPP) is already installed.", "BepInEx 6 (IL2CPP) jest już zainstalowany.");
+
+    public static string BepInExMonoBackup(string backup) =>
+        T($"BepInEx 5 (Mono) found — it cannot load this mod. Moving it to {backup}…",
+            $"Wykryto BepInEx 5 (Mono) — nie obsługuje tego moda. Przenoszę go do {backup}…");
+
+    public static string BepInExUsingPayload(string path) =>
+        T($"Using the local BepInEx payload in {path}…", $"Używam lokalnego payloadu BepInEx z {path}…");
+
+    public static string BepInExPayloadWriteFailed(string reason) =>
+        T("The BepInEx payload could not be copied into the game folder. If the game is installed under Program Files, " +
+          "run the launcher as administrator or move the Steam library to another drive. Details: " + reason,
+            "Nie udało się skopiować payloadu BepInEx do folderu gry. Jeśli gra jest w Program Files, uruchom launcher " +
+            "jako administrator albo przenieś bibliotekę Steam na inny dysk. Szczegóły: " + reason);
+
+    public static string BepInExLookingUp =>
+        T("Looking up the latest BepInEx 6 (IL2CPP, win-x64) build…", "Szukam najnowszego builda BepInEx 6 (IL2CPP, win-x64)…");
+
+    public static string BepInExDownloading(string build) =>
+        T($"Downloading BepInEx 6.0.0-be.{build}…", $"Pobieram BepInEx 6.0.0-be.{build}…");
+
+    public static string BepInExExtracting =>
+        T("Extracting BepInEx into the game folder…", "Rozpakowuję BepInEx do folderu gry…");
+
+    public static string BepInExWriteFailed(string reason) =>
+        T("BepInEx could not be written into the game folder. If the game is installed under Program Files, run the " +
+          "launcher as administrator or move the Steam library to another drive. Details: " + reason,
+            "Nie udało się zapisać BepInEx w folderze gry. Jeśli gra jest w Program Files, uruchom launcher jako " +
+            "administrator albo przenieś bibliotekę Steam na inny dysk. Szczegóły: " + reason);
+
+    public static string BepInExLayoutChanged =>
+        T("BepInEx was extracted but the IL2CPP loader files are missing. The build layout may have changed.",
+            "BepInEx został rozpakowany, ale brakuje plików loadera IL2CPP. Układ builda mógł się zmienić.");
+
+    public static string BepInExReady =>
+        T("BepInEx 6 (IL2CPP) is in place.", "BepInEx 6 (IL2CPP) jest na miejscu.");
+
+    public static string BepInExNoBuild =>
+        T("No BepInEx 6 IL2CPP win-x64 archive was found on builds.bepinex.dev.",
+            "Nie znaleziono archiwum BepInEx 6 IL2CPP win-x64 na builds.bepinex.dev.");
+
+    public static string GameRunningBlock =>
+        T("Star Trucker is running. Close the game first — Windows keeps the mod files locked while it is open.",
+            "Star Trucker jest uruchomiony. Najpierw zamknij grę — Windows blokuje pliki moda, gdy gra działa.");
+
+    public static string ClientReady =>
+        T("Multiplayer client is ready.", "Klient multiplayera jest gotowy.");
+
+    public static string FirstLaunchNote =>
+        T("The first launch after installing generates the BepInEx IL2CPP interop assemblies and can take a few minutes. " +
+          "If the overlay does not appear the first time, restart the game once.",
+            "Pierwsze uruchomienie po instalacji generuje biblioteki interop BepInEx IL2CPP i może potrwać kilka minut. " +
+            "Jeśli overlay nie pojawi się za pierwszym razem, uruchom grę ponownie.");
+
+    public static string ClientLookingUp =>
+        T("Looking up the latest StarTruckMP client release…", "Szukam najnowszego wydania klienta StarTruckMP…");
+
+    public static string ClientPackageMissing =>
+        T("None of the Kaofan1/StarTruckerMP releases contains the mod package yet (StarTruckMP-bepinex-plugin-win-x64.zip). " +
+          "The launcher keeps working without it, but the multiplayer client has to be published in a release before the " +
+          "launcher can add it — please report this in the Issues tab.",
+            "Żadne wydanie Kaofan1/StarTruckerMP nie zawiera jeszcze paczki moda (StarTruckMP-bepinex-plugin-win-x64.zip). " +
+            "Launcher działa dalej bez niej, ale klient multiplayera musi zostać opublikowany w wydaniu, zanim launcher " +
+            "będzie mógł go dodać — zgłoś to w zakładce Issues.");
+
+    public static string ClientDownloading(string file) =>
+        T($"Downloading {file}…", $"Pobieram {file}…");
+
+    public static string ClientInstalling(string directory) =>
+        T($"Installing the client into {directory}…", $"Instaluję klienta w {directory}…");
+
+    public static string ClientWriteFailed(string reason) =>
+        T("The client files could not be written into the game folder. Make sure the game is closed; if it is " +
+          "installed under Program Files, run the launcher as administrator. Details: " + reason,
+            "Nie udało się zapisać plików klienta w folderze gry. Upewnij się, że gra jest zamknięta; jeśli jest " +
+            "w Program Files, uruchom launcher jako administrator. Szczegóły: " + reason);
+
+    public static string ClientAssemblyMissing =>
+        T("The client archive was extracted but StarTruckMP.Client.dll is missing.",
+            "Archiwum klienta zostało rozpakowane, ale brakuje StarTruckMP.Client.dll.");
+
+    public static string ClientWithoutOverlay =>
+        T("Warning: the release does not contain the overlay. The radio UI will not be available.",
+            "Uwaga: wydanie nie zawiera overlaya. Interfejs radia nie będzie dostępny.");
+
+    public static string OverlayMissingFromArchive =>
+        T("Warning: overlay/StarTruckMP.Overlay.exe is missing from the client archive.",
+            "Uwaga: w archiwum klienta brakuje overlay/StarTruckMP.Overlay.exe.");
+
+    public static string ClientInstallFinished =>
+        T("Client installation finished.", "Instalacja klienta zakończona.");
+
+    public static string ClientInstalledFrom(string url) =>
+        T($"Client plugin installed from {url}", $"Plugin klienta zainstalowany z {url}");
 }
