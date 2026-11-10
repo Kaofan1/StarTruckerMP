@@ -28,6 +28,14 @@ gracz uruchamia jeden plik `StarTruckerMP-Setup.exe`, a launcher robi resztę:
 > Jeśli w folderze gry był wcześniej BepInEx 5 (Mono), launcher przenosi go do `BepInEx.mono-backup-<data>`
 > zamiast mieszać oba loadery.
 
+## Sprawdzanie aktualizacji
+
+Przy starcie launcher pyta GitHub Releases o najnowsze wydanie (`alpha-v<N>`) i porównuje je z własną wersją.
+CI buduje launcher jako `1.0.<N>`, więc numer wydania i numer builda są zgodne. Gdy dostępne jest nowsze
+wydanie, pod numerem wersji w nagłówku pojawia się przycisk **Update available · Alpha v0.N** — kliknięcie
+otwiera stronę wydania w przeglądarce. Sprawdzenie jest ciche: brak internetu lub limit GitHub API kończy się
+wpisem w logu (`Update check skipped: …`) i nie blokuje startu ani gry.
+
 ## Launcher działa samodzielnie, BepInEx jest opcjonalny
 
 Launcher nie wymaga BepInEx i nie dotyka folderu gry, dopóki nie klikniesz **Install / repair mod**.

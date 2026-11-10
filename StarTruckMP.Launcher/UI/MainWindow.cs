@@ -57,6 +57,11 @@ internal sealed class MainWindow : Window
         HorizontalAlignment = HorizontalAlignment.Right
     };
 
+    private readonly Button _updateButton = LauncherTheme.MakeButton(
+        "Update available",
+        ActionVariant.Ghost,
+        stretch: false);
+
     private readonly TextBlock _serverSummaryText = new()
     {
         Text = "No server selected",
@@ -191,8 +196,19 @@ internal sealed class MainWindow : Window
 
         WireEvents();
 
+        _updateButton.IsVisible = false;
+        _updateButton.HorizontalAlignment = HorizontalAlignment.Right;
+        _updateButton.Margin = new Thickness(0, 2, 0, 0);
+        _updateButton.FontSize = 11.5;
+        _updateButton.Foreground = LauncherTheme.AmberBrush;
+        _updateButton.Click += (_, _) => OpenUpdatePage();
+
         _log.LineWritten += OnLogLine;
-        Opened += (_, _) => DetectGame();
+        Opened += (_, _) =>
+        {
+            DetectGame();
+            _ = CheckForUpdatesAsync();
+        };
         Closing += (_, _) => SaveSettings();
     }
 
@@ -317,7 +333,7 @@ internal sealed class MainWindow : Window
             Spacing = 8,
             VerticalAlignment = VerticalAlignment.Center,
             HorizontalAlignment = HorizontalAlignment.Right,
-            Children = { pill, _versionText }
+            Children = { pill, _versionText, _updateButton }
         };
 
         var layout = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto") };
@@ -588,6 +604,45 @@ internal sealed class MainWindow : Window
         {
             SetBusy(false, string.Empty);
             RefreshModState();
+        }
+    }
+
+    private async System.Threading.Tasks.Task CheckForUpdatesAsync()
+    {
+        try
+        {
+            var update = await UpdateChecker.FindUpdateAsync(System.Threading.CancellationToken.None);
+
+            if (update is null)
+            {
+                _log.Log($"Launcher v{UpdateChecker.CurrentVersion.ToString(3)} is up to date.");
+                return;
+            }
+
+            _updateButton.Tag = update.PageUrl;
+            _updateButton.Content = $"Update available · {update.Name}";
+            _updateButton.IsVisible = true;
+            _log.Log($"A newer launcher is available: {update.Name} ({update.Tag}). Download: {update.PageUrl}");
+        }
+        catch (Exception exception)
+        {
+            // A failed update check must never get in the way of launching the game.
+            _log.Log("Update check skipped: " + exception.Message);
+        }
+    }
+
+    private void OpenUpdatePage()
+    {
+        var url = _updateButton.Tag as string ?? UpdateChecker.ReleasesPageUrl;
+
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(url) { UseShellExecute = true });
+            _log.Log("Opened the release page: " + url);
+        }
+        catch (Exception exception)
+        {
+            _log.Log("Could not open the release page: " + exception.Message);
         }
     }
 

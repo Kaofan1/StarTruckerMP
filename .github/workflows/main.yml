@@ -145,6 +145,7 @@ jobs:
           dotnet publish StarTruckMP.Launcher/StarTruckMP.Launcher.csproj `
             -c Release `
             -r win-x64 `
+            -p:Version=1.0.${{ github.event.inputs.version || github.run_number }} `
             --self-contained true `
             -p:PublishSingleFile=true `
             -p:IncludeNativeLibrariesForSelfExtract=true `
