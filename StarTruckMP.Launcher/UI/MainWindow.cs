@@ -378,7 +378,7 @@ internal sealed class MainWindow : Window
     {
         var left = new StackPanel
         {
-            Spacing = 14,
+            Spacing = 12,
             Children =
             {
                 BuildInstallCard(),
@@ -396,8 +396,8 @@ internal sealed class MainWindow : Window
 
         var right = new StackPanel
         {
-            Spacing = 14,
-            Margin = new Thickness(14, 0, 0, 0),
+            Spacing = 12,
+            Margin = new Thickness(12, 0, 0, 0),
             Children =
             {
                 BuildConnectCard(),
@@ -529,11 +529,19 @@ internal sealed class MainWindow : Window
 
     private Control BuildShortcutsCard()
     {
+        // Two equal buttons on one row keep the column rhythm tight; stacked full-width bars
+        // left a large gap under the heading and made the card the tallest in the column.
+        var row = new Grid { ColumnDefinitions = new ColumnDefinitions("*,*") };
+        row.Children.Add(_openGameFolderButton);
+
+        _openConfigButton.Margin = new Thickness(8, 0, 0, 0);
+        row.Children.Add(_openConfigButton);
+        Grid.SetColumn(_openConfigButton, 1);
+
         return LauncherTheme.Card(
             Strings.CardShortcuts,
             null,
-            _openGameFolderButton,
-            _openConfigButton,
+            row,
             LauncherTheme.Caption(Strings.ShortcutsCaption));
     }
 
