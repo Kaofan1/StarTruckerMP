@@ -67,7 +67,9 @@ public class CbRadioPttComponent : MonoBehaviour
 
     private void Awake()
     {
-        DontDestroyOnLoad(gameObject);
+        if (transform.parent == null)
+            DontDestroyOnLoad(gameObject);
+
         _cts = new CancellationTokenSource();
 
         _samplesPerFrame = SampleRate * FrameDurationMs / 1000;

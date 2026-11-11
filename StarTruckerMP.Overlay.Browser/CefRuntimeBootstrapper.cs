@@ -33,6 +33,16 @@ public static class CefRuntimeBootstrapper
 
             settings.CefCommandLineArgs["disable-gpu-vsync"] = "1";
             settings.CefCommandLineArgs["autoplay-policy"] = "no-user-gesture-required";
+
+            // Chromium starts its push, component update and on-device model services even though
+            // the overlay only renders a local page, and every attempt logs a noisy error.
+            settings.CefCommandLineArgs["disable-background-networking"] = "1";
+            settings.CefCommandLineArgs["disable-component-update"] = "1";
+            settings.CefCommandLineArgs["disable-sync"] = "1";
+            settings.CefCommandLineArgs["no-service-autorun"] = "1";
+            settings.CefCommandLineArgs["disable-domain-reliability"] = "1";
+            settings.CefCommandLineArgs["disable-features"] =
+                "OptimizationHints,MediaRouter,OnDeviceModel,OptimizationGuideModelDownloading,Translate";
             if (ignoreCertificateErrors)
                 settings.CefCommandLineArgs["ignore-certificate-errors"] = "1";
 

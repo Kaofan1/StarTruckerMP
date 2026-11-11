@@ -93,7 +93,10 @@ public class CbRadioSpeakerComponent : MonoBehaviour
 
     private void Awake()
     {
-        DontDestroyOnLoad(gameObject);
+        // The speaker lives on a child object of the truck, and DontDestroyOnLoad accepts root
+        // objects only, so asking for it there just produced a Unity warning.
+        if (transform.parent == null)
+            DontDestroyOnLoad(gameObject);
 
         // Max Opus frame is 120 ms
         _maxFrameSizePerChannel = CbRadioPttComponent.SampleRate * 120 / 1000;
