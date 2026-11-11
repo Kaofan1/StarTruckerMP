@@ -108,7 +108,7 @@ internal static class OverlayManager
                 };
                 _overlayProcess.ErrorDataReceived += (_, e) =>
                 {
-                    if (!string.IsNullOrEmpty(e.Data))
+                    if (!string.IsNullOrEmpty(e.Data) && !IsChromiumInternalNoise(e.Data))
                         App.Log.LogWarning($"[Overlay:err] {e.Data}");
                 };
                 _overlayProcess.BeginOutputReadLine();
@@ -137,6 +137,15 @@ internal static class OverlayManager
         }
         catch { /* ignored */ }
     }
+
+    /// <summary>
+    /// Chromium logs failures of its own push and model services on stderr. The overlay only
+    /// renders a local page, so those lines say nothing about the mod and are not worth a warning.
+    /// </summary>
+    private static bool IsChromiumInternalNoise(string line) =>
+        line.Contains("google_apis", StringComparison.OrdinalIgnoreCase)
+        || line.Contains("on_device_model", StringComparison.OrdinalIgnoreCase)
+        || line.Contains("gcm", StringComparison.OrdinalIgnoreCase);
 
     #endregion
 

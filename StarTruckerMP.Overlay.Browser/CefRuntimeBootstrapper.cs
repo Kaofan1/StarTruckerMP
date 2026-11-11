@@ -42,7 +42,7 @@ public static class CefRuntimeBootstrapper
             settings.CefCommandLineArgs["no-service-autorun"] = "1";
             settings.CefCommandLineArgs["disable-domain-reliability"] = "1";
             settings.CefCommandLineArgs["disable-features"] =
-                "OptimizationHints,MediaRouter,OnDeviceModel,OptimizationGuideModelDownloading,Translate";
+                "OptimizationHints,MediaRouter,OnDeviceModel,OptimizationGuideModelDownloading,Translate,PushMessaging,BackgroundFetch";
             if (ignoreCertificateErrors)
                 settings.CefCommandLineArgs["ignore-certificate-errors"] = "1";
 
