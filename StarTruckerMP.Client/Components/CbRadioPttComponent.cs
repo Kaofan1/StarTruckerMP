@@ -67,8 +67,11 @@ public class CbRadioPttComponent : MonoBehaviour
 
     private void Awake()
     {
-        if (transform.parent == null)
-            DontDestroyOnLoad(gameObject);
+        // This component is added to the player's truck, so the truck owns its lifetime. Moving
+        // the object to the DontDestroyOnLoad scene kept the whole cab alive after choosing
+        // "Exit to main menu": every grabbable, seat, brake, scanner and the ambient audio kept
+        // ticking without the objects they refer to and threw a NullReferenceException each frame.
+        App.Log.LogInfo($"[CB Radio] PTT attached to '{gameObject.name}' (root={transform.parent == null}).");
 
         _cts = new CancellationTokenSource();
 

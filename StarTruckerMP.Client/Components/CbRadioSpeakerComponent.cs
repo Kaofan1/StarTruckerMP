@@ -93,10 +93,10 @@ public class CbRadioSpeakerComponent : MonoBehaviour
 
     private void Awake()
     {
-        // The speaker lives on a child object of the truck, and DontDestroyOnLoad accepts root
-        // objects only, so asking for it there just produced a Unity warning.
-        if (transform.parent == null)
-            DontDestroyOnLoad(gameObject);
+        // The speaker lives on the truck's CB radio, so the truck owns its lifetime. It must never
+        // be moved to the DontDestroyOnLoad scene: doing so took the whole truck (or its CB radio)
+        // past the scene unload, and the abandoned scripts flooded the log with exceptions.
+        App.Log.LogInfo($"[CB Radio] Speaker attached to '{gameObject.name}' (root={transform.parent == null}).");
 
         // Max Opus frame is 120 ms
         _maxFrameSizePerChannel = CbRadioPttComponent.SampleRate * 120 / 1000;

@@ -228,6 +228,10 @@ public class GameEventsComponent : MonoBehaviour
     
     private void Update()
     {
+        // Unity objects may only be read on the main thread, so the position threads get a copy
+        // of the pose instead of touching the game objects themselves.
+        CapturePoses();
+
         if (SectorPersistence.instance && !_subscribedToSectorArrival)
         {
             SectorPersistence.instance.onArrivedAtSector.onTriggered +=
@@ -430,6 +434,7 @@ public class GameEventsComponent : MonoBehaviour
     
     private CancellationTokenSource _cts = new();
     private const float ThresholdChange = 0.1f;
+    private const float ThresholdChangeSquared = ThresholdChange * ThresholdChange;
     
     #region Player Location updates
     
@@ -451,7 +456,9 @@ public class GameEventsComponent : MonoBehaviour
             
             App.Log.LogInfo("PlayerPositionThread started");
             
-            var lastPosition = Vector3.zero;
+            var lastX = 0f;
+            var lastY = 0f;
+            var lastZ = 0f;
             while (!ct.IsCancellationRequested)
             {
                 if (Network.NetId == -1)
@@ -459,10 +466,9 @@ public class GameEventsComponent : MonoBehaviour
                     ct.WaitHandle.WaitOne(15);
                     continue;
                 }
-                
-                var player = _player;
-                var rigid = _playerRigid;
-                if (player == null || rigid == null)
+
+                var snapshot = _playerSnapshot;
+                if (snapshot == null)
                 {
                     ct.WaitHandle.WaitOne(250);
                     continue;
@@ -470,24 +476,25 @@ public class GameEventsComponent : MonoBehaviour
 
                 try
                 {
-                    player.transform.GetPositionAndRotation(out var position, out var rotation);
-                    if (Vector3.Distance(lastPosition, position) > ThresholdChange)
+                    if (snapshot.DistanceSquared(lastX, lastY, lastZ) > ThresholdChangeSquared)
                     {
                         Network.SendServerMessage(new UpdatePositionCmd
                         {
-                            Position = ConvertToSharedVector3(position),
-                            Rotation = ConvertToSharedQuaternion(rotation),
-                            Velocity = ConvertToSharedVector3(rigid.velocity),
-                            AngVel = ConvertToSharedVector3(rigid.angularVelocity),
+                            Position = snapshot.Position,
+                            Rotation = snapshot.Rotation,
+                            Velocity = snapshot.Velocity,
+                            AngVel = snapshot.AngularVelocity,
                             IsTruck = false,
                             InSeat = false
                         }, PacketType.UpdatePosition);
+
+                        lastX = snapshot.X;
+                        lastY = snapshot.Y;
+                        lastZ = snapshot.Z;
                     }
                 }
                 catch (Exception exception)
                 {
-                    // Touching a destroyed il2cpp object from this thread used to take the whole
-                    // game down; the objects are resolved again on the next sector arrival.
                     App.Log.LogWarning("[Player] Position update skipped: " + exception.Message);
                     ct.WaitHandle.WaitOne(250);
                     continue;
@@ -517,7 +524,9 @@ public class GameEventsComponent : MonoBehaviour
             
             App.Log.LogInfo("TruckPositionThread started");
             
-            var lastPosition = Vector3.zero;
+            var lastX = 0f;
+            var lastY = 0f;
+            var lastZ = 0f;
             while (!ct.IsCancellationRequested)
             {
                 if (Network.NetId == -1)
@@ -525,10 +534,9 @@ public class GameEventsComponent : MonoBehaviour
                     ct.WaitHandle.WaitOne(15);
                     continue;
                 }
-                
-                var truck = _truck;
-                var rigid = _truckRigid;
-                if (truck == null || rigid == null)
+
+                var snapshot = _truckSnapshot;
+                if (snapshot == null)
                 {
                     ct.WaitHandle.WaitOne(250);
                     continue;
@@ -536,18 +544,21 @@ public class GameEventsComponent : MonoBehaviour
 
                 try
                 {
-                    truck.transform.GetPositionAndRotation(out var position, out var rotation);
-                    if (Vector3.Distance(lastPosition, position) > ThresholdChange)
+                    if (snapshot.DistanceSquared(lastX, lastY, lastZ) > ThresholdChangeSquared)
                     {
                         Network.SendServerMessage(new UpdatePositionCmd
                         {
-                            Position = ConvertToSharedVector3(position),
-                            Rotation = ConvertToSharedQuaternion(rotation),
-                            Velocity = ConvertToSharedVector3(rigid.velocity),
-                            AngVel = ConvertToSharedVector3(rigid.angularVelocity),
+                            Position = snapshot.Position,
+                            Rotation = snapshot.Rotation,
+                            Velocity = snapshot.Velocity,
+                            AngVel = snapshot.AngularVelocity,
                             IsTruck = true,
                             InSeat = false
                         }, PacketType.UpdatePosition);
+
+                        lastX = snapshot.X;
+                        lastY = snapshot.Y;
+                        lastZ = snapshot.Z;
                     }
                 }
                 catch (Exception exception)
@@ -566,9 +577,73 @@ public class GameEventsComponent : MonoBehaviour
 
     #endregion
     
-    private StarTruckerMP.Shared.Vector3 ConvertToSharedVector3(Vector3 unityVector)
+    #region Pose snapshots
+
+    /// <summary>
+    /// The position threads run off the main thread, where touching a Unity object is illegal.
+    /// They used to read the player and the truck directly, and once those objects were destroyed
+    /// by a scene unload the il2cpp call crashed the whole process with an access violation inside
+    /// coreclr. The main thread copies the pose into plain values and the threads only read those.
+    /// </summary>
+    private sealed class PoseSnapshot
     {
-        return new StarTruckerMP.Shared.Vector3
+        public readonly global::StarTruckerMP.Shared.Vector3 Position;
+        public readonly global::StarTruckerMP.Shared.Quaternion Rotation;
+        public readonly global::StarTruckerMP.Shared.Vector3 Velocity;
+        public readonly global::StarTruckerMP.Shared.Vector3 AngularVelocity;
+
+        public PoseSnapshot(Vector3 position, Quaternion rotation, Vector3 velocity, Vector3 angularVelocity)
+        {
+            Position = ConvertToSharedVector3(position);
+            Rotation = ConvertToSharedQuaternion(rotation);
+            Velocity = ConvertToSharedVector3(velocity);
+            AngularVelocity = ConvertToSharedVector3(angularVelocity);
+        }
+
+        public float X => Position.X;
+        public float Y => Position.Y;
+        public float Z => Position.Z;
+
+        public float DistanceSquared(float x, float y, float z)
+        {
+            var dx = Position.X - x;
+            var dy = Position.Y - y;
+            var dz = Position.Z - z;
+            return dx * dx + dy * dy + dz * dz;
+        }
+    }
+
+    private volatile PoseSnapshot _playerSnapshot;
+    private volatile PoseSnapshot _truckSnapshot;
+
+    private void CapturePoses()
+    {
+        _playerSnapshot = CapturePose(_player, _playerRigid);
+        _truckSnapshot = CapturePose(_truck, _truckRigid);
+    }
+
+    private static PoseSnapshot CapturePose(GameObject gameObject, Rigidbody body)
+    {
+        if (gameObject == null)
+            return null;
+
+        try
+        {
+            gameObject.transform.GetPositionAndRotation(out var position, out var rotation);
+            var velocity = body == null ? Vector3.zero : body.velocity;
+            var angularVelocity = body == null ? Vector3.zero : body.angularVelocity;
+            return new PoseSnapshot(position, rotation, velocity, angularVelocity);
+        }
+        catch (Exception exception)
+        {
+            App.Log.LogWarning("[Pose] Skipped an object that is being destroyed: " + exception.Message);
+            return null;
+        }
+    }
+
+    private static global::StarTruckerMP.Shared.Vector3 ConvertToSharedVector3(Vector3 unityVector)
+    {
+        return new global::StarTruckerMP.Shared.Vector3
         {
             X = unityVector.x,
             Y = unityVector.y,
@@ -576,9 +651,9 @@ public class GameEventsComponent : MonoBehaviour
         };
     }
 
-    private StarTruckerMP.Shared.Quaternion ConvertToSharedQuaternion(Quaternion unityQuaternion)
+    private static global::StarTruckerMP.Shared.Quaternion ConvertToSharedQuaternion(Quaternion unityQuaternion)
     {
-        return new Shared.Quaternion()
+        return new global::StarTruckerMP.Shared.Quaternion
         {
             X = unityQuaternion.x,
             Y = unityQuaternion.y,
@@ -586,6 +661,8 @@ public class GameEventsComponent : MonoBehaviour
             W = unityQuaternion.w
         };
     }
+
+    #endregion
 
     #region Recycle
     
