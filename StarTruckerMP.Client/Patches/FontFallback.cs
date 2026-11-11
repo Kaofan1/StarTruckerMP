@@ -79,8 +79,10 @@ public static class FontFallback
             patched++;
         }
 
+        // The two fonts do not necessarily load in the same frame, so the attempts continue until
+        // the cap is reached and every asset that shows up gets the fallback.
         if (patched > 0)
-            _installed = true;
+            App.Log.LogInfo($"[Fonts] Fallback applied to {patched} font asset(s) so far.");
     }
 
     private static TMP_FontAsset FindFallback(Il2CppArrayBase<TMP_FontAsset> fonts)
