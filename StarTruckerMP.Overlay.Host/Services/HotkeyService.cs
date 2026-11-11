@@ -12,12 +12,22 @@ internal sealed class HotkeyService : IDisposable
     private readonly IOverlayLogger _logger;
     private bool _disposed;
 
+    /// <summary>
+    /// Enabling the mode moves focus to the overlay window, and Windows then delivers the same
+    /// key press to the newly focused window. Without this window a single F2 would open the panel
+    /// and immediately close it again.
+    /// </summary>
+    private static readonly TimeSpan EchoGuard = TimeSpan.FromSeconds(2);
+
+    private DateTime _modeEnabledAt = DateTime.MinValue;
+
     public HotkeyService(OverlayWindow window, OverlayModeService modeService, IOverlayLogger logger)
     {
         _window = window;
         _modeService = modeService;
         _logger = logger;
         _window.KeyDown += OnKeyDown;
+        _modeService.UiModeChanged += OnUiModeChanged;
     }
 
     public void Dispose()
@@ -27,6 +37,13 @@ internal sealed class HotkeyService : IDisposable
 
         _disposed = true;
         _window.KeyDown -= OnKeyDown;
+        _modeService.UiModeChanged -= OnUiModeChanged;
+    }
+
+    private void OnUiModeChanged(object? sender, bool enabled)
+    {
+        if (enabled)
+            _modeEnabledAt = DateTime.UtcNow;
     }
 
     private void OnKeyDown(object? sender, KeyEventArgs e)
@@ -35,6 +52,13 @@ internal sealed class HotkeyService : IDisposable
         // game handles F2 itself. Reacting here as well toggled the mode twice for one key press.
         if (e.Key == Key.F2 && _modeService.UiModeEnabled)
         {
+            if (DateTime.UtcNow - _modeEnabledAt < EchoGuard)
+            {
+                _logger.Info("[Hotkey] F2 ignored, the same press already opened the panel");
+                e.Handled = true;
+                return;
+            }
+
             _logger.Info("[Hotkey] F2 => toggle UI mode");
             _modeService.ToggleUiMode();
             e.Handled = true;
