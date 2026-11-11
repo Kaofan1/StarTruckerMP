@@ -31,10 +31,16 @@ public class GameEventsComponent : MonoBehaviour
                     App.Log.LogInfo($"[Object Inspector] request extra data for object {data}");
                     GetMoreData(data);
                     break;
+                case "overlayLoaded":
+                    // The page asks for the current state as soon as it mounts, because the
+                    // overlay process usually starts long before the browser finishes loading.
+                    ReportOverlayState();
+                    break;
             }
         };
 
         Network.OnConnected += netId => Connected();
+        Network.OnDisconnected += () => ReportOverlaySession(connected: false);
     }
 
     private bool _loaded;
@@ -89,8 +95,27 @@ public class GameEventsComponent : MonoBehaviour
         if (!_tptRunning) TruckPositionThread();
     }
 
+    private static void ReportOverlayState()
+    {
+        ReportOverlayMode();
+        ReportOverlaySession(Network.NetId != -1);
+    }
+
+    private static void ReportOverlayMode() =>
+        OverlayManager.PostMessage("overlayModeChanged", new { interactive = OverlayManager.IsInteractiveMode });
+
+    private static void ReportOverlaySession(bool connected) =>
+        OverlayManager.PostMessage("session", new
+        {
+            connected,
+            server = $"{App.ServerAddress.Value}:{App.ServerPort.Value}",
+            netId = connected ? Network.NetId : -1
+        });
+
     private void Connected()
     {
+        ReportOverlaySession(connected: true);
+
         // The handshake can finish before the truck exists (or with a connector that has no
         // cargo attached yet), so every step is optional here.
         var connector = _starTruck?.maglockConnector;
@@ -193,12 +218,14 @@ public class GameEventsComponent : MonoBehaviour
         {
             OverlayManager.ToggleInteractiveMode();
             App.Log.LogInfo($"[Overlay] F2 => toggle interactive mode => {(OverlayManager.IsInteractiveMode ? "ON" : "OFF")}");
+            ReportOverlayMode();
         }
 
         if (OverlayManager.IsInteractiveMode && Input.GetKeyDown(KeyCode.Escape))
         {
             App.Log.LogInfo("[Overlay] Esc => interactive mode OFF (click-through ON)");
             OverlayManager.SetInteractiveMode(false);
+            ReportOverlayMode();
         }
 
         if (Input.GetKeyDown(KeyCode.F3))

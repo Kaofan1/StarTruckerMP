@@ -2,11 +2,13 @@
     import {type GameMessage, onGameMessage, sendToGame} from "$lib/gameEvents";
     import ObjectInspector from "$lib/inspector/ObjectInspector.svelte";
     import RunCode from "$lib/runcode/RunCode.svelte";
-    
+    import Hud from "$lib/hud/Hud.svelte";
+
     sendToGame("overlayLoaded", { timestamp: Date.now() });
 </script>
 
 <div class="container">
+    <Hud />
     <ObjectInspector />
     <!--<RunCode />-->
 </div>
