@@ -56,6 +56,11 @@ public class Plugin : BasePlugin
         Harmony.CreateAndPatchAll(typeof(AIVehicleTruck_Patch));
         Harmony.CreateAndPatchAll(typeof(AIVehicleDef_Patch));
         Harmony.CreateAndPatchAll(typeof(GrabbableUpdate_Patch));
+        Harmony.CreateAndPatchAll(typeof(StarTruckUpdate_Patch));
+        Harmony.CreateAndPatchAll(typeof(TruckSeatUpdate_Patch));
+        Harmony.CreateAndPatchAll(typeof(EmergencyBrakeUpdate_Patch));
+        Harmony.CreateAndPatchAll(typeof(SalvageScannerUpdate_Patch));
+        Harmony.CreateAndPatchAll(typeof(TruckAmbientAudioUpdate_Patch));
         
         Log.LogInfo($"Plugin {PluginInfo.PLUGIN_GUID} loaded.");
         
