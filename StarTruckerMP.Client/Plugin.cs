@@ -3,6 +3,7 @@ using System.IO;
 using System.Net;
 using System.Net.Http;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
 using System.Threading;
@@ -338,6 +339,19 @@ public class Plugin : BasePlugin
     /// "GC: Collecting from unknown thread" errors when IL2CPP objects are used
     /// from threads not created by the IL2CPP runtime.
     /// </summary>
+    /// <summary>
+    /// Set as soon as the game starts closing. Il2cpp tears its threads down while the plugin still
+    /// has background threads sleeping, and waking up then fails with an SEHException from Sleep.
+    /// Reporting that through the log calls back into il2cpp and freezes the process halfway
+    /// through the exit, so nothing is logged, slept on or detached once this flag is set.
+    /// </summary>
+    public static volatile bool IsShuttingDown;
+
+    public static void NotifyShuttingDown()
+    {
+        IsShuttingDown = true;
+    }
+
     public static void StartAttachedThread(Action action)
     {
         new Thread(() =>
@@ -352,15 +366,23 @@ public class Plugin : BasePlugin
             {
                 // The runtime is shutting down, nothing left to report.
             }
+            catch (SEHException)
+            {
+                // The native sleep of a shutting down runtime reports itself this way.
+            }
             catch (Exception exception)
             {
+                if (IsShuttingDown)
+                    return;
+
                 // An exception that escapes a thread ends the whole process through
                 // il2cpp_unhandled_exception, so every background thread is contained here.
                 Log.LogError($"Background thread failed: {exception}");
             }
             finally
             {
-                IL2CPP.il2cpp_thread_detach(thread);
+                if (!IsShuttingDown)
+                    IL2CPP.il2cpp_thread_detach(thread);
             }
         }) { IsBackground = true }.Start();
     }

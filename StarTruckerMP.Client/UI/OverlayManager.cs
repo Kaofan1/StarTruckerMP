@@ -270,6 +270,9 @@ internal static class OverlayManager
 
             while (true)
             {
+                if (Plugin.IsShuttingDown)
+                    return;
+
                 attempts++;
                 try
                 {
@@ -297,7 +300,8 @@ internal static class OverlayManager
                 }
                 catch (Exception ex)
                 {
-                    App.Log.LogWarning($"[Overlay] IPC send failed: {ex.Message}");
+                    if (!Plugin.IsShuttingDown)
+                        App.Log.LogWarning($"[Overlay] IPC send failed: {ex.Message}");
                     return;
                 }
             }
@@ -438,9 +442,15 @@ internal static class OverlayManager
                 catch (AggregateException ae) when (ae.InnerException is OperationCanceledException) { break; }
                 catch (Exception ex)
                 {
-                    if (!ct.IsCancellationRequested)
-                        App.Log.LogWarning($"[Overlay] Game pipe error: {ex.Message}");
-                    Thread.Sleep(500);
+                    // While the game closes the pipe is torn down under this thread and the wake
+                    // up fails with an SEHException. Logging then calls back into il2cpp and
+                    // freezes the exit, so the loop just ends instead.
+                    if (Plugin.IsShuttingDown || ct.IsCancellationRequested)
+                        break;
+
+                    App.Log.LogWarning($"[Overlay] Game pipe error: {ex.Message}");
+                    if (ct.WaitHandle.WaitOne(500))
+                        break;
                 }
             }
         });

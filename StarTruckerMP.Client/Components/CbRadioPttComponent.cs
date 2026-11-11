@@ -161,7 +161,7 @@ public class CbRadioPttComponent : MonoBehaviour
     /// </summary>
     private void EncodeLoop()
     {
-        while (_enabled && !_cts.IsCancellationRequested)
+        while (_enabled && !_cts.IsCancellationRequested && !Plugin.IsShuttingDown)
         {
             if (_encodeQueue.TryDequeue(out var frame))
             {
@@ -534,6 +534,10 @@ public class CbRadioPttComponent : MonoBehaviour
     private void TryBindCbRadio()
     {
         if (_cbRadio != null)
+            return;
+
+        // The truck is destroyed with its scene, so this reference can be null during the change.
+        if (PlayerState.Truck == null)
             return;
 
         _cbRadio = PlayerState.Truck.GetComponentInChildren<CBRadioController>();

@@ -401,6 +401,7 @@ public class NetworkEventsComponent : MonoBehaviour
 
     private void OnApplicationQuit()
     {
+        Plugin.NotifyShuttingDown();
         ClearAllPlayers("the game is quitting");
     }
 

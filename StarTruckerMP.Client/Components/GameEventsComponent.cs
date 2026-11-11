@@ -10,6 +10,7 @@ using StarTruckerMP.Client.UI;
 using StarTruckerMP.Shared;
 using StarTruckerMP.Shared.Cmd;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using Quaternion = UnityEngine.Quaternion;
 using Vector3 = UnityEngine.Vector3;
 
@@ -231,6 +232,7 @@ public class GameEventsComponent : MonoBehaviour
         // Unity objects may only be read on the main thread, so the position threads get a copy
         // of the pose instead of touching the game objects themselves.
         CapturePoses();
+        CheckSceneBoundObjects();
 
         if (SectorPersistence.instance && !_subscribedToSectorArrival)
         {
@@ -435,6 +437,40 @@ public class GameEventsComponent : MonoBehaviour
     private CancellationTokenSource _cts = new();
     private const float ThresholdChange = 0.1f;
     private const float ThresholdChangeSquared = ThresholdChange * ThresholdChange;
+
+    private int _lastSceneHandle = int.MinValue;
+
+    /// <summary>
+    /// The player and the truck belong to their sector scene. A truck that outlives that scene is
+    /// exactly the state that used to flood the log with a NullReferenceException every frame, so
+    /// every reference to the previous scene is dropped here and a surviving truck is reported
+    /// loudly instead of being left to spam.
+    /// </summary>
+    private void CheckSceneBoundObjects()
+    {
+        var scene = SceneManager.GetActiveScene();
+        if (scene.handle == _lastSceneHandle)
+            return;
+
+        _lastSceneHandle = scene.handle;
+
+        if (_truck != null)
+            App.Log.LogError("[GameEvents] The player truck outlived its scene; it has to stay owned by the sector, otherwise its scripts spam NullReferenceExceptions.");
+
+        _player = null;
+        _playerCam = null;
+        _playerRigid = null;
+        _playerLocation = null;
+        _truck = null;
+        _truckRigid = null;
+        _starTruck = null;
+        _loaded = false;
+
+        // Other components resolve these again on the next sector arrival.
+        PlayerState.Player = null;
+        PlayerState.Truck = null;
+        PlayerState.SpaceSuit = null;
+    }
     
     #region Player Location updates
     
@@ -459,7 +495,7 @@ public class GameEventsComponent : MonoBehaviour
             var lastX = 0f;
             var lastY = 0f;
             var lastZ = 0f;
-            while (!ct.IsCancellationRequested)
+            while (!ct.IsCancellationRequested && !Plugin.IsShuttingDown)
             {
                 if (Network.NetId == -1)
                 {
@@ -527,7 +563,7 @@ public class GameEventsComponent : MonoBehaviour
             var lastX = 0f;
             var lastY = 0f;
             var lastZ = 0f;
-            while (!ct.IsCancellationRequested)
+            while (!ct.IsCancellationRequested && !Plugin.IsShuttingDown)
             {
                 if (Network.NetId == -1)
                 {
@@ -666,6 +702,14 @@ public class GameEventsComponent : MonoBehaviour
 
     #region Recycle
     
+    private void OnApplicationQuit()
+    {
+        Plugin.NotifyShuttingDown();
+
+        if (!_cts.IsCancellationRequested)
+            _cts.Cancel();
+    }
+
     private void OnDestroy()
     {
         _cts.Cancel();

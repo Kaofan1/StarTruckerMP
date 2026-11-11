@@ -157,16 +157,22 @@ public class Network
         
         while (!_handshakeCompleted)
         {
+            if (Plugin.IsShuttingDown) return;
             _client.PollEvents();
             Thread.Sleep(50);
         }
 
         while ((_server.ConnectionState & ConnectionState.Connected) == ConnectionState.Connected)
         {
+            if (Plugin.IsShuttingDown) return;
             _client.PollEvents();
             Thread.Sleep(50);
         }
-        
+
+        // The game is closing, so a dropped connection is expected and must not be logged: the log
+        // calls back into il2cpp after the runtime has already started tearing itself down.
+        if (Plugin.IsShuttingDown) return;
+
         App.Log.LogError("Server Polling end. Connection state: " + _server.ConnectionState);
     }
 
