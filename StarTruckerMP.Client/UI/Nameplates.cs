@@ -1,4 +1,5 @@
 using StarTruckerMP.Client.Components;
+using StarTruckerMP.Client.Synchronization;
 using TMPro;
 using UnityEngine;
 
@@ -10,8 +11,13 @@ namespace StarTruckerMP.Client.UI;
 /// </summary>
 internal static class Nameplates
 {
-    private const float SuitHeight = 2.1f;
-    private const float TruckHeight = 5.5f;
+    // Fallbacks only: the real height is measured from the rendered model so the label sits above
+    // the roof instead of inside the cab.
+    private const float SuitFallbackHeight = 1.9f;
+    private const float TruckFallbackHeight = 3.5f;
+
+    private const float SuitMargin = 0.35f;
+    private const float TruckMargin = 0.8f;
 
     private const float SuitFullDistance = 25f;
     private const float SuitHiddenDistance = 120f;
@@ -26,10 +32,10 @@ internal static class Nameplates
     private static bool _fontSearched;
 
     public static GameObject CreateSuitLabel(Transform target, string text) =>
-        Create(target, text, SuitHeight, SuitFullDistance, SuitHiddenDistance, SuitLabelWorldHeight);
+        Create(target, text, SuitFallbackHeight, SuitMargin, SuitFullDistance, SuitHiddenDistance, SuitLabelWorldHeight);
 
     public static GameObject CreateTruckLabel(Transform target, string text) =>
-        Create(target, text, TruckHeight, TruckFullDistance, TruckHiddenDistance, TruckLabelWorldHeight);
+        Create(target, text, TruckFallbackHeight, TruckMargin, TruckFullDistance, TruckHiddenDistance, TruckLabelWorldHeight);
 
     public static void SetText(GameObject label, string text)
     {
@@ -67,7 +73,7 @@ internal static class Nameplates
         component.SetSuspended(!visible);
     }
 
-    private static GameObject Create(Transform target, string text, float height, float fullDistance, float hiddenDistance, float worldHeight)
+    private static GameObject Create(Transform target, string text, float fallbackHeight, float margin, float fullDistance, float hiddenDistance, float worldHeight)
     {
         if (target == null)
             return null;
@@ -77,7 +83,7 @@ internal static class Nameplates
             return null;
 
         var labelObject = new GameObject($"Nameplate-{text}");
-        labelObject.transform.position = target.position + Vector3.up * height;
+        labelObject.transform.position = target.position + Vector3.up * fallbackHeight;
 
         var label = labelObject.AddComponent<TextMeshPro>();
         label.font = font;
@@ -87,7 +93,7 @@ internal static class Nameplates
         label.rectTransform.sizeDelta = new Vector2(40f, 8f);
 
         var nameplate = labelObject.AddComponent<NameplateComponent>();
-        nameplate.Configure(target, height, fullDistance, hiddenDistance, worldHeight);
+        nameplate.Configure(target, fallbackHeight, margin, fullDistance, hiddenDistance, worldHeight);
 
         return labelObject;
     }

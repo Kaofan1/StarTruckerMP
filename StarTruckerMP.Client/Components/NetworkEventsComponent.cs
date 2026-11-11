@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using Il2CppInterop.Runtime.Attributes;
 using Microsoft.Extensions.Caching.Memory;
 using StarTruckerMP.Client.Synchronization;
@@ -85,8 +86,11 @@ public class NetworkEventsComponent : MonoBehaviour
         App.Log.LogInfo($"({netId}) Created player truck object");
 
         var rigidbody = player.TruckObj.GetComponent<Rigidbody>();
-        rigidbody.detectCollisions = false;
+        // The clone's own colliders stay disabled, because the game components behind them keep
+        // objects alive after the scene ends. A box of our own makes it solid instead.
+        rigidbody.detectCollisions = true;
         DisableInteractions(player.TruckObj);
+        AddSolidCollider(player.TruckObj);
 
         #endregion
 
@@ -161,8 +165,9 @@ public class NetworkEventsComponent : MonoBehaviour
         customizer = player.TruckObj.GetComponent<AIVehicleCustomiser>();
         customizer.AssignCabLivery(liveryId, 0f);
         var rigidbody = player.TruckObj.GetComponent<Rigidbody>();
-        rigidbody.detectCollisions = false;
+        rigidbody.detectCollisions = true;
         DisableInteractions(player.TruckObj);
+        AddSolidCollider(player.TruckObj);
         // The rebuilt truck is a new object, so its label has to follow the new transform.
         Nameplates.SetTarget(player.TruckLabel, player.TruckObj.transform);
         App.Log.LogInfo($"Recreated truck for player {netId} with cargo count {cargoCount}");
@@ -198,6 +203,91 @@ public class NetworkEventsComponent : MonoBehaviour
             if (collider != null)
                 collider.enabled = false;
         }
+    }
+
+    /// <summary>
+    /// Gives a remote truck a physical body. The clone's own colliders are disabled to keep the
+    /// game's components from waking up, so one box around the rendered model is added instead and
+    /// the kinematic rigidbody blocks the local truck instead of letting it drive through.
+    /// </summary>
+    private static void AddSolidCollider(GameObject truck)
+    {
+        if (truck == null)
+            return;
+
+        if (truck.transform.Find("MPCollider") != null)
+            return;
+
+        var renderers = truck.GetComponentsInChildren<Renderer>(true);
+        if (renderers.Length == 0)
+        {
+            App.Log.LogWarning("Remote truck has no renderers, skipping the collision box.");
+            return;
+        }
+
+        var toLocal = truck.transform.worldToLocalMatrix;
+        var hasBounds = false;
+        var localBounds = new Bounds();
+
+        foreach (var renderer in renderers)
+        {
+            if (!TruckFactory.IsBodyMesh(renderer))
+                continue;
+
+            var world = renderer.bounds;
+
+            // The world box is turned into the truck's own space so the box still fits the model
+            // when the clone was rebuilt at an angle.
+            for (var corner = 0; corner < 8; corner++)
+            {
+                var point = new Vector3(
+                    (corner & 1) == 0 ? world.min.x : world.max.x,
+                    (corner & 2) == 0 ? world.min.y : world.max.y,
+                    (corner & 4) == 0 ? world.min.z : world.max.z);
+
+                var localPoint = toLocal.MultiplyPoint3x4(point);
+
+                if (!hasBounds)
+                {
+                    localBounds = new Bounds(localPoint, Vector3.zero);
+                    hasBounds = true;
+                }
+                else
+                {
+                    localBounds.Encapsulate(localPoint);
+                }
+            }
+        }
+
+        if (!hasBounds)
+        {
+            App.Log.LogWarning("Remote truck has no measurable bounds, skipping the collision box.");
+            return;
+        }
+
+        // Diagnostics: the largest meshes explain an oversized body, e.g. a mesh that does not
+        // belong to the vehicle hull.
+        foreach (var renderer in renderers
+                     .Where(r => r != null && TruckFactory.IsBodyMesh(r))
+                     .OrderByDescending(r => r.bounds.size.y)
+                     .Take(5))
+        {
+            var size = renderer.bounds.size;
+            App.Log.LogInfo($"Remote truck mesh '{renderer.name}' {size.x:0.#} x {size.y:0.#} x {size.z:0.#}.");
+        }
+
+        var colliderObject = new GameObject("MPCollider");
+        colliderObject.transform.SetParent(truck.transform, false);
+        colliderObject.transform.localPosition = localBounds.center;
+        colliderObject.transform.localRotation = Quaternion.identity;
+        colliderObject.transform.localScale = Vector3.one;
+
+        var box = colliderObject.AddComponent<BoxCollider>();
+        box.center = Vector3.zero;
+        box.size = localBounds.size;
+        box.isTrigger = false;
+
+        App.Log.LogInfo($"Remote truck collision box {box.size.x:0.#} x {box.size.y:0.#} x {box.size.z:0.#}.");
     }
 
     [HideFromIl2Cpp]

@@ -13,7 +13,10 @@ public class NameplateComponent : MonoBehaviour
     private Transform _target;
     private TMP_Text _text;
     private Camera _camera;
-    private float _height;
+    private float _fallbackHeight;
+    private float _anchorHeight;
+    private float _margin;
+    private float _nextBoundsRefresh;
     private float _fullDistance;
     private float _hiddenDistance;
     private float _worldHeight = 1f;
@@ -22,13 +25,16 @@ public class NameplateComponent : MonoBehaviour
     private bool _suspended;
     private bool _visible = true;
 
-    public void Configure(Transform target, float height, float fullDistance, float hiddenDistance, float worldHeight)
+    public void Configure(Transform target, float fallbackHeight, float margin, float fullDistance, float hiddenDistance, float worldHeight)
     {
         _target = target;
-        _height = height;
+        _fallbackHeight = fallbackHeight;
+        _anchorHeight = fallbackHeight;
+        _margin = margin;
         _fullDistance = fullDistance;
         _hiddenDistance = hiddenDistance;
         _worldHeight = worldHeight;
+        _nextBoundsRefresh = 0f;
         _text = GetComponent<TMP_Text>();
         _scaled = false;
     }
@@ -37,6 +43,41 @@ public class NameplateComponent : MonoBehaviour
     public void SetTarget(Transform target)
     {
         _target = target;
+        _nextBoundsRefresh = 0f;
+    }
+
+    /// <summary>
+    /// Measures the rendered model and returns how far above its origin the top of the object sits,
+    /// so the label clears the cab instead of ending up inside the truck.
+    /// </summary>
+    private void RefreshAnchorHeight()
+    {
+        // The model does not change while it drives, so measuring a couple of times per second is
+        // enough and keeps the per-frame cost of the label tiny.
+        _nextBoundsRefresh = Time.time + 2f;
+
+        if (_target == null)
+            return;
+
+        var top = float.MinValue;
+
+        foreach (var renderer in _target.GetComponentsInChildren<Renderer>(true))
+        {
+            if (!Synchronization.TruckFactory.IsBodyMesh(renderer))
+                continue;
+
+            var rendererTop = renderer.bounds.max.y;
+            if (rendererTop > top)
+                top = rendererTop;
+        }
+
+        if (top == float.MinValue)
+        {
+            _anchorHeight = _fallbackHeight;
+            return;
+        }
+
+        _anchorHeight = Mathf.Max(top - _target.position.y + _margin, _fallbackHeight);
     }
 
     /// <summary>Hides the label without removing it, for states where another label already shows the name.</summary>
@@ -57,7 +98,10 @@ public class NameplateComponent : MonoBehaviour
         if (_camera == null)
             _camera = Camera.main;
 
-        transform.position = _target.position + Vector3.up * _height;
+        if (Time.time >= _nextBoundsRefresh)
+            RefreshAnchorHeight();
+
+        transform.position = _target.position + Vector3.up * _anchorHeight;
 
         if (_camera == null)
         {
@@ -100,7 +144,8 @@ public class NameplateComponent : MonoBehaviour
         _scaled = true;
 
         App.Log.LogInfo($"[Nameplates] '{_text.text}' is {_worldHeight:0.##} units tall, " +
-                        $"{distance:0.#} units from the camera, visibility {visibility:0.##}.");
+                        $"{_anchorHeight:0.#} units above its target, {distance:0.#} units from the camera, " +
+                        $"visibility {visibility:0.##}.");
     }
 
     private void ApplyVisibility(float visibility)

@@ -31,6 +31,31 @@ public static class TruckFactory
         "MaglockHitchVFX"
     ];
 
+    /// <summary>
+    /// Light cones, trails and particle meshes report bounds far larger than the vehicle and are
+    /// what made the name label float above the cab and the collision box cover the road, so only
+    /// the meshes that build the body are measured.
+    /// </summary>
+    private static readonly string[] EffectMeshNames =
+    [
+        "Volumetric", "Beam", "Cone", "Trail", "Sprite", "VFX", "Glow"
+    ];
+
+    public static bool IsBodyMesh(Renderer renderer)
+    {
+        if (renderer == null || renderer.bounds.size == Vector3.zero)
+            return false;
+
+        var name = renderer.name;
+        foreach (var marker in EffectMeshNames)
+        {
+            if (name.IndexOf(marker, System.StringComparison.OrdinalIgnoreCase) >= 0)
+                return false;
+        }
+
+        return renderer.TryCast<MeshRenderer>() != null || renderer.TryCast<SkinnedMeshRenderer>() != null;
+    }
+
     public static GameObject CreatePlayerTruck(int nContainers, Vector3 spawnPos, Quaternion spawnRot)
     {
         var vehicleDef = AIVehicleDef_Patch.Instance;
