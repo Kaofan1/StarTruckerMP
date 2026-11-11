@@ -186,8 +186,10 @@ internal static class OverlayManager
     /// </summary>
     public static void SetSessionTokenAndNavigate(string token, string url)
     {
+        // The overlay process is launched at the same moment as the auth request and its pipe
+        // server needs a few seconds to start, so the send retries instead of racing it.
         SendCommands($"TOKEN:{token}", $"NAVIGATE:{url}");
-        App.Log.LogInfo($"[Overlay] Navigated to url (with token): {url}.");
+        App.Log.LogInfo($"[Overlay] Session token queued, navigating to {url}.");
     }
 
     /// <summary>
@@ -234,22 +236,54 @@ internal static class OverlayManager
 
     private static void SendCommand(string command) => SendCommands(command);
 
+    /// <summary>How long a single pipe connect may block before it counts as a missed attempt.</summary>
+    private const int PipeConnectTimeoutMs = 2000;
+
+    /// <summary>
+    /// How long a command keeps retrying while the overlay pipe is not listening yet. The overlay
+    /// starts CEF before it opens the pipe, which takes several seconds on a cold start.
+    /// </summary>
+    private const int PipeSendDeadlineMs = 20_000;
+
     private static void SendCommands(params string[] commands)
     {
         Plugin.StartAttachedThread(() =>
         {
-            try
+            var deadline = Environment.TickCount64 + PipeSendDeadlineMs;
+            var attempts = 0;
+
+            while (true)
             {
-                using var pipe = new NamedPipeClientStream(".", PipeName, PipeDirection.Out);
-                pipe.Connect(timeout: 2000);
-                using var writer = new StreamWriter(pipe, Encoding.UTF8, bufferSize: 1024, leaveOpen: false);
-                writer.AutoFlush = true;
-                foreach (var cmd in commands)
-                    writer.WriteLine(cmd);
-            }
-            catch (Exception ex)
-            {
-                App.Log.LogWarning($"[Overlay] IPC send failed: {ex.Message}");
+                attempts++;
+                try
+                {
+                    using var pipe = new NamedPipeClientStream(".", PipeName, PipeDirection.Out);
+                    pipe.Connect(timeout: PipeConnectTimeoutMs);
+                    using var writer = new StreamWriter(pipe, Encoding.UTF8, bufferSize: 1024, leaveOpen: false);
+                    writer.AutoFlush = true;
+                    foreach (var cmd in commands)
+                        writer.WriteLine(cmd);
+
+                    if (attempts > 1)
+                        App.Log.LogInfo($"[Overlay] IPC delivered after {attempts} attempts.");
+
+                    return;
+                }
+                catch (Exception ex) when (ex is TimeoutException or IOException or UnauthorizedAccessException)
+                {
+                    if (Environment.TickCount64 >= deadline)
+                    {
+                        App.Log.LogWarning($"[Overlay] IPC send failed after {attempts} attempts: {ex.Message}");
+                        return;
+                    }
+
+                    Thread.Sleep(250);
+                }
+                catch (Exception ex)
+                {
+                    App.Log.LogWarning($"[Overlay] IPC send failed: {ex.Message}");
+                    return;
+                }
             }
         });
     }
