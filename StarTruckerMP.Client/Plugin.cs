@@ -345,6 +345,16 @@ public class Plugin : BasePlugin
             {
                 action();
             }
+            catch (ThreadAbortException)
+            {
+                // The runtime is shutting down, nothing left to report.
+            }
+            catch (Exception exception)
+            {
+                // An exception that escapes a thread ends the whole process through
+                // il2cpp_unhandled_exception, so every background thread is contained here.
+                Log.LogError($"Background thread failed: {exception}");
+            }
             finally
             {
                 IL2CPP.il2cpp_thread_detach(thread);

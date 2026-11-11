@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading;
 using Concentus;
 using Concentus.Enums;
+using Il2CppInterop.Runtime.Attributes;
 using Il2CppInterop.Runtime.InteropTypes.Arrays;
 using RNNoise.NET;
 using StarTruckerMP.Client.Synchronization;
@@ -175,6 +176,7 @@ public class CbRadioPttComponent : MonoBehaviour
         }
     }
 
+    [HideFromIl2Cpp]
     private void TryDenoiseFrame(float[] frame, string path)
     {
         if (_denoiser == null || frame == null || frame.Length == 0)
@@ -263,6 +265,7 @@ public class CbRadioPttComponent : MonoBehaviour
         App.Log.LogInfo($"[CB Radio] Microphone candidate order: {string.Join(" | ", _micCandidates.Select((candidate, index) => $"#{index}: {candidate}"))}");
     }
 
+    [HideFromIl2Cpp]
     private IEnumerable<string> BuildPreferredDeviceOrder()
     {
         var availableDevices = Microphone.devices ?? Array.Empty<string>();
@@ -345,6 +348,7 @@ public class CbRadioPttComponent : MonoBehaviour
         return false;
     }
 
+    [HideFromIl2Cpp]
     private bool TryStartMicrophone(MicOpenCandidate candidate, string reason)
     {
         StopMicrophoneCapture();
@@ -400,6 +404,7 @@ public class CbRadioPttComponent : MonoBehaviour
         _micClip = null;
     }
 
+    [HideFromIl2Cpp]
     private float[] ConvertCaptureBufferToOutputFrame()
     {
         var monoFrame = new float[_captureSamplesPerFrame];

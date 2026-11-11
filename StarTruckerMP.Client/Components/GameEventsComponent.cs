@@ -36,6 +36,11 @@ public class GameEventsComponent : MonoBehaviour
                     // overlay process usually starts long before the browser finishes loading.
                     ReportOverlayState();
                     break;
+                case "overlayModeChanged":
+                    // Once the overlay has focus it handles F2 itself, so its toggle has to reach
+                    // the page too, otherwise the panel would stay on screen.
+                    ReportOverlayMode();
+                    break;
             }
         };
 
@@ -59,10 +64,12 @@ public class GameEventsComponent : MonoBehaviour
         PlayerState.Sector = GameObject.Find("[Sector]").scene.name;
         ArrivedAtSector?.Invoke(PlayerState.Sector);
         
-        // This event also happens when the player load a saved game
-        if (_loaded) return;
+        // This event also happens when the player loads a saved game, so the references are kept
+        // while they are alive. Going back to the main menu destroys those objects, and the next
+        // load has to resolve them again instead of reusing dead il2cpp pointers.
+        if (_loaded && _player != null && _truck != null) return;
         _loaded = true;
-        
+
         _player = GameObject.FindGameObjectWithTag("Player");
         PlayerState.Player = _player;
         _playerCam = GameObject.FindGameObjectWithTag("MainCamera");
@@ -70,7 +77,16 @@ public class GameEventsComponent : MonoBehaviour
         _playerLocation = _player?.GetComponent<PlayerLocation>();
         
         _truck = GameObject.Find("StarTruck(Clone)"); // clone?
-        _truck.AddComponent<CbRadioPttComponent>();
+        if (_truck == null)
+        {
+            App.Log.LogWarning("[GameEvents] No truck in this scene yet, waiting for the next arrival.");
+            _loaded = false;
+            return;
+        }
+
+        if (_truck.GetComponent<CbRadioPttComponent>() == null)
+            _truck.AddComponent<CbRadioPttComponent>();
+
         PlayerState.Truck = _truck;
         _truckRigid = _truck?.GetComponent<Rigidbody>();
         var truckInterior = _truck?.transform.Find("Interior");
@@ -79,16 +95,24 @@ public class GameEventsComponent : MonoBehaviour
         if (suit && suit.childCount > 0) 
             PlayerState.SpaceSuit = suit.GetChild(0).gameObject;
 
-        if (_truck != null)
+        _starTruck = _truck.GetComponentInChildren<StarTruck>();
+        var connector = _starTruck?.maglockConnector;
+        if (connector != null)
         {
-            _starTruck = _truck.GetComponentInChildren<StarTruck>();
-            _starTruck.maglockConnector.hitchControl.onTriggered += new System.Action<Il2CppSystem.Object, Il2CppSystem.EventArgs>((s, e) =>
+            connector.hitchControl.onTriggered += new System.Action<Il2CppSystem.Object, Il2CppSystem.EventArgs>((s, e) =>
             {
-                if (_starTruck.maglockConnector.hitchedCargo)
-                    OnHitchCargo(_starTruck.maglockConnector.hitchedCargo);
+                var current = _starTruck?.maglockConnector;
+                if (current == null) return;
+
+                if (current.hitchedCargo)
+                    OnHitchCargo(current.hitchedCargo);
                 else
                     OnUnhitchCargo();
             });
+        }
+        else
+        {
+            App.Log.LogWarning("[GameEvents] The truck has no maglock connector, cargo updates are disabled until the next arrival.");
         }
 
         if (!_pptRunning) PlayerPositionThread();
@@ -425,18 +449,37 @@ public class GameEventsComponent : MonoBehaviour
                     continue;
                 }
                 
-                _player.transform.GetPositionAndRotation(out var position, out var rotation);
-                if (Vector3.Distance(lastPosition, position) > ThresholdChange)
+                var player = _player;
+                var rigid = _playerRigid;
+                if (player == null || rigid == null)
                 {
-                    Network.SendServerMessage(new UpdatePositionCmd
+                    ct.WaitHandle.WaitOne(250);
+                    continue;
+                }
+
+                try
+                {
+                    player.transform.GetPositionAndRotation(out var position, out var rotation);
+                    if (Vector3.Distance(lastPosition, position) > ThresholdChange)
                     {
-                        Position = ConvertToSharedVector3(position),
-                        Rotation = ConvertToSharedQuaternion(rotation),
-                        Velocity = ConvertToSharedVector3(_playerRigid.velocity),
-                        AngVel = ConvertToSharedVector3(_playerRigid.angularVelocity),
-                        IsTruck = false,
-                        InSeat = false
-                    }, PacketType.UpdatePosition);
+                        Network.SendServerMessage(new UpdatePositionCmd
+                        {
+                            Position = ConvertToSharedVector3(position),
+                            Rotation = ConvertToSharedQuaternion(rotation),
+                            Velocity = ConvertToSharedVector3(rigid.velocity),
+                            AngVel = ConvertToSharedVector3(rigid.angularVelocity),
+                            IsTruck = false,
+                            InSeat = false
+                        }, PacketType.UpdatePosition);
+                    }
+                }
+                catch (Exception exception)
+                {
+                    // Touching a destroyed il2cpp object from this thread used to take the whole
+                    // game down; the objects are resolved again on the next sector arrival.
+                    App.Log.LogWarning("[Player] Position update skipped: " + exception.Message);
+                    ct.WaitHandle.WaitOne(250);
+                    continue;
                 }
 
                 ct.WaitHandle.WaitOne(15);
@@ -472,18 +515,35 @@ public class GameEventsComponent : MonoBehaviour
                     continue;
                 }
                 
-                _truck.transform.GetPositionAndRotation(out var position, out var rotation);
-                if (Vector3.Distance(lastPosition, position) > ThresholdChange)
+                var truck = _truck;
+                var rigid = _truckRigid;
+                if (truck == null || rigid == null)
                 {
-                    Network.SendServerMessage(new UpdatePositionCmd
+                    ct.WaitHandle.WaitOne(250);
+                    continue;
+                }
+
+                try
+                {
+                    truck.transform.GetPositionAndRotation(out var position, out var rotation);
+                    if (Vector3.Distance(lastPosition, position) > ThresholdChange)
                     {
-                        Position = ConvertToSharedVector3(position),
-                        Rotation = ConvertToSharedQuaternion(rotation),
-                        Velocity = ConvertToSharedVector3(_truckRigid.velocity),
-                        AngVel = ConvertToSharedVector3(_truckRigid.angularVelocity),
-                        IsTruck = true,
-                        InSeat = false
-                    }, PacketType.UpdatePosition);
+                        Network.SendServerMessage(new UpdatePositionCmd
+                        {
+                            Position = ConvertToSharedVector3(position),
+                            Rotation = ConvertToSharedQuaternion(rotation),
+                            Velocity = ConvertToSharedVector3(rigid.velocity),
+                            AngVel = ConvertToSharedVector3(rigid.angularVelocity),
+                            IsTruck = true,
+                            InSeat = false
+                        }, PacketType.UpdatePosition);
+                    }
+                }
+                catch (Exception exception)
+                {
+                    App.Log.LogWarning("[Truck] Position update skipped: " + exception.Message);
+                    ct.WaitHandle.WaitOne(250);
+                    continue;
                 }
 
                 ct.WaitHandle.WaitOne(15);

@@ -2,6 +2,7 @@
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using Concentus;
+using Il2CppInterop.Runtime.Attributes;
 using Il2CppInterop.Runtime.InteropTypes.Arrays;
 using StarTruckerMP.Client.Audio;
 using StarTruckerMP.Client.Synchronization;
@@ -147,6 +148,7 @@ public class CbRadioSpeakerComponent : MonoBehaviour
     }
 
     // Called from the network polling thread.
+    [HideFromIl2Cpp]
     private void HandleVoiceReceived(VoiceDto voice)
     {
         if (voice.OpusData.Length == 0)
@@ -193,6 +195,7 @@ public class CbRadioSpeakerComponent : MonoBehaviour
         }
     }
 
+    [HideFromIl2Cpp]
     private SenderState GetOrCreateSenderState(int senderId, bool createDecoder)
     {
         lock (_sendersLock)
@@ -214,6 +217,7 @@ public class CbRadioSpeakerComponent : MonoBehaviour
             );
     }
 
+    [HideFromIl2Cpp]
     private void EnsurePlaybackObjects(SenderState state)
     {
         if (state.AudioSource != null && state.PlaybackClip != null)
@@ -238,6 +242,7 @@ public class CbRadioSpeakerComponent : MonoBehaviour
         state.IsPlaying = false;
     }
 
+    [HideFromIl2Cpp]
     private void DrainPendingFrames(SenderState state)
     {
         while (state.PendingFrames.TryDequeue(out var frame))
@@ -250,6 +255,7 @@ public class CbRadioSpeakerComponent : MonoBehaviour
         }
     }
 
+    [HideFromIl2Cpp]
     private void PumpPlayback(SenderState state)
     {
         if (state.AudioSource == null || state.PlaybackClip == null)
@@ -287,6 +293,7 @@ public class CbRadioSpeakerComponent : MonoBehaviour
         WriteBufferedSamplesToClip(state, samplesNeeded, allowSilencePadding: true);
     }
 
+    [HideFromIl2Cpp]
     private void WriteBufferedSamplesToClip(SenderState state, int requestedSamples, bool allowSilencePadding)
     {
         var sampleCount = requestedSamples;
@@ -320,6 +327,7 @@ public class CbRadioSpeakerComponent : MonoBehaviour
         WriteSamplesIntoRingClip(state, samples);
     }
 
+    [HideFromIl2Cpp]
     private int CopyBufferedSamples(SenderState state, float[] destination, int requestedSamples)
     {
         var copied = 0;
@@ -345,6 +353,7 @@ public class CbRadioSpeakerComponent : MonoBehaviour
         return copied;
     }
 
+    [HideFromIl2Cpp]
     private void WriteSamplesIntoRingClip(SenderState state, float[] samples)
     {
         if (samples.Length == 0)
@@ -396,6 +405,7 @@ public class CbRadioSpeakerComponent : MonoBehaviour
         source.dopplerLevel = 0f;
     }
 
+    [HideFromIl2Cpp]
     private void CleanupSenderState(SenderState state)
     {
         state.Dispose();

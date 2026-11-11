@@ -1,4 +1,5 @@
 ﻿using System;
+using Il2CppInterop.Runtime.Attributes;
 using Microsoft.Extensions.Caching.Memory;
 using StarTruckerMP.Client.Synchronization;
 using StarTruckerMP.Shared;
@@ -46,6 +47,7 @@ public class NetworkEventsComponent : MonoBehaviour
         public GameObject SuitObj { get; set; }
     }
 
+    [HideFromIl2Cpp]
     private NetPlayer CreateNetPlayer(int netId)
     {
         var player = new NetPlayer
@@ -66,8 +68,7 @@ public class NetworkEventsComponent : MonoBehaviour
 
         var rigidbody = player.TruckObj.GetComponent<Rigidbody>();
         rigidbody.detectCollisions = false;
-        var colliders = player.TruckObj.GetComponentsInChildren<Collider>();
-        foreach (var collider in colliders) DestroyImmediate(collider);
+        DisableInteractions(player.TruckObj);
 
         #endregion
 
@@ -125,11 +126,34 @@ public class NetworkEventsComponent : MonoBehaviour
         customizer.AssignCabLivery(liveryId, 0f);
         var rigidbody = player.TruckObj.GetComponent<Rigidbody>();
         rigidbody.detectCollisions = false;
-        var colliders = player.TruckObj.GetComponentsInChildren<Collider>();
-        foreach (var collider in colliders) DestroyImmediate(collider);
+        DisableInteractions(player.TruckObj);
         App.Log.LogInfo($"Recreated truck for player {netId} with cargo count {cargoCount}");
     }
 
+    /// <summary>
+    /// A remote truck must not collide with anything and must not be interactive. Destroying the
+    /// colliders directly used to leave the game's grabbable components pointing at dead objects,
+    /// which spammed a NullReferenceException every frame and eventually killed the process.
+    /// </summary>
+    private static void DisableInteractions(GameObject truck)
+    {
+        if (truck == null)
+            return;
+
+        foreach (var collider in truck.GetComponentsInChildren<Collider>(true))
+        {
+            if (collider != null)
+                collider.enabled = false;
+        }
+
+        foreach (var grabbable in truck.GetComponentsInChildren<GrabbableObject>(true))
+        {
+            if (grabbable != null)
+                grabbable.enabled = false;
+        }
+    }
+
+    [HideFromIl2Cpp]
     private void HandleTruckLiveryUpdate(UpdateLiveryDto liveryDto)
     {
         _mainThreadContext.Post(new Action<Object>(_ =>
@@ -141,6 +165,7 @@ public class NetworkEventsComponent : MonoBehaviour
         }), null);
     }
 
+    [HideFromIl2Cpp]
     private void HandlePlayerPositionUpdate(UpdatePositionDto positionDto)
     {
         _mainThreadContext.Post(new Action<Object>(_ =>
@@ -178,6 +203,7 @@ public class NetworkEventsComponent : MonoBehaviour
     
     private static Quaternion Quat(global::StarTruckerMP.Shared.Quaternion quat) => new(quat.X, quat.Y, quat.Z, quat.W);
     
+    [HideFromIl2Cpp]
     private void HandleTrailerUpdate(UpdateTrailerDto trailerDto)
     {
         _mainThreadContext.Post(new Action<Object>(_ =>
@@ -245,6 +271,7 @@ public class NetworkEventsComponent : MonoBehaviour
         }), null);
     }
 
+    [HideFromIl2Cpp]
     private void HandlePlayerSectorUpdate(UpdateSectorDto sectorDto)
     {
         _mainThreadContext.Post(new Action<Object>(_ =>
