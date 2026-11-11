@@ -63,6 +63,7 @@ public class GameEventsComponent : MonoBehaviour
     private void OnArrivedAtSector(Il2CppSystem.Object sender, Il2CppSystem.EventArgs args)
     {
         PlayerState.Sector = GameObject.Find("[Sector]").scene.name;
+        App.Log.LogInfo($"[GameEvents] Arrived at sector '{PlayerState.Sector}'.");
         ArrivedAtSector?.Invoke(PlayerState.Sector);
         
         // This event also happens when the player loads a saved game, so the references are kept

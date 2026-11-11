@@ -333,6 +333,18 @@ public class NetworkEventsComponent : MonoBehaviour
                 if (string.IsNullOrEmpty(PlayerState.Sector))
                     return;
 
+                // A peer can repeat its sector update, and creating another truck for it every time
+                // left orphaned clones behind. An existing remote player is kept as it is.
+                if (_players.TryGetValue(sectorDto.NetId, out NetPlayer existing))
+                {
+                    if (existing.TruckObj != null)
+                        return;
+
+                    DestroyNetPlayer(existing);
+                    _players.Remove(sectorDto.NetId);
+                    _knownIds.Remove(sectorDto.NetId);
+                }
+
                 var netPlayer = CreateNetPlayer(sectorDto.NetId);
                 if (netPlayer == null)
                     return;
