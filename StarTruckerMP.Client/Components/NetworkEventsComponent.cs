@@ -418,6 +418,7 @@ public class NetworkEventsComponent : MonoBehaviour
     }
     
     private int _activeSceneHandle = -1;
+    private string _lastSector;
 
     private void OnDisable()
     {
@@ -427,35 +428,56 @@ public class NetworkEventsComponent : MonoBehaviour
     private void Update()
     {
         var scene = SceneManager.GetActiveScene();
-        if (scene.handle == _activeSceneHandle)
+        if (scene.handle != _activeSceneHandle)
+        {
+            _activeSceneHandle = scene.handle;
+
+            // A remote truck that outlives its sector keeps the game's own objects alive with dead
+            // references, which took the process down while the main menu was loading.
+            ClearAllPlayers("the active scene changed");
+        }
+
+        var sector = PlayerState.Sector;
+        if (sector == _lastSector)
             return;
 
-        _activeSceneHandle = scene.handle;
+        var previousSector = _lastSector;
+        _lastSector = sector;
 
-        // A remote truck that outlives its sector keeps the game's own objects alive with dead
-        // references, which took the process down while the main menu was loading.
-        ClearAllPlayers();
+        if (!string.IsNullOrEmpty(previousSector))
+            ClearAllPlayers($"the player left sector {previousSector}");
     }
 
-    private void ClearAllPlayers()
+    private void OnApplicationQuit()
+    {
+        ClearAllPlayers("the game is quitting");
+    }
+
+    private void ClearAllPlayers(string reason)
     {
         if (_knownIds.Count == 0)
             return;
 
+        var removed = 0;
+
         foreach (var netId in new List<int>(_knownIds))
         {
             if (_players.TryGetValue(netId, out NetPlayer player))
+            {
                 DestroyNetPlayer(player);
+                removed++;
+            }
 
             _players.Remove(netId);
         }
 
         _knownIds.Clear();
-        App.Log.LogInfo("Cleared every remote player before the scene change.");
+        App.Log.LogInfo($"Cleared {removed} remote player(s) because {reason}.");
     }
 
     private void OnDestroy()
     {
+        ClearAllPlayers("the network component is destroyed");
         Unsubscribe();
     }
 }
