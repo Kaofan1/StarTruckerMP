@@ -6,6 +6,7 @@ namespace StarTruckerMP.Shared.Dto;
 public class PlayerSnapshotDto
 {
     public int NetId { get; set; }
+    public string Name { get; set; } = string.Empty;
     public string Sector { get; set; } = "none";
     public string Livery { get; set; } = string.Empty;
     public TransformDto Player { get; set; } = new();

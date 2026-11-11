@@ -12,6 +12,12 @@ public static class PlayerState
     public static string Token { get; set; } = "";
 
     /// <summary>
+    /// Name the other players see above this player's suit and truck. Taken from the Steam persona
+    /// name or the Xbox gamertag, with a fallback used when neither is available.
+    /// </summary>
+    public static string PlayerName { get; set; } = "";
+
+    /// <summary>
     /// Server ephemeral P-256 public key (SubjectPublicKeyInfo DER bytes) received during HTTPS auth.
     /// Used by the client to derive the shared ChaCha20-Poly1305 session key via ECDH + HKDF.
     /// Cleared after the session key is derived.

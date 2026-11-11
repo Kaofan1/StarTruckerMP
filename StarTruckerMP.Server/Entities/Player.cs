@@ -10,6 +10,9 @@ public class Player(int id)
     public int Id { get; set; } = id;
     public bool HandshakeCompleted { get; set; }
     public ushort ProtocolVersion { get; set; }
+
+    /// <summary>Name the player is shown as, taken from the handshake and never longer than 24 characters.</summary>
+    public string Name { get; set; } = string.Empty;
     public string Sector { get; set; } = "none";
     public string Livery { get; set; } = string.Empty;
 

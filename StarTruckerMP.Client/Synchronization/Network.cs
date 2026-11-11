@@ -20,6 +20,7 @@ public class Network
     public static event Action<UpdatePositionDto> OnPlayerPositionUpdate;
     public static event Action<UpdateLiveryDto> OnTruckLiveryUpdate;
     public static event Action<UpdateSectorDto> OnPlayerSectorUpdate;
+    public static event Action<int, string> OnPlayerNameUpdate;
     public static event Action<int> OnPlayerDisconnected;
     public static event Action<UpdateTrailerDto> OnTrailerUpdate;
     public static event Action<VoiceDto> OnVoiceReceived;
@@ -287,6 +288,11 @@ public class Network
             return;
         }
 
+        // The name is raised before the sector update that creates the remote player, so the label
+        // exists with the right text from its first frame.
+        if (!string.IsNullOrWhiteSpace(snapshot.Name))
+            OnPlayerNameUpdate?.Invoke(snapshot.NetId, snapshot.Name);
+
         OnPlayerSectorUpdate?.Invoke(new UpdateSectorDto
         {
             NetId = snapshot.NetId,
@@ -430,6 +436,7 @@ public class Network
         var hello = new ProtocolHelloCmd
         {
             ProtocolVersion = NetProtocol.CurrentVersion,
+            PlayerName = string.IsNullOrWhiteSpace(PlayerState.PlayerName) ? "Player" : PlayerState.PlayerName,
             ClientPublicKey = _ephemeralKey is not null
                 ? ClientKeyExchange.ExportPublicKeyBytes(_ephemeralKey)
                 : Array.Empty<byte>()

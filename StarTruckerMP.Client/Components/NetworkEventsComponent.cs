@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Il2CppInterop.Runtime.Attributes;
 using Microsoft.Extensions.Caching.Memory;
 using StarTruckerMP.Client.Synchronization;
+using StarTruckerMP.Client.UI;
 using StarTruckerMP.Shared;
 using StarTruckerMP.Shared.Cmd;
 using StarTruckerMP.Shared.Dto;
@@ -29,6 +30,7 @@ public class NetworkEventsComponent : MonoBehaviour
         Network.OnConnected += HandleConnected;
         Network.OnDisconnected += HandleDisconnected;
         Network.OnPlayerDisconnected += HandlePlayerDisconnected;
+        Network.OnPlayerNameUpdate += HandlePlayerNameUpdate;
         Network.OnPlayerSectorUpdate += HandlePlayerSectorUpdate;
         Network.OnPlayerPositionUpdate += HandlePlayerPositionUpdate;
         Network.OnTruckLiveryUpdate += HandleTruckLiveryUpdate;
@@ -42,6 +44,10 @@ public class NetworkEventsComponent : MonoBehaviour
     // The cache cannot be enumerated, so the ids of the remote players are tracked next to it.
     private readonly HashSet<int> _knownIds = new();
 
+    // A name arrives before the sector update that spawns the remote player, so names are kept
+    // apart from the objects that only exist while the player shares our sector.
+    private readonly Dictionary<int, string> _names = new();
+
     private class NetPlayer
     {
         public int PlayerId { get; set; }
@@ -49,6 +55,8 @@ public class NetworkEventsComponent : MonoBehaviour
         public GameObject TruckObj { get; set; }
         public GameObject PlayerObj { get; set; }
         public GameObject SuitObj { get; set; }
+        public GameObject TruckLabel { get; set; }
+        public GameObject SuitLabel { get; set; }
     }
 
     [HideFromIl2Cpp]
@@ -57,7 +65,7 @@ public class NetworkEventsComponent : MonoBehaviour
         var player = new NetPlayer
         {
             PlayerId = netId,
-            PlayerName = $"Player #{netId}"
+            PlayerName = LabelFor(netId)
         };
 
         var go = GameObject.Find("[Sector]");
@@ -113,6 +121,22 @@ public class NetworkEventsComponent : MonoBehaviour
         
         #endregion
         
+        #region Name labels
+
+        // A label that cannot be built must never stop the remote player from being created.
+        try
+        {
+            player.TruckLabel = Nameplates.CreateTruckLabel(player.TruckObj.transform, player.PlayerName);
+            player.SuitLabel = Nameplates.CreateSuitLabel(player.PlayerObj.transform, player.PlayerName);
+            App.Log.LogInfo($"({netId}) Name labels created for '{player.PlayerName}'.");
+        }
+        catch (Exception exception)
+        {
+            App.Log.LogError($"({netId}) Failed to create the name labels: {exception}");
+        }
+
+        #endregion
+
         App.Log.LogInfo($"Created NetPlayer for netId {netId}");
         
         return player;
@@ -139,6 +163,8 @@ public class NetworkEventsComponent : MonoBehaviour
         var rigidbody = player.TruckObj.GetComponent<Rigidbody>();
         rigidbody.detectCollisions = false;
         DisableInteractions(player.TruckObj);
+        // The rebuilt truck is a new object, so its label has to follow the new transform.
+        Nameplates.SetTarget(player.TruckLabel, player.TruckObj.transform);
         App.Log.LogInfo($"Recreated truck for player {netId} with cargo count {cargoCount}");
     }
 
@@ -217,6 +243,11 @@ public class NetworkEventsComponent : MonoBehaviour
                     rigid.angularVelocity = Vec(positionDto.AngVel);
                 }
             }
+
+            // A player sitting in the truck is shown by the truck label, so the suit label is hidden
+            // to keep the cabin from carrying two names on top of each other.
+            if (positionDto.IsTruck)
+                Nameplates.SetVisible(player.SuitLabel, !positionDto.InSeat);
         });
     }
 
@@ -238,6 +269,32 @@ public class NetworkEventsComponent : MonoBehaviour
                 App.Log.LogError("Network event handler failed: " + exception);
             }
         }), null);
+    }
+
+    /// <summary>Name and network id shown above a remote player, e.g. "Kaofan #3".</summary>
+    private string LabelFor(int netId) =>
+        _names.TryGetValue(netId, out var name) && !string.IsNullOrWhiteSpace(name)
+            ? $"{name} #{netId}"
+            : $"Player #{netId}";
+
+    [HideFromIl2Cpp]
+    private void HandlePlayerNameUpdate(int netId, string name)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+            return;
+
+        PostToMainThread(() =>
+        {
+            _names[netId] = name;
+
+            if (!_players.TryGetValue(netId, out NetPlayer player))
+                return;
+
+            player.PlayerName = LabelFor(netId);
+            Nameplates.SetText(player.TruckLabel, player.PlayerName);
+            Nameplates.SetText(player.SuitLabel, player.PlayerName);
+            App.Log.LogInfo($"Remote player {netId} is now shown as '{player.PlayerName}'.");
+        });
     }
 
     private static Vector3 Vec(global::StarTruckerMP.Shared.Vector3 vec) => new(vec.X, vec.Y, vec.Z);
@@ -437,6 +494,12 @@ public class NetworkEventsComponent : MonoBehaviour
             player.PlayerObj.SetActive(false);
             Destroy(player.PlayerObj);
         }
+
+        if (player.TruckLabel != null)
+            Destroy(player.TruckLabel);
+
+        if (player.SuitLabel != null)
+            Destroy(player.SuitLabel);
     }
 
     private void ClearAllPlayers(string reason)
@@ -466,6 +529,7 @@ public class NetworkEventsComponent : MonoBehaviour
         Network.OnConnected -= HandleConnected;
         Network.OnDisconnected -= HandleDisconnected;
         Network.OnPlayerDisconnected -= HandlePlayerDisconnected;
+        Network.OnPlayerNameUpdate -= HandlePlayerNameUpdate;
         Network.OnPlayerSectorUpdate -= HandlePlayerSectorUpdate;
         Network.OnPlayerPositionUpdate -= HandlePlayerPositionUpdate;
         Network.OnTruckLiveryUpdate -= HandleTruckLiveryUpdate;

@@ -82,6 +82,7 @@ public class Plugin : BasePlugin
         ClassInjector.RegisterTypeInIl2Cpp<RunCodeComponent>();
         ClassInjector.RegisterTypeInIl2Cpp<CbRadioPttComponent>();
         ClassInjector.RegisterTypeInIl2Cpp<CbRadioSpeakerComponent>();
+        ClassInjector.RegisterTypeInIl2Cpp<NameplateComponent>();
         AddComponent<GameEventsComponent>();
         AddComponent<NetworkEventsComponent>();
         AddComponent<RunCodeComponent>();
@@ -132,6 +133,9 @@ public class Plugin : BasePlugin
             // but the HTTP call runs on a background thread to avoid blocking the game loop.
             var xuid = XboxAuth.Xuid;
             var gamertag = XboxAuth.Gamertag;
+
+            if (!string.IsNullOrWhiteSpace(gamertag))
+                PlayerState.PlayerName = gamertag;
             StartAttachedThread(() => SendXboxAuth(xuid, gamertag, token));
         };
     }

@@ -47,6 +47,20 @@ internal static class SteamAuthHelper
                 return;
             }
 
+            try
+            {
+                var personaName = Steamworks.SteamFriends.GetPersonaName();
+                if (!string.IsNullOrWhiteSpace(personaName))
+                {
+                    PlayerState.PlayerName = personaName;
+                    Log.LogInfo($"[Auth] Steam persona name: {personaName}");
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.LogWarning("[Auth] Could not read the Steam persona name: " + ex.Message);
+            }
+
             var steamId = Steamworks.SteamUser.GetSteamID();
 
             // GetAuthSessionTicket requires an Il2CppStructArray<byte> buffer.

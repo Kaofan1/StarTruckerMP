@@ -2,6 +2,7 @@
 using System.Net.Sockets;
 using System.Collections.Concurrent;
 using System.Security.Cryptography;
+using System.Text;
 using LiteNetLib;
 using Microsoft.Extensions.Logging;
 using StarTruckerMP.Server.Controllers.Services;
@@ -350,6 +351,7 @@ public class ServerManager
         return new PlayerSnapshotDto
         {
             NetId = player.Id,
+            Name = player.Name,
             Sector = player.Sector,
             Livery = player.Livery,
             Player = new TransformDto
@@ -414,6 +416,7 @@ public class ServerManager
 
         player.HandshakeCompleted = true;
         player.ProtocolVersion = hello.ProtocolVersion;
+        player.Name = SanitizeName(hello.PlayerName, peerId);
 
         // ProtocolWelcome is sent in plaintext - the client will use its own local key derivation.
         // From this point on all other packets are encrypted.
@@ -435,6 +438,29 @@ public class ServerManager
 
         var connectedPayload = ToSnapshot(player);
         QueueSendReliableToAllExcept(connectedPayload.Serialize(PacketType.PlayerConnected), peerId);
+    }
+
+    /// <summary>
+    /// The display name comes from a client and is relayed to everyone else, so it is trimmed,
+    /// capped and stripped of control characters before it is stored.
+    /// </summary>
+    private static string SanitizeName(string? name, int peerId)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+            return $"Player {peerId}";
+
+        var trimmed = name.Trim();
+        if (trimmed.Length > 24)
+            trimmed = trimmed[..24];
+
+        var builder = new StringBuilder(trimmed.Length);
+        foreach (var character in trimmed)
+        {
+            if (!char.IsControl(character))
+                builder.Append(character);
+        }
+
+        return builder.Length == 0 ? $"Player {peerId}" : builder.ToString();
     }
 
     private static bool IsVersionSupported(ushort version)
