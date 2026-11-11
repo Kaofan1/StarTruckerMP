@@ -52,6 +52,7 @@ public class Plugin : BasePlugin
         Harmony.CreateAndPatchAll(typeof(ClientHooks));
         Harmony.CreateAndPatchAll(typeof(AIVehicleTruck_Patch));
         Harmony.CreateAndPatchAll(typeof(AIVehicleDef_Patch));
+        Harmony.CreateAndPatchAll(typeof(FontWarningFilter));
         
         Log.LogInfo($"Plugin {PluginInfo.PLUGIN_GUID} loaded.");
         

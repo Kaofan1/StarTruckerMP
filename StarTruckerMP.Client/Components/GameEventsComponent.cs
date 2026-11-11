@@ -119,6 +119,8 @@ public class GameEventsComponent : MonoBehaviour
         if (!_tptRunning) TruckPositionThread();
     }
 
+    private float _nextFontFallbackCheck;
+
     private static void ReportOverlayState()
     {
         ReportOverlayMode();
@@ -238,6 +240,14 @@ public class GameEventsComponent : MonoBehaviour
             PlayerState.SpaceSuitMats = PlayerState.SpaceSuit.GetComponent<MeshRenderer>()?.materials.ToArray();
         
         // Real overlay hotkeys: F2 toggles UI mode and Esc closes it.
+        // Font assets are loaded by the game after the plugin starts, so the fallback is added
+        // once they appear instead of only at start up.
+        if (!Patches.FontFallback.Installed && Time.unscaledTime >= _nextFontFallbackCheck)
+        {
+            _nextFontFallbackCheck = Time.unscaledTime + 3f;
+            Patches.FontFallback.TryInstall();
+        }
+
         // F2 opens the panel only; Escape is the key that closes it again.
         if (Input.GetKeyDown(KeyCode.F2) && !OverlayManager.IsInteractiveMode)
         {
