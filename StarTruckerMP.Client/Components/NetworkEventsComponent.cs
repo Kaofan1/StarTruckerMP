@@ -315,6 +315,9 @@ public class NetworkEventsComponent : MonoBehaviour
         {
             if (sectorDto.Sector != PlayerState.Sector)
             {
+                if (_players.TryGetValue(sectorDto.NetId, out NetPlayer leaving))
+                    DestroyNetPlayer(leaving);
+
                 _players.Remove(sectorDto.NetId);
                 App.Log.LogInfo($"Removed player {sectorDto.NetId} from cache due to sector change ({sectorDto.Sector} != {PlayerState.Sector})");
                 return;
@@ -342,8 +345,7 @@ public class NetworkEventsComponent : MonoBehaviour
             lock (netId.ToString())
             {
                 if (!_players.TryGetValue(netId, out NetPlayer player)) return;
-                player.TruckObj.SetActive(false);
-                player.PlayerObj.SetActive(false);
+                DestroyNetPlayer(player);
                 _players.Remove(netId);
             }
         });
@@ -372,6 +374,28 @@ public class NetworkEventsComponent : MonoBehaviour
             {
                 App.Log.LogWarning("Could not extract livery from player truck, skipping livery update.");
             }
+        }
+    }
+
+    /// <summary>
+    /// Removes the objects a remote player left behind. A clone that survives a sector change keeps
+    /// ticking with missing colliders after the game unloads its assets.
+    /// </summary>
+    private static void DestroyNetPlayer(NetPlayer player)
+    {
+        if (player == null)
+            return;
+
+        if (player.TruckObj != null)
+        {
+            player.TruckObj.SetActive(false);
+            Destroy(player.TruckObj);
+        }
+
+        if (player.PlayerObj != null)
+        {
+            player.PlayerObj.SetActive(false);
+            Destroy(player.PlayerObj);
         }
     }
 
