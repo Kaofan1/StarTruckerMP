@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using Il2CppInterop.Runtime.Attributes;
 using Microsoft.Extensions.Caching.Memory;
 using StarTruckerMP.Client.Synchronization;
@@ -37,6 +38,9 @@ public class NetworkEventsComponent : MonoBehaviour
     }
 
     private IMemoryCache _players = new MemoryCache(new MemoryCacheOptions());
+
+    // The cache has no way to enumerate its entries, so the ids are tracked next to it.
+    private readonly HashSet<int> _knownIds = new();
 
     private class NetPlayer
     {
@@ -319,6 +323,7 @@ public class NetworkEventsComponent : MonoBehaviour
                     DestroyNetPlayer(leaving);
 
                 _players.Remove(sectorDto.NetId);
+                _knownIds.Remove(sectorDto.NetId);
                 App.Log.LogInfo($"Removed player {sectorDto.NetId} from cache due to sector change ({sectorDto.Sector} != {PlayerState.Sector})");
                 return;
             }
@@ -333,6 +338,7 @@ public class NetworkEventsComponent : MonoBehaviour
                     return;
 
                 _players.Set(sectorDto.NetId, netPlayer);
+                _knownIds.Add(sectorDto.NetId);
                 App.Log.LogInfo($"Added player {sectorDto.NetId} to cache for sector {sectorDto.Sector}");
             }
         });
@@ -347,6 +353,7 @@ public class NetworkEventsComponent : MonoBehaviour
                 if (!_players.TryGetValue(netId, out NetPlayer player)) return;
                 DestroyNetPlayer(player);
                 _players.Remove(netId);
+                _knownIds.Remove(netId);
             }
         });
     }
@@ -410,9 +417,41 @@ public class NetworkEventsComponent : MonoBehaviour
         Network.OnTrailerUpdate -= HandleTrailerUpdate;
     }
     
+    private int _activeSceneHandle = -1;
+
     private void OnDisable()
     {
         Unsubscribe();
+    }
+
+    private void Update()
+    {
+        var scene = SceneManager.GetActiveScene();
+        if (scene.handle == _activeSceneHandle)
+            return;
+
+        _activeSceneHandle = scene.handle;
+
+        // A remote truck that outlives its sector keeps the game's own objects alive with dead
+        // references, which took the process down while the main menu was loading.
+        ClearAllPlayers();
+    }
+
+    private void ClearAllPlayers()
+    {
+        if (_knownIds.Count == 0)
+            return;
+
+        foreach (var netId in new List<int>(_knownIds))
+        {
+            if (_players.TryGetValue(netId, out NetPlayer player))
+                DestroyNetPlayer(player);
+
+            _players.Remove(netId);
+        }
+
+        _knownIds.Clear();
+        App.Log.LogInfo("Cleared every remote player before the scene change.");
     }
 
     private void OnDestroy()
