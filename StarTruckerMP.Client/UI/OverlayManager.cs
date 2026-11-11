@@ -186,9 +186,10 @@ internal static class OverlayManager
     /// </summary>
     public static void SetSessionTokenAndNavigate(string token, string url)
     {
-        // The overlay process is launched at the same moment as the auth request and its pipe
-        // server needs a few seconds to start, so the send retries instead of racing it.
-        SendCommands($"TOKEN:{token}", $"NAVIGATE:{url}");
+        // The overlay process is launched at the same moment as the auth request and needs up to
+        // half a minute before its pipe server listens (CEF and Avalonia start up first), so this
+        // send waits much longer than a normal command.
+        SendCommands(PipeTokenDeadlineMs, $"TOKEN:{token}", $"NAVIGATE:{url}");
         App.Log.LogInfo($"[Overlay] Session token queued, navigating to {url}.");
     }
 
@@ -239,17 +240,23 @@ internal static class OverlayManager
     /// <summary>How long a single pipe connect may block before it counts as a missed attempt.</summary>
     private const int PipeConnectTimeoutMs = 2000;
 
-    /// <summary>
-    /// How long a command keeps retrying while the overlay pipe is not listening yet. The overlay
-    /// starts CEF before it opens the pipe, which takes several seconds on a cold start.
-    /// </summary>
+    /// <summary>How long a normal command keeps retrying while the overlay pipe is not listening.</summary>
     private const int PipeSendDeadlineMs = 20_000;
 
-    private static void SendCommands(params string[] commands)
+    /// <summary>
+    /// The session token has to survive the whole overlay cold start: on this machine the pipe
+    /// server appeared around twenty seconds after the process started.
+    /// </summary>
+    private const int PipeTokenDeadlineMs = 120_000;
+
+    private static void SendCommands(params string[] commands) =>
+        SendCommands(PipeSendDeadlineMs, commands);
+
+    private static void SendCommands(int deadlineMs, params string[] commands)
     {
         Plugin.StartAttachedThread(() =>
         {
-            var deadline = Environment.TickCount64 + PipeSendDeadlineMs;
+            var deadline = Environment.TickCount64 + deadlineMs;
             var attempts = 0;
 
             while (true)
