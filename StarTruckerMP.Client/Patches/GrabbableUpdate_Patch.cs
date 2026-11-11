@@ -81,3 +81,15 @@ internal static class TruckAmbientAudioUpdate_Patch
 {
     private static Exception Finalizer(Exception __exception) => UnloadNoise.Filter("TruckSystemAmbientAudio.LateUpdate", __exception);
 }
+
+[HarmonyPatch(typeof(InteractRaycaster), "LateUpdate")]
+internal static class InteractRaycasterUpdate_Patch
+{
+    private static Exception Finalizer(Exception __exception) => UnloadNoise.Filter("InteractRaycaster.LateUpdate", __exception);
+}
+
+[HarmonyPatch(typeof(TruckSeat), "SetAutoRecenterCabView")]
+internal static class TruckSeatRecenter_Patch
+{
+    private static Exception Finalizer(Exception __exception) => UnloadNoise.Filter("TruckSeat.SetAutoRecenterCabView", __exception);
+}

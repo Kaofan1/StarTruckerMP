@@ -61,6 +61,8 @@ public class Plugin : BasePlugin
         Harmony.CreateAndPatchAll(typeof(EmergencyBrakeUpdate_Patch));
         Harmony.CreateAndPatchAll(typeof(SalvageScannerUpdate_Patch));
         Harmony.CreateAndPatchAll(typeof(TruckAmbientAudioUpdate_Patch));
+        Harmony.CreateAndPatchAll(typeof(InteractRaycasterUpdate_Patch));
+        Harmony.CreateAndPatchAll(typeof(TruckSeatRecenter_Patch));
         
         Log.LogInfo($"Plugin {PluginInfo.PLUGIN_GUID} loaded.");
         
