@@ -58,7 +58,13 @@ public class NetworkEventsComponent : MonoBehaviour
 
         var go = GameObject.Find("[Sector]");
         var scene = go?.scene;
-        if (scene == null) App.Log.LogError($"({netId}) Could not find sector root object to get scene for player");
+        if (scene == null)
+        {
+            // No sector means the game is at the main menu or still loading, and spawning a remote
+            // truck there only leaves broken objects behind for the next scene.
+            App.Log.LogWarning($"({netId}) No sector root object, skipping the remote player for now.");
+            return null;
+        }
 
         #region Truck setup
 
@@ -119,7 +125,9 @@ public class NetworkEventsComponent : MonoBehaviour
         var liveryId = customizer.m_cabLiveryApplier.CurrentLiveryId ?? customizer.m_cabLiveryApplier.AppliedLiveryId;
         // delete
         player.TruckObj.SetActive(false);
-        DestroyImmediate(player.TruckObj);
+        // DestroyImmediate during a scene change corrupts the game's own object lists and stops the
+        // main menu from loading, so the old truck is removed at the end of the frame instead.
+        Destroy(player.TruckObj);
         // recreate with same data
         player.TruckObj = TruckFactory.CreatePlayerTruck(cargoCount, currentPos, currentRot);
         customizer = player.TruckObj.GetComponent<AIVehicleCustomiser>();
@@ -140,16 +148,25 @@ public class NetworkEventsComponent : MonoBehaviour
         if (truck == null)
             return;
 
+        // The clone is a full player truck: seats, brakes, scanners, grabbables, ambient audio and
+        // the truck itself all keep running their Update loops and expect the real player, which
+        // flooded the log with exceptions every frame and kept the main menu from loading. Only the
+        // network controller is allowed to tick.
+        foreach (var behaviour in truck.GetComponentsInChildren<Behaviour>(true))
+        {
+            if (behaviour == null)
+                continue;
+
+            if (behaviour.TryCast<TruckControllerComponent>() != null)
+                continue;
+
+            behaviour.enabled = false;
+        }
+
         foreach (var collider in truck.GetComponentsInChildren<Collider>(true))
         {
             if (collider != null)
                 collider.enabled = false;
-        }
-
-        foreach (var grabbable in truck.GetComponentsInChildren<GrabbableObject>(true))
-        {
-            if (grabbable != null)
-                grabbable.enabled = false;
         }
     }
 
@@ -305,7 +322,13 @@ public class NetworkEventsComponent : MonoBehaviour
 
             lock (sectorDto.NetId.ToString())
             {
+                if (string.IsNullOrEmpty(PlayerState.Sector))
+                    return;
+
                 var netPlayer = CreateNetPlayer(sectorDto.NetId);
+                if (netPlayer == null)
+                    return;
+
                 _players.Set(sectorDto.NetId, netPlayer);
                 App.Log.LogInfo($"Added player {sectorDto.NetId} to cache for sector {sectorDto.Sector}");
             }
