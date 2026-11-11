@@ -1,15 +1,15 @@
 using System;
 using HarmonyLib;
+using Il2CppInterop.Runtime.InteropTypes.Arrays;
 using TMPro;
 using UnityEngine;
-using UnityEngine.TextCore.LowLevel;
 
 namespace StarTruckerMP.Client.Patches;
 
 /// <summary>
-/// The game ships two digital fonts without the Polish L with stroke and without the underline
-/// glyph, so TextMeshPro draws a space and logs a warning every time such a text is refreshed.
-/// A dynamic fallback font built from a system font fills both gaps.
+/// The game ships two dot matrix fonts without the Polish L with stroke and without the underline
+/// glyph, so TextMeshPro draws a space there. Another font asset of the game that does have the
+/// Polish glyphs is attached to both as a fallback.
 /// </summary>
 public static class FontFallback
 {
@@ -19,22 +19,42 @@ public static class FontFallback
         "Digital7-Mono-Regular_SDF"
     ];
 
-    private static TMP_FontAsset _fallback;
-    private static bool _installed;
+    private const char PolishL = '\u0141';
+    private const char Underline = '\u0332';
+    private const int MaxAttempts = 40;
 
-    public static bool Installed => _installed;
+    private static bool _installed;
+    private static bool _gaveUp;
+    private static int _attempts;
+
+    public static bool Installed => _installed || _gaveUp;
 
     /// <summary>
-    /// Adds the fallback to every affected font asset that is loaded. Safe to call repeatedly while
-    /// the game is still loading its assets.
+    /// Attaches a fallback font to the affected assets. Safe to call repeatedly while the game is
+    /// still loading its assets, and it stops on its own once it has either worked or run out of
+    /// attempts.
     /// </summary>
     public static void TryInstall()
     {
-        if (_installed)
+        if (_installed || _gaveUp)
             return;
 
+        if (++_attempts > MaxAttempts)
+        {
+            _gaveUp = true;
+            App.Log.LogInfo("[Fonts] No loaded font carries the Polish glyph, keeping the warnings filtered.");
+            return;
+        }
+
         var fonts = Resources.FindObjectsOfTypeAll<TMP_FontAsset>();
-        var matched = 0;
+        if (fonts == null || fonts.Length == 0)
+            return;
+
+        var fallback = FindFallback(fonts);
+        if (fallback == null)
+            return;
+
+        var patched = 0;
 
         foreach (var font in fonts)
         {
@@ -44,66 +64,48 @@ public static class FontFallback
             if (Array.IndexOf(AffectedFonts, font.name) < 0)
                 continue;
 
-            if (font.HasCharacter('\u0141') && font.HasCharacter('\u0332'))
+            if (font.HasCharacter(PolishL) && font.HasCharacter(Underline))
                 continue;
-
-            EnsureFallback();
-            if (_fallback == null)
-                return;
 
             if (font.fallbackFontAssetTable == null)
                 font.fallbackFontAssetTable = new Il2CppSystem.Collections.Generic.List<TMP_FontAsset>();
 
-            if (!font.fallbackFontAssetTable.Contains(_fallback))
+            if (!font.fallbackFontAssetTable.Contains(fallback))
             {
-                font.fallbackFontAssetTable.Add(_fallback);
-                App.Log.LogInfo($"[Fonts] Added the fallback font to {font.name}.");
+                font.fallbackFontAssetTable.Add(fallback);
+                App.Log.LogInfo($"[Fonts] Using {fallback.name} as the fallback for {font.name}.");
             }
 
-            matched++;
+            patched++;
         }
 
-        if (matched > 0)
+        if (patched > 0)
             _installed = true;
     }
 
-    private static void EnsureFallback()
+    private static TMP_FontAsset FindFallback(Il2CppArrayBase<TMP_FontAsset> fonts)
     {
-        if (_fallback != null)
-            return;
+        TMP_FontAsset best = null;
 
-        try
+        foreach (var font in fonts)
         {
-            var osFont = Font.CreateDynamicFontFromOSFont("Arial", 48);
-            if (osFont == null)
-            {
-                App.Log.LogWarning("[Fonts] Arial is not available, cannot build a fallback font.");
-                return;
-            }
+            if (font == null || string.IsNullOrEmpty(font.name))
+                continue;
 
-            _fallback = TMP_FontAsset.CreateFontAsset(
-                osFont,
-                samplingPointSize: 90,
-                atlasPadding: 9,
-                renderMode: GlyphRenderMode.SDFAA,
-                atlasWidth: 1024,
-                atlasHeight: 1024,
-                atlasPopulationMode: AtlasPopulationMode.Dynamic,
-                enableMultiAtlasSupport: true);
+            if (Array.IndexOf(AffectedFonts, font.name) >= 0)
+                continue;
 
-            if (_fallback == null)
-            {
-                App.Log.LogWarning("[Fonts] TextMeshPro refused to create the fallback font.");
-                return;
-            }
+            if (!font.HasCharacter(PolishL))
+                continue;
 
-            _fallback.name = "StarTruckerMP Fallback";
-            App.Log.LogInfo("[Fonts] Fallback font created.");
+            // A font that also has the underline glyph covers both warnings at once.
+            if (font.HasCharacter(Underline))
+                return font;
+
+            best ??= font;
         }
-        catch (Exception exception)
-        {
-            App.Log.LogWarning("[Fonts] Could not create a fallback font: " + exception.Message);
-        }
+
+        return best;
     }
 }
 
