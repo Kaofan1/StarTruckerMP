@@ -42,6 +42,9 @@ public class Plugin : BasePlugin
         App.Log = Log;
         App.Configure(Config);
 
+        // Installed before the game logs its first missing glyph warning.
+        LogNoiseFilter.Install();
+
         SetupXboxAuth();
         SetupSteamAuth();
         SetupComponents();
@@ -52,7 +55,6 @@ public class Plugin : BasePlugin
         Harmony.CreateAndPatchAll(typeof(ClientHooks));
         Harmony.CreateAndPatchAll(typeof(AIVehicleTruck_Patch));
         Harmony.CreateAndPatchAll(typeof(AIVehicleDef_Patch));
-        Harmony.CreateAndPatchAll(typeof(FontWarningFilter));
         
         Log.LogInfo($"Plugin {PluginInfo.PLUGIN_GUID} loaded.");
         

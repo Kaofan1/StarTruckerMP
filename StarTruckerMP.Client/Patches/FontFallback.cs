@@ -1,5 +1,4 @@
 using System;
-using HarmonyLib;
 using Il2CppInterop.Runtime.InteropTypes.Arrays;
 using TMPro;
 using UnityEngine;
@@ -23,25 +22,23 @@ public static class FontFallback
     private const char Underline = '\u0332';
     private const int MaxAttempts = 40;
 
-    private static bool _installed;
-    private static bool _gaveUp;
+    private static bool _finished;
     private static int _attempts;
 
-    public static bool Installed => _installed || _gaveUp;
+    public static bool Installed => _finished;
 
     /// <summary>
     /// Attaches a fallback font to the affected assets. Safe to call repeatedly while the game is
-    /// still loading its assets, and it stops on its own once it has either worked or run out of
-    /// attempts.
+    /// still loading its assets, and it stops on its own once the attempts run out.
     /// </summary>
     public static void TryInstall()
     {
-        if (_installed || _gaveUp)
+        if (_finished)
             return;
 
         if (++_attempts > MaxAttempts)
         {
-            _gaveUp = true;
+            _finished = true;
             App.Log.LogInfo("[Fonts] No loaded font carries the Polish glyph, keeping the warnings filtered.");
             return;
         }
@@ -74,15 +71,14 @@ public static class FontFallback
             {
                 font.fallbackFontAssetTable.Add(fallback);
                 App.Log.LogInfo($"[Fonts] Using {fallback.name} as the fallback for {font.name}.");
+                patched++;
             }
-
-            patched++;
         }
 
         // The two fonts do not necessarily load in the same frame, so the attempts continue until
         // the cap is reached and every asset that shows up gets the fallback.
         if (patched > 0)
-            App.Log.LogInfo($"[Fonts] Fallback applied to {patched} font asset(s) so far.");
+            App.Log.LogInfo($"[Fonts] Fallback applied to {patched} font asset(s) in this pass.");
     }
 
     private static TMP_FontAsset FindFallback(Il2CppArrayBase<TMP_FontAsset> fonts)
@@ -108,32 +104,5 @@ public static class FontFallback
         }
 
         return best;
-    }
-}
-
-/// <summary>
-/// TextMeshPro warns about every missing glyph, and the affected texts are refreshed constantly,
-/// so the two known font asset messages are dropped before they reach the log. Everything else is
-/// passed through untouched.
-/// </summary>
-[HarmonyPatch]
-internal static class FontWarningFilter
-{
-    [HarmonyPatch(typeof(Debug), nameof(Debug.LogWarning), new[] { typeof(object) })]
-    [HarmonyPrefix]
-    private static bool Prefix(object message)
-    {
-        var text = message?.ToString();
-        if (string.IsNullOrEmpty(text))
-            return true;
-
-        if (text.Contains("is not available in font asset", StringComparison.Ordinal))
-            return false;
-
-        if (text.Contains("was not found in the", StringComparison.Ordinal) &&
-            text.Contains("SDF]", StringComparison.Ordinal))
-            return false;
-
-        return true;
     }
 }
