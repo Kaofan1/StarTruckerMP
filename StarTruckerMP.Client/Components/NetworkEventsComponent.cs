@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using Il2CppInterop.Runtime.Attributes;
 using Microsoft.Extensions.Caching.Memory;
 using StarTruckerMP.Client.Synchronization;
@@ -37,6 +38,9 @@ public class NetworkEventsComponent : MonoBehaviour
     }
 
     private IMemoryCache _players = new MemoryCache(new MemoryCacheOptions());
+
+    // The cache cannot be enumerated, so the ids of the remote players are tracked next to it.
+    private readonly HashSet<int> _knownIds = new();
 
     private class NetPlayer
     {
@@ -315,7 +319,11 @@ public class NetworkEventsComponent : MonoBehaviour
         {
             if (sectorDto.Sector != PlayerState.Sector)
             {
+                if (_players.TryGetValue(sectorDto.NetId, out NetPlayer leaving))
+                    DestroyNetPlayer(leaving);
+
                 _players.Remove(sectorDto.NetId);
+                _knownIds.Remove(sectorDto.NetId);
                 App.Log.LogInfo($"Removed player {sectorDto.NetId} from cache due to sector change ({sectorDto.Sector} != {PlayerState.Sector})");
                 return;
             }
@@ -330,6 +338,7 @@ public class NetworkEventsComponent : MonoBehaviour
                     return;
 
                 _players.Set(sectorDto.NetId, netPlayer);
+                _knownIds.Add(sectorDto.NetId);
                 App.Log.LogInfo($"Added player {sectorDto.NetId} to cache for sector {sectorDto.Sector}");
             }
         });
@@ -342,9 +351,9 @@ public class NetworkEventsComponent : MonoBehaviour
             lock (netId.ToString())
             {
                 if (!_players.TryGetValue(netId, out NetPlayer player)) return;
-                player.TruckObj.SetActive(false);
-                player.PlayerObj.SetActive(false);
+                DestroyNetPlayer(player);
                 _players.Remove(netId);
+                _knownIds.Remove(netId);
             }
         });
     }
@@ -375,6 +384,70 @@ public class NetworkEventsComponent : MonoBehaviour
         }
     }
 
+    private int _activeSceneHandle = -1;
+
+    private void Update()
+    {
+        var scene = SceneManager.GetActiveScene();
+        if (scene.handle == _activeSceneHandle)
+            return;
+
+        _activeSceneHandle = scene.handle;
+
+        // A remote truck that outlives its sector keeps the game's own objects alive with dead
+        // references, so every clone is removed as soon as the scene is replaced.
+        ClearAllPlayers("the active scene changed");
+    }
+
+    private void OnApplicationQuit()
+    {
+        ClearAllPlayers("the game is quitting");
+    }
+
+    /// <summary>
+    /// Destroys the truck and the suit of a remote player. Leaving them behind after a scene change
+    /// keeps the game's own objects alive with references to objects that no longer exist.
+    /// </summary>
+    private static void DestroyNetPlayer(NetPlayer player)
+    {
+        if (player == null)
+            return;
+
+        if (player.TruckObj != null)
+        {
+            player.TruckObj.SetActive(false);
+            Destroy(player.TruckObj);
+        }
+
+        if (player.PlayerObj != null)
+        {
+            player.PlayerObj.SetActive(false);
+            Destroy(player.PlayerObj);
+        }
+    }
+
+    private void ClearAllPlayers(string reason)
+    {
+        if (_knownIds.Count == 0)
+            return;
+
+        var removed = 0;
+
+        foreach (var netId in new List<int>(_knownIds))
+        {
+            if (_players.TryGetValue(netId, out NetPlayer player))
+            {
+                DestroyNetPlayer(player);
+                removed++;
+            }
+
+            _players.Remove(netId);
+        }
+
+        _knownIds.Clear();
+        App.Log.LogInfo($"Cleared {removed} remote player(s) because {reason}.");
+    }
+
     private void Unsubscribe()
     {
         Network.OnConnected -= HandleConnected;
@@ -393,6 +466,7 @@ public class NetworkEventsComponent : MonoBehaviour
 
     private void OnDestroy()
     {
+        ClearAllPlayers("the network component is destroyed");
         Unsubscribe();
     }
 }
