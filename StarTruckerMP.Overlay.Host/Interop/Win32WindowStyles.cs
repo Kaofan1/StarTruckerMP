@@ -101,12 +101,18 @@ internal sealed class Win32WindowStyles
         if (hwnd == 0)
             return;
 
-        ShowWindow(hwnd, SwShow);
-        BringWindowToTop(hwnd);
-        SetForegroundWindow(hwnd);
-        SetActiveWindow(hwnd);
-        SetFocus(hwnd);
-        _logger.Info($"[Win32] FocusGameWindow hwnd=0x{hwnd:X}");
+        // The game window belongs to Unity, and taking its focus with ShowWindow, SetActiveWindow
+        // or SetFocus from this process made the game tear down its input handling on close.
+        // A plain foreground request is all the overlay needs.
+        try
+        {
+            SetForegroundWindow(hwnd);
+            _logger.Info($"[Win32] FocusGameWindow hwnd=0x{hwnd:X}");
+        }
+        catch (Exception ex)
+        {
+            _logger.Warn($"[Win32] FocusGameWindow failed: {ex.Message}");
+        }
     }
 
     public void ShowWithoutActivation(nint hwnd)

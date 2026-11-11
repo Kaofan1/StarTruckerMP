@@ -37,9 +37,8 @@ public class GameEventsComponent : MonoBehaviour
                     ReportOverlayState();
                     break;
                 case "overlayModeChanged":
-                    // Once the overlay has focus it handles F2 itself, so its toggle has to reach
-                    // the page too, otherwise the panel would stay on screen.
-                    _lastOverlayModeChangeUtc = DateTime.UtcNow;
+                    // The overlay window closes the panel with Escape, so its own mode change has to
+                    // reach the page too, otherwise the panel would stay on screen.
                     ReportOverlayMode();
                     break;
             }
@@ -119,10 +118,6 @@ public class GameEventsComponent : MonoBehaviour
         if (!_pptRunning) PlayerPositionThread();
         if (!_tptRunning) TruckPositionThread();
     }
-
-    private const int OverlayModeEchoGuardMs = 2000;
-
-    private static DateTime _lastOverlayModeChangeUtc = DateTime.MinValue;
 
     private static void ReportOverlayState()
     {
@@ -243,21 +238,12 @@ public class GameEventsComponent : MonoBehaviour
             PlayerState.SpaceSuitMats = PlayerState.SpaceSuit.GetComponent<MeshRenderer>()?.materials.ToArray();
         
         // Real overlay hotkeys: F2 toggles UI mode and Esc closes it.
-        if (Input.GetKeyDown(KeyCode.F2))
+        // F2 opens the panel only; Escape is the key that closes it again.
+        if (Input.GetKeyDown(KeyCode.F2) && !OverlayManager.IsInteractiveMode)
         {
-            // Enabling the overlay moves focus to its window and Windows delivers the same key
-            // press there as well, so a press right after a change is treated as an echo.
-            if ((DateTime.UtcNow - _lastOverlayModeChangeUtc).TotalMilliseconds < OverlayModeEchoGuardMs)
-            {
-                App.Log.LogInfo("[Overlay] F2 ignored, it echoes the mode change that just happened");
-            }
-            else
-            {
-                OverlayManager.ToggleInteractiveMode();
-                _lastOverlayModeChangeUtc = DateTime.UtcNow;
-                App.Log.LogInfo($"[Overlay] F2 => toggle interactive mode => {(OverlayManager.IsInteractiveMode ? "ON" : "OFF")}");
-                ReportOverlayMode();
-            }
+            OverlayManager.SetInteractiveMode(true);
+            App.Log.LogInfo("[Overlay] F2 => open panel");
+            ReportOverlayMode();
         }
 
         if (OverlayManager.IsInteractiveMode && Input.GetKeyDown(KeyCode.Escape))
