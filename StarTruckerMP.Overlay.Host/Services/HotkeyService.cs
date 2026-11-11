@@ -31,7 +31,9 @@ internal sealed class HotkeyService : IDisposable
 
     private void OnKeyDown(object? sender, KeyEventArgs e)
     {
-        if (e.Key == Key.F2)
+        // While UI mode is off the overlay is click-through and the game window has focus, so the
+        // game handles F2 itself. Reacting here as well toggled the mode twice for one key press.
+        if (e.Key == Key.F2 && _modeService.UiModeEnabled)
         {
             _logger.Info("[Hotkey] F2 => toggle UI mode");
             _modeService.ToggleUiMode();

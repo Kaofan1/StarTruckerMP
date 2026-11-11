@@ -156,19 +156,19 @@ public class NetworkEventsComponent : MonoBehaviour
     [HideFromIl2Cpp]
     private void HandleTruckLiveryUpdate(UpdateLiveryDto liveryDto)
     {
-        _mainThreadContext.Post(new Action<Object>(_ =>
+        PostToMainThread(() =>
         {
             if (!_players.TryGetValue(liveryDto.NetId, out NetPlayer player)) return;
             
             var customiser = player.TruckObj.GetComponentInChildren<AIVehicleCustomiser>(true);
             customiser.AssignCabLivery(liveryDto.Livery, 0f);
-        }), null);
+        });
     }
 
     [HideFromIl2Cpp]
     private void HandlePlayerPositionUpdate(UpdatePositionDto positionDto)
     {
-        _mainThreadContext.Post(new Action<Object>(_ =>
+        PostToMainThread(() =>
         {
             if (!_players.TryGetValue(positionDto.NetId, out NetPlayer player)) return;
 
@@ -196,6 +196,26 @@ public class NetworkEventsComponent : MonoBehaviour
                     rigid.angularVelocity = Vec(positionDto.AngVel);
                 }
             }
+        });
+    }
+
+    /// <summary>
+    /// A callback posted to the Unity main thread must never throw: an exception escaping it
+    /// reaches il2cpp_unhandled_exception and takes the whole process down.
+    /// </summary>
+    [HideFromIl2Cpp]
+    private void PostToMainThread(Action action)
+    {
+        _mainThreadContext.Post(new Action<Object>(_ =>
+        {
+            try
+            {
+                action();
+            }
+            catch (Exception exception)
+            {
+                App.Log.LogError("Network event handler failed: " + exception);
+            }
         }), null);
     }
 
@@ -206,7 +226,7 @@ public class NetworkEventsComponent : MonoBehaviour
     [HideFromIl2Cpp]
     private void HandleTrailerUpdate(UpdateTrailerDto trailerDto)
     {
-        _mainThreadContext.Post(new Action<Object>(_ =>
+        PostToMainThread(() =>
         {
             if (!_players.TryGetValue(trailerDto.NetId, out NetPlayer player)) return;
 
@@ -268,13 +288,13 @@ public class NetworkEventsComponent : MonoBehaviour
                     m_damagePercent = 0f
                 });
             }
-        }), null);
+        });
     }
 
     [HideFromIl2Cpp]
     private void HandlePlayerSectorUpdate(UpdateSectorDto sectorDto)
     {
-        _mainThreadContext.Post(new Action<Object>(_ =>
+        PostToMainThread(() =>
         {
             if (sectorDto.Sector != PlayerState.Sector)
             {
@@ -289,12 +309,12 @@ public class NetworkEventsComponent : MonoBehaviour
                 _players.Set(sectorDto.NetId, netPlayer);
                 App.Log.LogInfo($"Added player {sectorDto.NetId} to cache for sector {sectorDto.Sector}");
             }
-        }), null);
+        });
     }
 
     private void HandlePlayerDisconnected(int netId)
     {
-        _mainThreadContext.Post(new Action<Object>(_ =>
+        PostToMainThread(() =>
         {
             lock (netId.ToString())
             {
@@ -303,7 +323,7 @@ public class NetworkEventsComponent : MonoBehaviour
                 player.PlayerObj.SetActive(false);
                 _players.Remove(netId);
             }
-        }), null);
+        });
     }
 
     private void HandleDisconnected()
