@@ -99,8 +99,11 @@ Karta **MODY BEPINEX** pokazuje, co leży w `BepInEx\plugins`, i pozwala dorzuci
 folderem) i kopiuje je do `BepInEx\plugins`, nadpisując tylko pliki o tych samych nazwach.
 **Otwórz folder pluginów** otwiera ten katalog w Eksploratorze, a **Odśwież** przeczesuje go
 ponownie po ręcznych zmianach. Kliknięcie wiersza zaznacza plugin, a **Usuń zaznaczony** usuwa go
-po potwierdzeniu w oknie dialogowym. Wpis „nasz klient” to plugin StarTruckerMP i jego nie da się
-tu usunąć (służy do tego **Odinstaluj** w karcie STATUS MODA).
+po potwierdzeniu w oknie dialogowym. **Wyłącz** odsuwa plugin bez kasowania plików: luźny `.dll`
+dostaje rozszerzenie `.disabled`, a folder pluginu przenosi się do `BepInEx\plugins-disabled`.
+Potem ten sam przycisk zmienia się w **Włącz** i przywraca plugin na miejsce. Wpis „nasz klient”
+to plugin StarTruckerMP i jego nie da się tu usunąć ani wyłączyć (służy do tego **Odinstaluj**
+w karcie STATUS MODA).
 
 ## Lokalny serwer
 

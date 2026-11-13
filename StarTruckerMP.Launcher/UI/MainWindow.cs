@@ -191,6 +191,10 @@ internal sealed class MainWindow : Window
         Strings.RemovePluginAction,
         ActionVariant.Secondary);
 
+    private readonly Button _togglePluginButton = LauncherTheme.MakeButton(
+        Strings.DisablePluginAction,
+        ActionVariant.Secondary);
+
     private readonly Button _refreshPluginsButton = LauncherTheme.MakeButton(
         Strings.RefreshPlugins,
         ActionVariant.Ghost,
@@ -742,6 +746,12 @@ internal sealed class MainWindow : Window
             HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled
         };
 
+        var pluginActions = new Grid { ColumnDefinitions = new ColumnDefinitions("*,*") };
+        _togglePluginButton.Margin = new Thickness(0, 0, 8, 0);
+        pluginActions.Children.Add(_togglePluginButton);
+        pluginActions.Children.Add(_removePluginButton);
+        Grid.SetColumn(_removePluginButton, 1);
+
         var row = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto") };
         _openPluginsButton.Margin = new Thickness(0, 0, 8, 0);
         row.Children.Add(_openPluginsButton);
@@ -754,7 +764,7 @@ internal sealed class MainWindow : Window
             _pluginsStatusText,
             list,
             _addPluginButton,
-            _removePluginButton,
+            pluginActions,
             row,
             LauncherTheme.Caption(Strings.PluginsCaption));
     }
@@ -829,6 +839,7 @@ internal sealed class MainWindow : Window
         _uninstallLoaderButton.Click += async (_, _) => await UninstallLoaderAsync();
         _addPluginButton.Click += async (_, _) => await AddPluginAsync();
         _removePluginButton.Click += async (_, _) => await RemovePluginAsync();
+        _togglePluginButton.Click += async (_, _) => await TogglePluginAsync();
         _openPluginsButton.Click += (_, _) => OpenPluginsFolder();
         _refreshPluginsButton.Click += (_, _) => RefreshPlugins();
         _serverPageButton.Click += (_, _) => OpenServerPage();
@@ -1831,10 +1842,18 @@ internal sealed class MainWindow : Window
         foreach (var entry in entries)
             _pluginList.Children.Add(BuildPluginRow(entry));
 
+        var selected = entries.FirstOrDefault(entry =>
+            string.Equals(entry.Path, _selectedPluginPath, StringComparison.OrdinalIgnoreCase));
+
+        SetButtonText(
+            _togglePluginButton,
+            selected is null || selected.IsEnabled ? Strings.DisablePluginAction : Strings.EnablePluginAction);
+
         _addPluginButton.IsEnabled = !_busy;
         _openPluginsButton.IsEnabled = !_busy;
         _refreshPluginsButton.IsEnabled = !_busy;
-        _removePluginButton.IsEnabled = !_busy && _selectedPluginPath is not null;
+        _removePluginButton.IsEnabled = !_busy && selected is not null && !selected.IsOwnClient;
+        _togglePluginButton.IsEnabled = !_busy && selected is not null && !selected.IsOwnClient;
     }
 
     /// <summary>One plugin row; clicking it selects the plugin that Remove will delete.</summary>
@@ -1846,14 +1865,18 @@ internal sealed class MainWindow : Window
         {
             Text = entry.Name,
             FontSize = 11.5,
-            Foreground = LauncherTheme.TextBrush,
+            Foreground = entry.IsEnabled ? LauncherTheme.TextBrush : LauncherTheme.MutedBrush,
             TextTrimming = TextTrimming.CharacterEllipsis,
             VerticalAlignment = VerticalAlignment.Center
         };
 
-        var tag = LauncherTheme.Caption(
-            entry.IsOwnClient ? Strings.OwnClientTag : entry.IsDirectory ? Strings.PluginFolderTag : Strings.PluginDllTag,
-            10);
+        var tagText = entry.IsOwnClient
+            ? Strings.OwnClientTag
+            : !entry.IsEnabled
+                ? Strings.PluginDisabledTag
+                : entry.IsDirectory ? Strings.PluginFolderTag : Strings.PluginDllTag;
+
+        var tag = LauncherTheme.Caption(tagText, 10, entry.IsEnabled ? null : LauncherTheme.AmberBrush);
         tag.VerticalAlignment = VerticalAlignment.Center;
 
         var content = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto") };
@@ -1890,6 +1913,59 @@ internal sealed class MainWindow : Window
         };
 
         return rowButton;
+    }
+
+    /// <summary>
+    /// Switches the selected plugin off or on without deleting anything: a loose DLL gets the
+    /// .disabled extension, a plugin folder moves to BepInEx\plugins-disabled.
+    /// </summary>
+    private async System.Threading.Tasks.Task TogglePluginAsync()
+    {
+        if (_install is null || _busy || string.IsNullOrWhiteSpace(_selectedPluginPath))
+        {
+            _log.Log(Strings.PluginSelectHint);
+            return;
+        }
+
+        if (ModInstaller.IsGameRunning())
+        {
+            _log.Log(Strings.GameRunningBlock);
+            return;
+        }
+
+        var gamePath = _install.Path;
+        var pluginPath = _selectedPluginPath;
+        var entry = BepInExPlugins.List(gamePath).FirstOrDefault(item =>
+            string.Equals(item.Path, pluginPath, StringComparison.OrdinalIgnoreCase));
+
+        if (entry is null)
+        {
+            _log.Log(Strings.PluginSelectHint);
+            RefreshPlugins();
+            return;
+        }
+
+        SetBusy(true, entry.IsEnabled ? Strings.PluginDisabling(entry.Name) : Strings.PluginEnabling(entry.Name));
+
+        try
+        {
+            var moved = await System.Threading.Tasks.Task.Run(
+                () => entry.IsEnabled
+                    ? BepInExPlugins.Disable(gamePath, pluginPath)
+                    : BepInExPlugins.Enable(gamePath, pluginPath));
+
+            _selectedPluginPath = moved;
+            _log.Log(entry.IsEnabled ? Strings.PluginDisabled(entry.Name) : Strings.PluginEnabled(entry.Name));
+        }
+        catch (Exception exception)
+        {
+            _log.Log(Strings.PluginToggleFailed(exception.Message));
+        }
+        finally
+        {
+            SetBusy(false, string.Empty);
+            RefreshModState();
+        }
     }
 
     /// <summary>Deletes the selected plugin after a confirmation dialog.</summary>
@@ -2162,6 +2238,7 @@ internal sealed class MainWindow : Window
         _openPluginsButton.IsEnabled = !busy && _install is not null;
         _refreshPluginsButton.IsEnabled = !busy && _install is not null;
         _removePluginButton.IsEnabled = !busy && _install is not null && _selectedPluginPath is not null;
+        _togglePluginButton.IsEnabled = !busy && _install is not null && _selectedPluginPath is not null;
     }
 
     private void OnLogLine(string line)

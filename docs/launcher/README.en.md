@@ -101,8 +101,10 @@ The **BEPINEX MODS** card lists what is in `BepInEx\plugins` and lets you add yo
 folder) and copies it into `BepInEx\plugins`, overwriting only files with the same name.
 **Open plugins folder** opens that directory in Explorer, and **Refresh** scans it again after manual
 changes. Clicking a row selects the plugin, and **Remove selected** deletes it after a confirmation
-dialog. The "our client" entry is the StarTruckerMP plugin and cannot be removed here (use
-**Uninstall** in the MOD STATUS card for that).
+dialog. **Disable** moves a plugin aside without deleting it: a loose `.dll` gets the `.disabled`
+extension and a plugin folder moves to `BepInEx\plugins-disabled`. The same button then reads
+**Enable** and puts the plugin back. The "our client" entry is the StarTruckerMP plugin and cannot
+be removed or disabled here (use **Uninstall** in the MOD STATUS card for that).
 
 ## Local server
 

@@ -207,6 +207,38 @@ internal static class Strings
 
     public static string RemovePluginAction => T("Remove selected", "Usuń zaznaczony");
 
+    public static string EnablePluginAction => T("Enable", "Włącz");
+
+    public static string DisablePluginAction => T("Disable", "Wyłącz");
+
+    public static string PluginDisabledTag => T("disabled", "wyłączony");
+
+    public static string PluginDisabling(string name) =>
+        T($"Switching {name} off…", $"Wyłączam {name}…");
+
+    public static string PluginEnabling(string name) =>
+        T($"Switching {name} on…", $"Włączam {name}…");
+
+    public static string PluginDisabled(string name) =>
+        T($"{name} was switched off. Start the game to check the result.",
+            $"{name} został wyłączony. Uruchom grę, aby sprawdzić efekt.");
+
+    public static string PluginEnabled(string name) =>
+        T($"{name} was switched on again.", $"{name} został ponownie włączony.");
+
+    public static string PluginToggleFailed(string reason) =>
+        T($"Could not switch the plugin: {reason}", $"Nie udało się przełączyć pluginu: {reason}");
+
+    public static string PluginToggleOwnClient =>
+        T("The StarTruckerMP client cannot be switched off here; use Uninstall in the mod card.",
+            "Klienta StarTruckerMP nie można tu wyłączyć; użyj Odinstaluj w karcie STATUS MODA.");
+
+    public static string PluginDisabledNameTaken(string name) =>
+        T($"{name} is already switched off.", $"{name} jest już wyłączony.");
+
+    public static string PluginEnabledNameTaken(string name) =>
+        T($"A plugin named {name} is enabled already.", $"Plugin o nazwie {name} jest już włączony.");
+
     public static string RemovePluginConfirmTitle => T("Remove this plugin?", "Usunąć ten plugin?");
 
     public static string RemovePluginConfirm(string name, string target) =>
