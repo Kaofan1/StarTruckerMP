@@ -48,6 +48,21 @@ protocols. Mount `server.json` as a volume so settings survive a container rebui
 Both listeners share the same port number on purpose: LiteNetLib uses UDP, Kestrel uses TCP, so one
 firewall rule covers the whole server.
 
+## Status page
+
+The server answers `https://<server>:7777/` with a small HTML page: whether it runs, the server and
+protocol version, how many players are connected and which sectors they are in. The page refreshes
+every 5 seconds and follows the browser language (English or Polish). It also works as a health check
+for an uptime monitor.
+
+`0.0.0.0` in the server log is only the address both listeners bind to, so it cannot be opened in a
+browser and shows `ERR_ADDRESS_INVALID`. Use the server IP, `127.0.0.1` or `localhost` instead. The
+certificate is self-signed, so the browser asks for confirmation on the first visit.
+
+The page reports aggregates only: no player names, IP addresses or tokens. Anyone who can reach the
+port can read it. The overlay UI stays under `/overlay` and requires a session token, so opening it
+directly without one returns `401`.
+
 ## server.json
 
 The file is created on first start and rewritten on every start, so new fields always appear:

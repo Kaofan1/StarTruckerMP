@@ -48,6 +48,20 @@ protokoły. Zamontuj `server.json` jako wolumen, żeby ustawienia przetrwały pr
 Oba listenery dzielą ten sam numer portu celowo: LiteNetLib używa UDP, Kestrel TCP, więc jedna reguła
 firewalla wystarcza dla całego serwera.
 
+## Strona statusu
+
+Serwer odpowiada pod `https://<serwer>:7777/` małą stroną HTML: czy działa, wersją serwera i protokołu,
+liczbą podłączonych graczy oraz sektorami, w których są. Strona odświeża się co 5 sekund i dopasowuje
+język do przeglądarki (angielski lub polski). Działa też jako health check dla monitoringu uptime.
+
+`0.0.0.0` w logu serwera to tylko adres, na którym nasłuchują oba listenery, więc nie da się go otworzyć
+w przeglądarce i pokazuje `ERR_ADDRESS_INVALID`. Wpisuj IP serwera, `127.0.0.1` albo `localhost`.
+Certyfikat jest samopodpisany, więc przy pierwszej wizycie przeglądarka poprosi o potwierdzenie.
+
+Strona pokazuje tylko wartości zbiorcze: żadnych nicków, adresów IP ani tokenów. Widzi ją każdy, kto
+ma dostęp do portu. UI overlaya zostaje pod `/overlay` i wymaga tokenu sesji, więc wejście tam bez
+niego zwraca `401`.
+
 ## server.json
 
 Plik powstaje przy pierwszym starcie i jest przepisywany przy każdym uruchomieniu, więc nowe pola
