@@ -66,13 +66,18 @@ Name: "service"; Description: "Register and start the server as a Windows servic
 [Files]
 Source: "{#SourceDir}\*"; DestDir: "{app}"; Excludes: "*.pdb,server.json"; Flags: ignoreversion recursesubdirs createallsubdirs
 
+[Dirs]
+; Settings live outside Program Files so editing server.json needs no administrator rights.
+Name: "{commonappdata}\StarTruckerMP"; Permissions: users-modify
+Name: "{commonappdata}\StarTruckerMP\certs"; Permissions: users-modify
+
 [Registry]
 Root: HKLM; Subkey: "Software\StarTruckerMP Server"; ValueType: string; ValueName: "InstallDir"; ValueData: "{app}"; Flags: uninsdeletekey
 Root: HKLM; Subkey: "Software\StarTruckerMP Server"; ValueType: dword; ValueName: "Port"; ValueData: "{code:GetPortText}"; Flags: uninsdeletekey
 
 [Icons]
 Name: "{group}\{#MyAppName}"; Filename: "https://localhost:{code:GetPortText}/"; Comment: "Status page of the local server"
-Name: "{group}\Server settings (server.json)"; Filename: "notepad.exe"; Parameters: """{app}\server.json"""; Comment: "The settings file sits in Program Files, so saving it needs administrator rights"
+Name: "{group}\Server settings (server.json)"; Filename: "notepad.exe"; Parameters: """{commonappdata}\StarTruckerMP\server.json"""; Comment: "No administrator rights needed, the settings live in ProgramData"
 Name: "{group}\{cm:UninstallProgram,{#MyAppName}}"; Filename: "{uninstallexe}"
 
 [UninstallRun]
@@ -161,22 +166,33 @@ begin
   Result := ResultCode;
 end;
 
+function ServerProcessRunning: Boolean;
+var
+  ResultCode: Integer;
+begin
+  // tasklist piped into find: a zero exit code means the server process is still alive.
+  Exec(ExpandConstant('{sys}\cmd.exe'),
+       '/c tasklist /fi "imagename eq StarTruckerMP.Server.exe" | find /i "StarTruckerMP.Server.exe" >nul',
+       '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  Result := ResultCode = 0;
+end;
+
 procedure StopAndDeleteService;
 var
   Attempt, ResultCode: Integer;
 begin
-  if ServiceQueryCode('query {#ServiceName}') <> 0 then
-    Exit;
-
-  // Stop first so the server shuts down cleanly, then delete. The service object disappears
-  // only after its process exits, and until then the executable stays locked, so the loop below
-  // waits for that instead of sleeping a fixed time.
-  ServiceQueryCode('stop {#ServiceName}');
-  ServiceQueryCode('delete {#ServiceName}');
-
-  for Attempt := 1 to 30 do
+  if ServiceQueryCode('query {#ServiceName}') = 0 then
   begin
-    if ServiceQueryCode('query {#ServiceName}') <> 0 then
+    // Stop first so the server shuts down cleanly, then delete it so Windows cannot restart it.
+    ServiceQueryCode('stop {#ServiceName}');
+    ServiceQueryCode('delete {#ServiceName}');
+  end;
+
+  // The service object can disappear while its process is still shutting down, and the executable
+  // stays locked until that process exits, so wait for the process itself.
+  for Attempt := 1 to 20 do
+  begin
+    if not ServerProcessRunning then
       Exit;
 
     Sleep(1000);
@@ -218,11 +234,34 @@ begin
   DeleteFile(TempFile);
 end;
 
+procedure MigrateServerConfig;
+var
+  Source, Target, SourceCerts, TargetCerts: String;
+  ResultCode: Integer;
+begin
+  // An installation from an older release keeps server.json next to the executable. Copy it to
+  // the shared folder so the operator can edit it without administrator rights.
+  Source := ExpandConstant('{app}\server.json');
+  Target := ExpandConstant('{commonappdata}\StarTruckerMP\server.json');
+
+  if FileExists(Source) and not FileExists(Target) then
+    FileCopy(Source, Target, False);
+
+  // The certificate is only copied when the shared folder has none, so a custom certificate in
+  // the shared folder is never overwritten by the old one from Program Files.
+  SourceCerts := ExpandConstant('{app}\certs');
+  TargetCerts := ExpandConstant('{commonappdata}\StarTruckerMP\certs');
+  if DirExists(SourceCerts) and not DirExists(TargetCerts) then
+    Exec(ExpandConstant('{sys}\cmd.exe'),
+         '/c xcopy /E /I /Q /Y "' + SourceCerts + '" "' + TargetCerts + '"',
+         '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+end;
+
 procedure WriteServerConfig;
 var
   Path, Json: String;
 begin
-  Path := ExpandConstant('{app}\server.json');
+  Path := ExpandConstant('{commonappdata}\StarTruckerMP\server.json');
   if FileExists(Path) then
     Exit;
 
@@ -272,11 +311,11 @@ begin
   end;
 
   if Exec(ExpandConstant('{sys}\sc.exe'),
-          'create {#ServiceName} binPath= "' + ExePath + '" start= auto DisplayName= "{#MyAppName}"',
+          'create {#ServiceName} binPath= "' + ExePath + '" obj= "NT AUTHORITY\LocalService" start= auto DisplayName= "{#MyAppName}"',
           '', SW_HIDE, ewWaitUntilTerminated, ResultCode) and (ResultCode = 0) then
   begin
     Exec(ExpandConstant('{sys}\sc.exe'),
-         'description {#ServiceName} "StarTruckerMP dedicated server. Settings: ' + ExpandConstant('{app}\server.json') + '"',
+         'description {#ServiceName} "StarTruckerMP dedicated server. Settings: ' + ExpandConstant('{commonappdata}\StarTruckerMP\server.json') + '"',
          '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
     Exec(ExpandConstant('{sys}\sc.exe'), 'start {#ServiceName}', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
   end;
@@ -288,6 +327,7 @@ var
 begin
   if CurStep = ssPostInstall then
   begin
+    MigrateServerConfig;
     WriteServerConfig;
 
     // A silent install cannot tick the boxes, and that is exactly how a host updates the
@@ -299,7 +339,7 @@ begin
       CreateAndStartService;
 
     Message := 'StarTruckerMP dedicated server is installed.' + #13#10#13#10 +
-               'Settings: ' + ExpandConstant('{app}\server.json') + #13#10 +
+               'Settings: ' + ExpandConstant('{commonappdata}\StarTruckerMP\server.json') + #13#10 +
                'Status page: https://localhost:' + IntToStr(ServerPort) + '/' + #13#10 +
                'Players join: <public ip>:' + IntToStr(ServerPort) + ' (UDP and TCP)';
 
@@ -316,7 +356,7 @@ end;
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
 begin
   if (CurUninstallStep = usPostUninstall) and not UninstallSilent then
-    MsgBox('server.json and the certs folder were kept in the install directory, so a reinstall continues with the same settings.' + #13#10 +
+    MsgBox('server.json and the certs folder were kept in ' + ExpandConstant('{commonappdata}\StarTruckerMP') + ', so a reinstall continues with the same settings.' + #13#10 +
            'Remove that folder yourself when the server is no longer needed.',
            mbInformation, MB_OK);
 end;

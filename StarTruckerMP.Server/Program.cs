@@ -19,13 +19,30 @@ internal class Program
         var appDirectory = AppContext.BaseDirectory;
         var appConfigPath = Path.Combine(appDirectory, "server.json");
         var appDirectoryWritable = IsDirectoryWritable(appDirectory);
+        var sharedDataDirectory = GetSharedDataDirectory();
+        var sharedConfigPath = Path.Combine(sharedDataDirectory, "server.json");
 
-        // Program Files belongs to the administrator. A copy started by hand still reads the
-        // settings installed there, but anything it has to write goes to a folder it may use.
-        var dataDirectory = appDirectoryWritable ? appDirectory : GetSharedDataDirectory();
-        var settingsPath = File.Exists(appConfigPath) || appDirectoryWritable
-            ? appConfigPath
-            : Path.Combine(dataDirectory, "server.json");
+        // The Setup keeps the live settings in ProgramData, where the operator can edit them
+        // without administrator rights, and that copy wins when it exists. A portable copy or the
+        // launcher's own server has none and keeps its settings next to the executable.
+        string dataDirectory;
+        string settingsPath;
+
+        if (File.Exists(sharedConfigPath))
+        {
+            dataDirectory = sharedDataDirectory;
+            settingsPath = sharedConfigPath;
+        }
+        else if (appDirectoryWritable)
+        {
+            dataDirectory = appDirectory;
+            settingsPath = appConfigPath;
+        }
+        else
+        {
+            dataDirectory = sharedDataDirectory;
+            settingsPath = sharedConfigPath;
+        }
 
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions
         {

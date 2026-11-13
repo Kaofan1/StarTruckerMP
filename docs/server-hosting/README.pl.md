@@ -43,6 +43,12 @@ ją uruchamia.
   `sudo ./StarTruckerMP-Server-linux-x64.run --port 7777`. Przyjmuje `--dir`, `--max-players`,
   `--user`, `--no-start` i `--uninstall`, zakłada użytkownika usługi, unit systemd i `server.json`.
 
+Na Windowsie program zostaje w `Program Files`, a właściwe ustawienia mieszkają w
+`%ProgramData%\StarTruckerMP\server.json`, z certyfikatem w folderze `certs` obok. Ten folder jest
+zapisywalny dla zwykłych użytkowników, więc `server.json` wyedytujesz w Notatniku bez uprawnień
+administratora, a usługa działa jako `NT AUTHORITY\LocalService`. Aktualizacja jednorazowo kopiuje
+starszy `server.json` z folderu instalacji do `%ProgramData%\StarTruckerMP`.
+
 Oba zachowują istniejący `server.json` i folder `certs`, więc ponowne uruchomienie jest aktualizacją,
 a przy odinstalowaniu zostawiają je na miejscu, żeby reinstalacja przejęła te same ustawienia. Po
 instalacji dopisz `DirectoryUrl` i `DirectoryHost` w `server.json`, żeby serwer pojawił się w

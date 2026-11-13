@@ -44,6 +44,12 @@ files and starts it again.
   `--user`, `--no-start` and `--uninstall`, creates the service user, the systemd unit and
   `server.json`.
 
+On Windows the program stays in `Program Files` and the live settings live in
+`%ProgramData%\StarTruckerMP\server.json`, with the certificate in `certs` next to it. That folder is
+writable for normal users, so the settings can be edited in Notepad without administrator rights, and
+the service runs as `NT AUTHORITY\LocalService`. An upgrade copies an older `server.json` from the
+install folder into `%ProgramData%\StarTruckerMP` once.
+
 Both keep an existing `server.json` and `certs` folder, so running the installer again is an upgrade,
 and leave them in place when the server is uninstalled, so a reinstall continues with the same
 settings. Add `DirectoryUrl` and `DirectoryHost` to `server.json` afterwards to publish the server in
