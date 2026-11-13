@@ -197,6 +197,52 @@ internal static class Strings
 
     public static string CancelAction => T("Cancel", "Anuluj");
 
+    public static string CardDirectory => T("DEDICATED SERVERS", "SERWERY DEDYKOWANE");
+
+    public static string DirectoryNote => T("search public servers", "szukaj publicznych serwerów");
+
+    public static string DirectoryUrlPlaceholder =>
+        T("Directory address, e.g. https://hub.example:7777", "Adres katalogu, np. https://hub.example:7777");
+
+    public static string DirectorySearchPlaceholder =>
+        T("Server name or host", "Nazwa serwera lub host");
+
+    public static string DirectorySearchAction => T("Search", "Szukaj");
+
+    public static string DirectoryAddAction => T("Add", "Dodaj");
+
+    public static string DirectoryCaption =>
+        T("The list comes from a server that hosts the directory. Add a result to keep it in your server list.",
+            "Lista pochodzi z serwera, który hostuje katalog. Dodaj wynik, żeby zapisać go na liście serwerów.");
+
+    public static string DirectoryNeedsUrl =>
+        T("Enter the directory address first.", "Najpierw wpisz adres katalogu.");
+
+    public static string DirectorySearching => T("Searching the directory…", "Szukam w katalogu…");
+
+    public static string DirectoryEmpty =>
+        T("No public servers match.", "Brak publicznych serwerów dla tego wyszukiwania.");
+
+    public static string DirectoryFound(int count) =>
+        count == 1
+            ? T("1 public server", "1 publiczny serwer")
+            : T($"{count} public servers", $"{count} publicznych serwerów");
+
+    public static string DirectoryFailed(string reason) =>
+        T($"Directory unavailable: {reason}", $"Katalog niedostępny: {reason}");
+
+    public static string DirectoryUnreachable =>
+        T("the address did not answer", "adres nie odpowiedział");
+
+    public static string DirectoryPlayers(int players, int capacity) =>
+        T($"{players}/{capacity} players", $"{players}/{capacity} graczy");
+
+    public static string DirectoryServerAlreadyAdded(string name) =>
+        T($"{name} is already on your server list.", $"{name} jest już na Twojej liście serwerów.");
+
+    public static string DirectoryServerAdded(string name, string address) =>
+        T($"{name} ({address}) was added to your servers.", $"{name} ({address}) został dodany do Twoich serwerów.");
+
     public static string CardPlugins => T("BEPINEX MODS", "MODY BEPINEX");
 
     public static string PluginsNote => T("other mods and plugins", "inne mody i pluginy");

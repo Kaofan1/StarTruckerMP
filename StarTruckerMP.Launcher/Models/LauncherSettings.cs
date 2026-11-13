@@ -31,6 +31,9 @@ public sealed class LauncherSettings
 
     public string? SelectedServerId { get; set; }
 
+    /// <summary>Base URL of the public server directory, for example https://hub.example:7777.</summary>
+    public string? DirectoryUrl { get; set; }
+
     public List<ServerEntry> Servers { get; set; } = new();
 
     [JsonIgnore]

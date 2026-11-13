@@ -105,6 +105,18 @@ Potem ten sam przycisk zmienia się w **Włącz** i przywraca plugin na miejsce.
 to plugin StarTruckerMP i jego nie da się tu usunąć ani wyłączyć (służy do tego **Odinstaluj**
 w karcie STATUS MODA).
 
+## Wyszukiwarka serwerów dedykowanych
+
+Karta **SERWERY DEDYKOWANE** czyta publiczny katalog serwerów. W pierwszym polu podaj adres serwera,
+który ten katalog hostuje (np. `https://hub.example:7777`), w drugim wpisz nazwę lub host i kliknij
+**Szukaj** albo naciśnij Enter. Wyniki pokazują nazwę, adres i obłożenie, a **Dodaj** zapisuje serwer
+w zakładkach, więc można go wybrać i kliknąć **GRAJ**.
+
+Adres katalogu jest zapamiętywany w `launcher.json`, więc wystarczy wpisać go raz. Katalog może
+działać na certyfikacie self-signed, bo launcher czyta wyłącznie publiczne dane; gdy https nie
+odpowie, próbuje jeszcze http. Sam katalog hostuje dowolny serwer StarTruckerMP, opis endpointów
+jest w [dokumentacji hostingu](../server-hosting/README.pl.md).
+
 ## Lokalny serwer
 
 Karta **SERWER LOKALNY** uruchamia i zatrzymuje serwer multiplayera na tym komputerze oraz

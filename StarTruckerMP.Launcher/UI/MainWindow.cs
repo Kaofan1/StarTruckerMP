@@ -6,6 +6,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Controls.Templates;
+using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
@@ -214,6 +215,31 @@ internal sealed class MainWindow : Window
     /// <summary>Path of the plugin row the player picked, so Remove knows what to delete.</summary>
     private string? _selectedPluginPath;
 
+    private readonly TextBox _directoryUrlBox = LauncherTheme.StyleInput(new TextBox
+    {
+        Watermark = Strings.DirectoryUrlPlaceholder,
+        FontSize = 12
+    });
+
+    private readonly TextBox _directorySearchBox = LauncherTheme.StyleInput(new TextBox
+    {
+        Watermark = Strings.DirectorySearchPlaceholder,
+        FontSize = 12
+    });
+
+    private readonly Button _directorySearchButton = LauncherTheme.MakeButton(
+        Strings.DirectorySearchAction,
+        ActionVariant.Accent);
+
+    private readonly TextBlock _directoryStatusText = new()
+    {
+        TextWrapping = TextWrapping.Wrap,
+        FontSize = 12.5,
+        Foreground = LauncherTheme.MutedBrush
+    };
+
+    private readonly StackPanel _directoryResults = new() { Spacing = 4 };
+
     /// <summary>Shown while the local server runs, so its status page is one click away.</summary>
     private readonly Button _serverPageButton = LauncherTheme.MakeButton(
         LocalServer.StatusPageUrl,
@@ -320,6 +346,7 @@ internal sealed class MainWindow : Window
         _sslCheck.IsChecked = _settings.IgnoreSslValidation;
         _closeCheck.IsChecked = _settings.CloseLauncherAfterLaunch;
         _versionText.Text = $"Launcher v{GetType().Assembly.GetName().Version?.ToString(3) ?? "1.0.0"}  ·  github.com/Kaofan1/StarTruckerMP";
+        _directoryUrlBox.Text = _settings.DirectoryUrl ?? string.Empty;
 
         Content = BuildLayout();
 
@@ -515,6 +542,7 @@ internal sealed class MainWindow : Window
             {
                 BuildInstallCard(),
                 BuildServerCard(),
+                BuildDirectoryCard(),
                 BuildLocalServerCard(),
                 BuildLaunchCard()
             }
@@ -631,6 +659,45 @@ internal sealed class MainWindow : Window
             nameHostRow,
             portRow,
             LauncherTheme.Caption(Strings.ServerCaption));
+    }
+
+    /// <summary>
+    /// Search for public dedicated servers. The list is read from a directory that any server can
+    /// host, so there is no built-in central service and the address is the player's choice.
+    /// </summary>
+    private Control BuildDirectoryCard()
+    {
+        _directorySearchBox.KeyDown += (_, args) =>
+        {
+            if (args.Key != Key.Enter)
+                return;
+
+            args.Handled = true;
+            _ = SearchDirectoryAsync();
+        };
+
+        var searchRow = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto") };
+        _directorySearchBox.Margin = new Thickness(0, 0, 8, 0);
+        searchRow.Children.Add(_directorySearchBox);
+        searchRow.Children.Add(_directorySearchButton);
+        Grid.SetColumn(_directorySearchButton, 1);
+
+        var results = new ScrollViewer
+        {
+            Content = _directoryResults,
+            MaxHeight = 220,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled
+        };
+
+        return LauncherTheme.Card(
+            Strings.CardDirectory,
+            Strings.DirectoryNote,
+            _directoryUrlBox,
+            searchRow,
+            _directoryStatusText,
+            results,
+            LauncherTheme.Caption(Strings.DirectoryCaption));
     }
 
     /// <summary>
@@ -850,6 +917,7 @@ internal sealed class MainWindow : Window
         _openConfigButton.Click += (_, _) => OpenPath(_install is null ? null : PluginConfigWriter.GetConfigPath(_install.Path));
         _addServerButton.Click += (_, _) => AddServer();
         _removeServerButton.Click += (_, _) => RemoveServer();
+        _directorySearchButton.Click += async (_, _) => await SearchDirectoryAsync();
         _applyServerButton.Click += (_, _) => ApplyServerEdits();
         _serverToggleButton.Click += async (_, _) => await ToggleLocalServerAsync();
         _serverCombo.SelectionChanged += (_, _) => LoadSelectedServerIntoEditor();
@@ -2088,6 +2156,129 @@ internal sealed class MainWindow : Window
         }
     }
 
+    /// <summary>Asks the directory for public servers and renders the matches as rows.</summary>
+    private async System.Threading.Tasks.Task SearchDirectoryAsync()
+    {
+        if (_busy)
+            return;
+
+        var url = ServerDirectoryClient.NormalizeBaseUrl(_directoryUrlBox.Text);
+        if (url is null)
+        {
+            _directoryStatusText.Text = Strings.DirectoryNeedsUrl;
+            _directoryStatusText.Foreground = LauncherTheme.AmberBrush;
+            return;
+        }
+
+        _settings.DirectoryUrl = url;
+        _store.Save(_settings);
+
+        _directoryResults.Children.Clear();
+        _directoryStatusText.Text = Strings.DirectorySearching;
+        _directoryStatusText.Foreground = LauncherTheme.MutedBrush;
+        SetBusy(true, Strings.DirectorySearching);
+
+        try
+        {
+            var (error, servers) = await ServerDirectoryClient.SearchAsync(
+                url, _directorySearchBox.Text, CancellationToken.None);
+
+            if (error is not null)
+            {
+                _directoryStatusText.Text = Strings.DirectoryFailed(error);
+                _directoryStatusText.Foreground = LauncherTheme.DangerBrush;
+                return;
+            }
+
+            if (servers.Count == 0)
+            {
+                _directoryStatusText.Text = Strings.DirectoryEmpty;
+                _directoryStatusText.Foreground = LauncherTheme.AmberBrush;
+                return;
+            }
+
+            _directoryStatusText.Text = Strings.DirectoryFound(servers.Count);
+            _directoryStatusText.Foreground = LauncherTheme.TealBrush;
+
+            foreach (var server in servers)
+                _directoryResults.Children.Add(BuildDirectoryRow(server));
+        }
+        catch (Exception exception)
+        {
+            _directoryStatusText.Text = Strings.DirectoryFailed(exception.Message);
+            _directoryStatusText.Foreground = LauncherTheme.DangerBrush;
+        }
+        finally
+        {
+            SetBusy(false, string.Empty);
+        }
+    }
+
+    private Control BuildDirectoryRow(DirectoryServer server)
+    {
+        var title = new TextBlock
+        {
+            Text = server.Name,
+            FontSize = 12.5,
+            FontWeight = FontWeight.SemiBold,
+            Foreground = LauncherTheme.TextBrush,
+            TextTrimming = TextTrimming.CharacterEllipsis
+        };
+
+        var details = LauncherTheme.Caption(
+            $"{server.Host}:{server.Port} · {Strings.DirectoryPlayers(server.Players, server.Capacity)}",
+            10.5);
+
+        var text = new StackPanel
+        {
+            Spacing = 1,
+            Children = { title, details }
+        };
+
+        var add = LauncherTheme.MakeButton(
+            Strings.DirectoryAddAction,
+            ActionVariant.Ghost,
+            stretch: false,
+            fontSize: 11.5,
+            padding: new Thickness(12, 6));
+        add.Click += (_, _) => AddDirectoryServer(server);
+
+        var row = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto") };
+        row.Children.Add(text);
+        row.Children.Add(add);
+        Grid.SetColumn(add, 1);
+
+        return new Border
+        {
+            BorderBrush = LauncherTheme.EdgeBrush,
+            BorderThickness = new Thickness(0, 0, 0, 1),
+            Padding = new Thickness(0, 4),
+            Child = row
+        };
+    }
+
+    /// <summary>Bookmarks a directory result, so it survives the next search and a restart.</summary>
+    private void AddDirectoryServer(DirectoryServer server)
+    {
+        var port = server.Port.ToString();
+        var known = _settings.Servers.Any(entry =>
+            entry.Address.Equals(server.Host, StringComparison.OrdinalIgnoreCase) && entry.Port == port);
+
+        if (known)
+        {
+            _log.Log(Strings.DirectoryServerAlreadyAdded(server.Name));
+            return;
+        }
+
+        var entry = new ServerEntry { Name = server.Name, Address = server.Host, Port = port };
+        _settings.Servers.Add(entry);
+        _settings.SelectedServerId = entry.Id;
+
+        _store.Save(_settings);
+        RefreshServerList();
+        _log.Log(Strings.DirectoryServerAdded(server.Name, $"{server.Host}:{port}"));
+    }
+
     private void RefreshServerList()
     {
         _refreshingServerList = true;
@@ -2234,6 +2425,9 @@ internal sealed class MainWindow : Window
         _browseButton.IsEnabled = !busy;
         _updateButton.IsEnabled = !busy && _pendingUpdate is not null;
         _serverToggleButton.IsEnabled = !busy;
+        _directorySearchButton.IsEnabled = !busy;
+        _directoryUrlBox.IsEnabled = !busy;
+        _directorySearchBox.IsEnabled = !busy;
         _addPluginButton.IsEnabled = !busy && _install is not null;
         _openPluginsButton.IsEnabled = !busy && _install is not null;
         _refreshPluginsButton.IsEnabled = !busy && _install is not null;

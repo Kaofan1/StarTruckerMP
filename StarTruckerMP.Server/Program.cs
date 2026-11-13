@@ -108,6 +108,8 @@ internal class Program
                 opt.JsonSerializerOptions.WriteIndented = false;
             });
 
+        builder.Services.AddSingleton<ServerDirectory>();
+
         builder.Services.AddSingleton<ServerSettings>(sp =>
         {
             var logger = sp.GetRequiredService<ILogger<Program>>();
@@ -196,6 +198,41 @@ internal class Program
         {
             context.Response.Cookies.Delete(StatusPage.TokenCookie);
             return Results.Redirect("/");
+        });
+
+        // Public directory for dedicated servers: they announce themselves here, the launcher
+        // searches it. Any instance can be the hub, so no central service is baked in.
+        app.MapGet("/directory/servers", (HttpContext context, ServerDirectory directory) =>
+        {
+            context.Response.Headers.CacheControl = "no-store";
+            return Results.Json(directory.Snapshot(context.Request.Query["q"]), ServerDirectory.JsonOptions);
+        });
+
+        app.MapPost("/directory/announce", async (HttpContext context, ServerDirectory directory) =>
+        {
+            AnnounceRequest? request;
+
+            try
+            {
+                request = await JsonSerializer.DeserializeAsync<AnnounceRequest>(
+                    context.Request.Body, App.JsonOptionsRead, context.RequestAborted);
+            }
+            catch (JsonException)
+            {
+                return Results.Json(new { error = "invalid json" }, ServerDirectory.JsonOptions, statusCode: 400);
+            }
+
+            if (request is null)
+                return Results.Json(new { error = "empty body" }, ServerDirectory.JsonOptions, statusCode: 400);
+
+            var address = context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+            var result = directory.Announce(request, address);
+
+            object body = result.Error is null
+                ? new { id = result.Id, token = result.Token, ttlSeconds = 180 }
+                : new { error = result.Error };
+
+            return Results.Json(body, ServerDirectory.JsonOptions, statusCode: result.StatusCode);
         });
 
         var startupLogger = app.Services.GetRequiredService<ILogger<Program>>();

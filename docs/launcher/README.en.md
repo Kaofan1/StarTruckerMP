@@ -106,6 +106,18 @@ extension and a plugin folder moves to `BepInEx\plugins-disabled`. The same butt
 **Enable** and puts the plugin back. The "our client" entry is the StarTruckerMP plugin and cannot
 be removed or disabled here (use **Uninstall** in the MOD STATUS card for that).
 
+## Dedicated server search
+
+The **DEDICATED SERVERS** card reads a public server directory. Put the address of the server that
+hosts that directory in the first field (for example `https://hub.example:7777`), type a name or
+host in the second one and press **Search** or Enter. Results show the name, address and player
+count, and **Add** stores the server in your bookmarks so you can pick it and press **PLAY**.
+
+The directory address is saved in `launcher.json`, so it has to be typed once. The directory may use
+a self-signed certificate, because the launcher only reads public data; when https does not answer it
+retries over http. Any StarTruckerMP server can host the directory: the endpoints are described in
+the [hosting documentation](../server-hosting/README.md).
+
 ## Local server
 
 The **LOCAL SERVER** card starts and stops the multiplayer server on this PC and shows its state

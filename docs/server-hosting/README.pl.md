@@ -100,6 +100,28 @@ i zapisuje go jako PFX. Gracze łączący się z takim serwerem muszą włączy�
 errors** w launcherze, albo zainstaluj prawdziwy certyfikat i wskaż go w `CertificatePath` oraz
 `CertificatePassword`.
 
+## Katalog serwerów dedykowanych
+
+Każda instancja serwera może hostować publiczny katalog, którego szuka launcher. Serwer dedykowany
+utrzymuje się na liście heartbeatem; pierwsze wywołanie zwraca id i token, a kolejne muszą je podawać.
+
+```
+POST /directory/announce
+{"name":"EU Freight","host":"203.0.113.10","port":7777,"players":3,"capacity":8,
+ "description":"wieczorami, EU","protocol":"1","version":"1.0.64"}
+
+200 {"id":"...","token":"...","ttlSeconds":180}
+```
+
+Heartbeat wysyłaj co 60 sekund z tym samym `id` i `token`, aktualizując `players` w miarę zapełniania
+sesji. Wpis wygasa po trzech minutach bez heartbeatu, pierwsze zgłoszenie z danego adresu jest
+przyjmowane raz na sekundę, a zły token kończy się kodem 403, więc nie da się przejąć cudzego wpisu.
+
+`GET /directory/servers?q=freight` zwraca publiczną listę (`name`, `host`, `port`, `players`,
+`capacity`, `description`, `lastSeenSeconds`); to samo pokazuje karta **SERWERY DEDYKOWANE** w
+launcherze. Katalog trzyma wpisy w pamięci, więc po restarcie huba serwery zarejestrują się ponownie
+następnym heartbeatem i dostaną nowe id.
+
 ## Podłączanie graczy
 
 1. Zainstaluj launcher z Releases i otwórz kartę **Zakładki serwerów**.

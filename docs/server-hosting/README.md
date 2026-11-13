@@ -100,6 +100,28 @@ valid for one year and saves it as a PFX. Players connecting to such a server mu
 **Ignore SSL certificate errors** in the launcher, or you can install a real certificate and point
 `CertificatePath` and `CertificatePassword` at it.
 
+## Dedicated server directory
+
+Any server instance can host the public directory the launcher searches. A dedicated server keeps
+itself listed with a heartbeat; the first call returns an id and a token, later calls must send both.
+
+```
+POST /directory/announce
+{"name":"EU Freight","host":"203.0.113.10","port":7777,"players":3,"capacity":8,
+ "description":"evenings, EU","protocol":"1","version":"1.0.64"}
+
+200 {"id":"...","token":"...","ttlSeconds":180}
+```
+
+Send the heartbeat every 60 seconds, with the same `id` and `token`, and refresh `players` as the
+session fills. Entries expire after three minutes without a beat, the first announce from an address
+is accepted once per second, and a wrong token is rejected with 403 so a listing cannot be hijacked.
+
+`GET /directory/servers?q=freight` returns the public list (`name`, `host`, `port`, `players`,
+`capacity`, `description`, `lastSeenSeconds`); the same list is what the launcher's **DEDICATED
+SERVERS** card shows. The directory lives in memory, so after a hub restart servers re-register with
+their next heartbeat and receive a new id.
+
 ## Connecting players
 
 1. Install the launcher from Releases and open the **Server bookmarks** card.
