@@ -442,8 +442,8 @@ internal static class Strings
         T($"Running (PID {processId}).", $"Działa (PID {processId}).");
 
     public static string DedicatedServerStopped =>
-        T("Stopped. The service is registered and starts with the system.",
-            "Zatrzymany. Usługa jest zarejestrowana i startuje z systemem.");
+        T("Stopped. The service is registered and stays stopped until you start it.",
+            "Zatrzymany. Usługa jest zarejestrowana i pozostaje zatrzymana, dopóki jej nie uruchomisz.");
 
     public static string DedicatedServerMissing =>
         T("Not installed. Run StarTruckerMP-Server-Setup.exe to add it.",

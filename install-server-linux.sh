@@ -2,8 +2,8 @@
 # Installs the StarTruckerMP dedicated server as a systemd service on Linux x64.
 #
 # It downloads the server package from a GitHub release, unpacks it, writes server.json when it is
-# missing and registers the service, so the server starts with the machine. An existing server.json
-# and the certs folder are kept during an upgrade.
+# missing and registers the service without enabling it, so the operator starts the server when
+# needed. An existing server.json and the certs folder are kept during an upgrade.
 #
 # Usage:
 #   sudo ./install-server-linux.sh [--version alpha-v67] [--port 7777] [--max-players 100]
@@ -144,13 +144,13 @@ UNIT
 
 systemctl daemon-reload
 
+# The unit is not enabled on purpose: an installed server stays stopped until the operator
+# starts it, and `systemctl enable` makes it start with the machine when that is wanted.
 if [[ "$START_SERVICE" == "yes" ]]; then
-    step "Enabling and starting $SERVICE"
-    systemctl enable --now "$SERVICE"
+    step "Starting $SERVICE"
+    systemctl start "$SERVICE"
     sleep 2
     systemctl --no-pager --lines=0 status "$SERVICE" || true
-else
-    systemctl enable "$SERVICE"
 fi
 
 printf '\n\033[32mStarTruckerMP server %s installed in %s\033[0m\n' "$TAG" "$INSTALL_DIR"

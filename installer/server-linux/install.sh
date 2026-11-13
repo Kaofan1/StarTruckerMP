@@ -147,13 +147,13 @@ UNIT
 
 systemctl daemon-reload
 
+# The unit is not enabled on purpose: an installed server stays stopped until the operator
+# starts it, and `systemctl enable` makes it start with the machine when that is wanted.
 if [ "$START_SERVICE" = "yes" ]; then
-    step "Enabling and starting $SERVICE"
-    systemctl enable --now "$SERVICE"
+    step "Starting $SERVICE"
+    systemctl start "$SERVICE"
     sleep 2
     systemctl --no-pager --lines=0 status "$SERVICE" || true
-else
-    systemctl enable "$SERVICE"
 fi
 
 printf '\n\033[32mStarTruckerMP dedicated server installed in %s\033[0m\n' "$INSTALL_DIR"

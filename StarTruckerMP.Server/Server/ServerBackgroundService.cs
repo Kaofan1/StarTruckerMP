@@ -1,11 +1,11 @@
-﻿using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Hosting;
 using StarTruckerMP.Server.Server.Services;
 
 namespace StarTruckerMP.Server.Server;
 
 public class ServerBackgroundService(ServerManager serverManager) : IHostedService
 {
+    private readonly CancellationTokenSource _stopping = new();
     private Task? _pollingTask;
 
     public Task StartAsync(CancellationToken cancellationToken)
@@ -13,29 +13,46 @@ public class ServerBackgroundService(ServerManager serverManager) : IHostedServi
         serverManager.Start();
 
         // Run the polling loop in a separate Task so StartAsync returns immediately,
-        // allowing Kestrel and the rest of the host to finish starting up.
+        // allowing Kestrel and the rest of the host to finish starting up. The loop owns its
+        // token, because the token passed to StartAsync is never cancelled on shutdown: waiting
+        // for a loop that cannot end made the service sit in STOP_PENDING for the whole host
+        // shutdown timeout.
         _pollingTask = Task.Run(async () =>
         {
             try
             {
-                while (!cancellationToken.IsCancellationRequested)
+                while (!_stopping.IsCancellationRequested)
                 {
                     serverManager.Polling();
-                    await Task.Delay(15, cancellationToken);
+                    await Task.Delay(15, _stopping.Token).ConfigureAwait(false);
                 }
             }
-            catch (TaskCanceledException)
+            catch (OperationCanceledException)
             {
+                // Normal shutdown.
             }
-        }, cancellationToken);
+        }, CancellationToken.None);
 
         return Task.CompletedTask;
     }
 
     public async Task StopAsync(CancellationToken cancellationToken)
     {
+        _stopping.Cancel();
         serverManager.Stop();
+
         if (_pollingTask is not null)
-            await _pollingTask.ConfigureAwait(false);
+        {
+            try
+            {
+                await _pollingTask.WaitAsync(cancellationToken).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                // The host gave up waiting, which is still a stopped server.
+            }
+        }
+
+        _stopping.Dispose();
     }
 }

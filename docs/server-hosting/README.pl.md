@@ -52,9 +52,17 @@ usuwa je z folderu instalacji, żeby została tylko jedna konfiguracja. Własny,
 `CertificatePath` wskazujący do folderu instalacji zostawia ten certyfikat na miejscu.
 
 Oba zachowują istniejący `server.json` i folder `certs`, więc ponowne uruchomienie jest aktualizacją,
-a przy odinstalowaniu zostawiają je na miejscu, żeby reinstalacja przejęła te same ustawienia. Po
-instalacji dopisz `DirectoryUrl` i `DirectoryHost` w `server.json`, żeby serwer pojawił się w
-wyszukiwarce launchera.
+a przy odinstalowaniu zostawiają je na miejscu, żeby reinstalacja przejęła te same ustawienia.
+
+Instalator rejestruje usługę jako ręczną, więc nie włącza się sama: po restarcie systemu pozostaje
+zatrzymana, dopóki nie uruchomisz jej przyciskiem w launcherze, poleceniem `sc start StarTruckerMPServer`
+albo z `services.msc`. Na Linuksie unit nie jest włączony (`systemctl enable`), a `systemctl start`
+uruchamia go tylko na teraz. Autostart włączasz świadomie: `sc config StarTruckerMPServer start= auto`
+na Windowsie albo `systemctl enable startruckermp` na Linuksie.
+
+Serwer zgłasza się do własnego katalogu sam, więc nie musisz nic dopisywać, żeby zobaczyć go
+w wyszukiwarce launchera. `DirectoryUrl` ustaw tylko wtedy, gdy chcesz zbierać wpisy w jednym wspólnym
+hubie, a `DirectoryHost` gdy gracze mają łączyć się przez publiczne IP albo domenę.
 
 ## Skrypty instalacyjne
 

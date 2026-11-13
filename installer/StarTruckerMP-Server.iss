@@ -325,12 +325,15 @@ begin
   end;
 
   if Exec(ExpandConstant('{sys}\sc.exe'),
-          'create {#ServiceName} binPath= "' + ExePath + '" obj= "NT AUTHORITY\LocalService" start= auto DisplayName= "{#MyAppName}"',
+          'create {#ServiceName} binPath= "' + ExePath + '" obj= "NT AUTHORITY\LocalService" start= demand DisplayName= "{#MyAppName}"',
           '', SW_HIDE, ewWaitUntilTerminated, ResultCode) and (ResultCode = 0) then
   begin
     Exec(ExpandConstant('{sys}\sc.exe'),
          'description {#ServiceName} "StarTruckerMP dedicated server. Settings: ' + ExpandConstant('{commonappdata}\StarTruckerMP\server.json') + '"',
          '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+    // The service is manual on purpose: it only runs when the operator starts it, so a stopped
+    // server stays stopped after a reboot.
+    Exec(ExpandConstant('{sys}\sc.exe'), 'config {#ServiceName} start= demand', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
     Exec(ExpandConstant('{sys}\sc.exe'), 'start {#ServiceName}', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
   end;
 end;

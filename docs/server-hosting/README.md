@@ -54,8 +54,17 @@ points into the install folder keeps that certificate in place.
 
 Both keep an existing `server.json` and `certs` folder, so running the installer again is an upgrade,
 and leave them in place when the server is uninstalled, so a reinstall continues with the same
-settings. Add `DirectoryUrl` and `DirectoryHost` to `server.json` afterwards to publish the server in
-the launcher search.
+settings.
+
+The installer registers the service as manual, so it does not start on its own: after a reboot it stays
+stopped until you start it from the launcher, with `sc start StarTruckerMPServer` or from
+`services.msc`. On Linux the unit is not enabled (`systemctl enable`), and `systemctl start` only runs
+it for now. Autostart is an explicit choice: `sc config StarTruckerMPServer start= auto` on Windows or
+`systemctl enable startruckermp` on Linux.
+
+The server announces itself to its own directory, so nothing has to be added for it to appear in the
+launcher search. Set `DirectoryUrl` only to gather entries in one shared hub, and `DirectoryHost` when
+players should connect through a public IP or domain.
 
 ## Installer scripts
 

@@ -5,8 +5,9 @@
 
 .DESCRIPTION
     Downloads the server package from a GitHub release, unpacks it, writes server.json when it is
-    missing and registers the executable as a Windows service, so it starts with the machine.
-    An existing server.json and the certs folder are kept during an upgrade.
+    missing and registers the executable as a Windows service without enabling autostart, so it
+    stays stopped until the operator starts it. An existing server.json and the certs folder are
+    kept during an upgrade.
 
 .PARAMETER Version
     Release tag to install, for example alpha-v67. The default is the newest release.
@@ -174,7 +175,9 @@ try {
         Start-Sleep -Seconds 2
     }
 
-    sc.exe create $ServiceName binPath= "`"$exe`"" start= auto DisplayName= "$displayName" | Out-Null
+    # Manual start on purpose: an installed server does not start with Windows, the operator
+    # starts it from the launcher or services.msc.
+    sc.exe create $ServiceName binPath= "`"$exe`"" start= demand DisplayName= "$displayName" | Out-Null
     sc.exe description $ServiceName "StarTruckerMP dedicated server. Settings: $settingsPath" | Out-Null
 
     foreach ($ruleName in @("StarTruckerMP Dedicated Server (TCP $Port)", "StarTruckerMP Dedicated Server (UDP $Port)")) {
