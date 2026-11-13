@@ -26,8 +26,9 @@ the player runs a single `StarTruckerMP-Setup.exe` and the launcher does the res
 4. Check that the launcher detected the game. If not, click **Choose folder…** and point it at the folder
    containing `Star Trucker.exe`.
 5. Add a server (**Add**), type a name, host and port, then save it (**Save server**).
-6. Close the game and click **Install / repair mod**. The launcher always downloads a fresh client, so the same
-   button repairs a partial installation and updates an old mod version. Wait for "Multiplayer mod is ready.".
+6. Close the game and click **Install** in the **MOD STATUS** card. It only fills in what is missing;
+   **Repair mod** deletes the plugin folder and installs the client again, and **Uninstall** removes the
+   mod from the game folder. Wait for "Multiplayer mod is ready.".
 7. Click **PLAY**. The game starts through Steam, and the overlay and server connection appear once you enter a sector.
 
 > [!NOTE]
@@ -84,11 +85,11 @@ reopening the launcher. The check is silent: no internet or a GitHub API rate li
 ## The launcher works on its own, BepInEx is optional
 
 The launcher does not require BepInEx and does not touch the game folder until you click
-**Install / repair mod**. Without the mod, **PLAY** simply starts Star Trucker through Steam.
+**Install**. Without the mod, **PLAY** simply starts Star Trucker through Steam.
 
 BepInEx also has its own card in the launcher (**BEPINEX LOADER**): it shows whether BepInEx 6 IL2CPP,
-BepInEx 5 (Mono) or nothing is in the game folder, and **Install / repair BepInEx** installs only the
-loader. That works even when the client package has not been published in a release yet, so the game
+BepInEx 5 (Mono) or nothing is in the game folder, and **Install**, **Repair loader** and **Uninstall**
+work on the loader alone without touching the mod plugin. That works even when the client package has not been published in a release yet, so the game
 can be prepared for plugins independently from the multiplayer mod.
 
 ## Local server
@@ -100,7 +101,9 @@ started outside the launcher shows up too.
 The server is looked up in `payload\server` next to the launcher (offline); when that folder is
 missing, the launcher downloads `StarTruckerMP-server-win-x64.zip` from GitHub Releases and
 extracts it to `%APPDATA%\StarTruckerMP\server`. `server.json` and the certificate live there as
-well; the server itself listens on `https://0.0.0.0:7777` and prints its log in a console window.
+well; the server itself listens on `https://localhost:7777` and writes its log to `server-out.log`
+and `server-err.log` in that folder, so no separate console window opens. While the server runs the
+card shows the status page address, and **Stop server** ends the process.
 
 The launcher also keeps that package current: on start it compares the tag stored in
 `package-tag.txt` with the newest release and replaces the server files, leaving `server.json`, the
@@ -179,10 +182,10 @@ ISCC.exe /DMyAppVersion=1.2.0 installer\StarTruckerMP.iss
 | --- | --- |
 | "Star Trucker was not found" | Click **Choose folder…** and point it at the folder with `Star Trucker.exe` (for example `…\steamapps\common\Star Trucker`). |
 | Mod installation fails to download | Check access to `api.github.com`, `github.com` and `builds.bepinex.dev` (proxy/firewall). The GitHub API allows 60 requests per hour per IP address. |
-| Launcher says "BepInEx 5 (Mono) is installed here" | The game folder had BepInEx 5, which cannot load IL2CPP. Click **Install / repair mod** - the launcher moves the old loader aside and installs BepInEx 6 IL2CPP. |
+| Launcher says "BepInEx 5 (Mono) is installed here" | The game folder had BepInEx 5, which cannot load IL2CPP. Click **Napraw mod** - the launcher moves the old loader aside and installs BepInEx 6 IL2CPP. |
 | The first game start takes minutes | That is normal: BepInEx builds `BepInEx\interop`. Later starts are fast. |
 | The game starts but does not connect | Check the server address and port; for your own server with a self-signed certificate keep **Ignore SSL certificate errors** enabled. |
-| The overlay does not appear | Close the game, click **Install / repair mod** (it fills in a missing overlay), check `BepInEx\LogOutput.log`. |
+| The overlay does not appear | Close the game, click **Napraw mod** (it fills in a missing overlay), check `BepInEx\LogOutput.log`. |
 | The launcher does not start | Look at `%APPDATA%\StarTruckerMP\launcher-crash.log`. |
 
 ## Uninstalling

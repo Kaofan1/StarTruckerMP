@@ -156,12 +156,35 @@ internal sealed class MainWindow : Window
         stretch: false);
 
     private readonly Button _installButton = LauncherTheme.MakeButton(
-        Strings.InstallMod,
+        Strings.InstallAction,
         ActionVariant.Accent);
 
+    private readonly Button _repairButton = LauncherTheme.MakeButton(
+        Strings.RepairMod,
+        ActionVariant.Secondary);
+
+    private readonly Button _uninstallButton = LauncherTheme.MakeButton(
+        Strings.UninstallAction,
+        ActionVariant.Ghost);
+
     private readonly Button _installLoaderButton = LauncherTheme.MakeButton(
-        Strings.InstallLoader,
+        Strings.InstallAction,
         ActionVariant.Accent);
+
+    private readonly Button _repairLoaderButton = LauncherTheme.MakeButton(
+        Strings.RepairLoader,
+        ActionVariant.Secondary);
+
+    private readonly Button _uninstallLoaderButton = LauncherTheme.MakeButton(
+        Strings.UninstallAction,
+        ActionVariant.Ghost);
+
+    /// <summary>Shown while the local server runs, so its status page is one click away.</summary>
+    private readonly Button _serverPageButton = LauncherTheme.MakeButton(
+        LocalServer.StatusPageUrl,
+        ActionVariant.Secondary,
+        stretch: false,
+        fontSize: 12);
 
     private readonly Button _openGameFolderButton = LauncherTheme.MakeButton(
         Strings.OpenGameFolder,
@@ -584,6 +607,7 @@ internal sealed class MainWindow : Window
             Strings.CardLocalServer,
             Strings.LocalServerNote,
             _localServerStatusText,
+            _serverPageButton,
             _serverToggleButton,
             LauncherTheme.Caption(Strings.LocalServerCaption));
     }
@@ -655,7 +679,7 @@ internal sealed class MainWindow : Window
             Strings.CardModStatus,
             Strings.ModNote,
             _modStatusText,
-            _installButton);
+            ButtonsRow(_installButton, _repairButton, _uninstallButton));
     }
 
     /// <summary>
@@ -668,8 +692,31 @@ internal sealed class MainWindow : Window
             Strings.CardLoader,
             Strings.LoaderNote,
             _loaderStatusText,
-            _installLoaderButton,
+            ButtonsRow(_installLoaderButton, _repairLoaderButton, _uninstallLoaderButton),
             LauncherTheme.Caption(Strings.LoaderCaption));
+    }
+
+    /// <summary>Equal-width action row, so install, repair and uninstall stay separate buttons.</summary>
+    private static Control ButtonsRow(params Button[] buttons)
+    {
+        var columns = new System.Text.StringBuilder();
+
+        for (var index = 0; index < buttons.Length; index++)
+            columns.Append(index == 0 ? "*" : ",*");
+
+        var row = new Grid { ColumnDefinitions = new ColumnDefinitions(columns.ToString()) };
+
+        for (var index = 0; index < buttons.Length; index++)
+        {
+            var button = buttons[index];
+            if (index > 0)
+                button.Margin = new Thickness(8, 0, 0, 0);
+
+            row.Children.Add(button);
+            Grid.SetColumn(button, index);
+        }
+
+        return row;
     }
 
     private Control BuildShortcutsCard()
@@ -705,7 +752,12 @@ internal sealed class MainWindow : Window
         _browseButton.Click += async (_, _) => await BrowseGameAsync();
         _refreshMicrophoneButton.Click += (_, _) => RefreshMicrophoneList();
         _installButton.Click += async (_, _) => await InstallModAsync();
+        _repairButton.Click += async (_, _) => await RepairModAsync();
+        _uninstallButton.Click += async (_, _) => await UninstallModAsync();
         _installLoaderButton.Click += async (_, _) => await InstallLoaderAsync();
+        _repairLoaderButton.Click += async (_, _) => await RepairLoaderAsync();
+        _uninstallLoaderButton.Click += async (_, _) => await UninstallLoaderAsync();
+        _serverPageButton.Click += (_, _) => OpenServerPage();
         _updateNowButton.Click += async (_, _) => await UpdateLauncherAsync();
         _releasePageButton.Click += (_, _) => OpenUpdatePage();
         _playButton.Click += async (_, _) => await PlayAsync();
@@ -773,6 +825,13 @@ internal sealed class MainWindow : Window
     {
         if (_install is null || _busy)
             return;
+
+        // Install only fills what is missing; repairing and updating is the button next to it.
+        if (ModInstaller.HasPlugin(_install.Path) && ModInstaller.HasOverlay(_install.Path) && ModInstaller.HasBepInEx(_install.Path))
+        {
+            _log.Log(Strings.ModAlreadyInstalled);
+            return;
+        }
 
         SetBusy(true, Strings.ModInstalling);
 
@@ -1203,6 +1262,7 @@ internal sealed class MainWindow : Window
 
         var status = LocalServer.Detect();
         _localServer = status;
+        _serverPageButton.IsVisible = status.State == LocalServerState.Running;
 
         switch (status.State)
         {
@@ -1301,6 +1361,197 @@ internal sealed class MainWindow : Window
         }
 
         RefreshLocalServerState();
+    }
+
+    /// <summary>
+    /// Repair keeps install and update apart: the plugin folder is deleted first, so a half-copied
+    /// or hand-edited install cannot survive the download.
+    /// </summary>
+    private async System.Threading.Tasks.Task RepairModAsync()
+    {
+        if (_install is null || _busy)
+            return;
+
+        var gamePath = _install.Path;
+
+        if (ModInstaller.IsGameRunning())
+        {
+            _log.Log(Strings.GameRunningBlock);
+            return;
+        }
+
+        SetBusy(true, Strings.ModRepairing);
+
+        var progress = new Progress<string>(message => _log.Log(message));
+
+        try
+        {
+            await System.Threading.Tasks.Task.Run(async () =>
+            {
+                await StarTruckerMP.Launcher.Mod.BepInExRuntime.InstallAsync(
+                    gamePath,
+                    StarTruckerMP.Launcher.Mod.BepInExRuntime.DefaultPayloadRoot,
+                    progress,
+                    System.Threading.CancellationToken.None);
+
+                ModInstaller.Uninstall(gamePath);
+                await _installer.InstallAsync(gamePath, progress, System.Threading.CancellationToken.None);
+            });
+
+            _log.Log(Strings.ModRepairCompleted);
+        }
+        catch (Exception exception)
+        {
+            _log.Log(Strings.ModRepairFailed(exception.Message));
+        }
+        finally
+        {
+            SetBusy(false, string.Empty);
+            RefreshModState();
+        }
+    }
+
+    private async System.Threading.Tasks.Task UninstallModAsync()
+    {
+        if (_install is null || _busy)
+            return;
+
+        var gamePath = _install.Path;
+
+        if (!ModInstaller.IsModInstalled(gamePath))
+        {
+            _log.Log(Strings.ModUninstallSkipped);
+            return;
+        }
+
+        if (ModInstaller.IsGameRunning())
+        {
+            _log.Log(Strings.GameRunningBlock);
+            return;
+        }
+
+        SetBusy(true, Strings.ModUninstalling);
+
+        try
+        {
+            var removed = await System.Threading.Tasks.Task.Run(() => ModInstaller.Uninstall(gamePath));
+            _log.Log(removed ? Strings.ModUninstallCompleted : Strings.ModUninstallSkipped);
+        }
+        catch (Exception exception)
+        {
+            _log.Log(Strings.ModUninstallFailed(exception.Message));
+        }
+        finally
+        {
+            SetBusy(false, string.Empty);
+            RefreshModState();
+        }
+    }
+
+    private async System.Threading.Tasks.Task RepairLoaderAsync()
+    {
+        if (_install is null || _busy)
+            return;
+
+        var gamePath = _install.Path;
+
+        if (ModInstaller.IsGameRunning())
+        {
+            _log.Log(Strings.GameRunningBlock);
+            return;
+        }
+
+        SetBusy(true, Strings.LoaderRepairing);
+
+        var progress = new Progress<string>(message => _log.Log(message));
+
+        try
+        {
+            await System.Threading.Tasks.Task.Run(async () =>
+            {
+                StarTruckerMP.Launcher.Mod.BepInExRuntime.Uninstall(gamePath);
+
+                await StarTruckerMP.Launcher.Mod.BepInExRuntime.InstallAsync(
+                    gamePath,
+                    StarTruckerMP.Launcher.Mod.BepInExRuntime.DefaultPayloadRoot,
+                    progress,
+                    System.Threading.CancellationToken.None);
+            });
+
+            _log.Log(Strings.LoaderRepairCompleted);
+        }
+        catch (Exception exception)
+        {
+            _log.Log(Strings.LoaderRepairFailed(exception.Message));
+        }
+        finally
+        {
+            SetBusy(false, string.Empty);
+            RefreshModState();
+        }
+    }
+
+    private async System.Threading.Tasks.Task UninstallLoaderAsync()
+    {
+        if (_install is null || _busy)
+            return;
+
+        var gamePath = _install.Path;
+
+        if (!ModInstaller.HasBepInEx(gamePath) && !ModInstaller.HasMonoBepInEx(gamePath))
+        {
+            _log.Log(Strings.LoaderNotInstalled);
+            return;
+        }
+
+        if (ModInstaller.IsGameRunning())
+        {
+            _log.Log(Strings.GameRunningBlock);
+            return;
+        }
+
+        SetBusy(true, Strings.LoaderUninstalling);
+
+        try
+        {
+            var removed = await System.Threading.Tasks.Task.Run(
+                () => StarTruckerMP.Launcher.Mod.BepInExRuntime.Uninstall(gamePath));
+
+            if (removed)
+            {
+                _log.Log(Strings.LoaderUninstallCompleted);
+                _log.Log(Strings.LoaderUninstallKeptPlugins);
+            }
+            else
+            {
+                _log.Log(Strings.LoaderNotInstalled);
+            }
+        }
+        catch (Exception exception)
+        {
+            _log.Log(Strings.LoaderUninstallFailed(exception.Message));
+        }
+        finally
+        {
+            SetBusy(false, string.Empty);
+            RefreshModState();
+        }
+    }
+
+    /// <summary>Opens the local server status page in the default browser.</summary>
+    private void OpenServerPage()
+    {
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(LocalServer.StatusPageUrl)
+            {
+                UseShellExecute = true
+            });
+        }
+        catch (Exception exception)
+        {
+            _log.Log(Strings.ReleasePageFailed(exception.Message));
+        }
     }
 
     /// <summary>Swaps the label of a themed button without losing its border and palette.</summary>
@@ -1447,7 +1698,11 @@ internal sealed class MainWindow : Window
         }
 
         _installButton.IsEnabled = _install is not null && !_busy;
+        _repairButton.IsEnabled = _install is not null && !_busy;
+        _uninstallButton.IsEnabled = _install is not null && !_busy;
         _installLoaderButton.IsEnabled = _install is not null && !_busy;
+        _repairLoaderButton.IsEnabled = _install is not null && !_busy;
+        _uninstallLoaderButton.IsEnabled = _install is not null && !_busy;
         _playButton.IsEnabled = _install is not null && !_busy;
         _openGameFolderButton.IsEnabled = _install is not null;
         _openConfigButton.IsEnabled = _install is not null;
@@ -1589,7 +1844,11 @@ internal sealed class MainWindow : Window
             _statusDot.Background = busy ? LauncherTheme.AmberBrush : LauncherTheme.TealBrush;
 
         _installButton.IsEnabled = !busy && _install is not null;
+        _repairButton.IsEnabled = !busy && _install is not null;
+        _uninstallButton.IsEnabled = !busy && _install is not null;
         _installLoaderButton.IsEnabled = !busy && _install is not null;
+        _repairLoaderButton.IsEnabled = !busy && _install is not null;
+        _uninstallLoaderButton.IsEnabled = !busy && _install is not null;
         _playButton.IsEnabled = !busy && _install is not null;
         _detectButton.IsEnabled = !busy;
         _browseButton.IsEnabled = !busy;

@@ -25,7 +25,7 @@ normalnie.
 1. Pobierz `StarTruckerMP-Setup.exe` z [Releases](https://github.com/Kaofan1/StarTruckerMP/releases).
 2. Uruchom go - instaluje się per user, bez uprawnień administratora.
 3. Otwórz **Star Trucker Multiplayer** z menu Start.
-4. Wybierz serwer, kliknij **Install / repair mod**, a potem **PLAY**.
+4. Wybierz serwer, kliknij **Zainstaluj**, a potem **PLAY**.
 
 Wersja portable `StarTruckerMP-Launcher-win-x64.zip` nie wymaga instalacji.
 Budowanie, ścieżki plików i rozwiązywanie problemów: [docs/launcher/README.md](docs/launcher/README.md).

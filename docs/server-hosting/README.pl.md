@@ -104,7 +104,7 @@ errors** w launcherze, albo zainstaluj prawdziwy certyfikat i wskaż go w `Certi
 
 1. Zainstaluj launcher z Releases i otwórz kartę **Zakładki serwerów**.
 2. Kliknij **Dodaj**, wpisz nazwę, IP lub host serwera i port `7777`, potem **Zapisz serwer**.
-3. Kliknij **Zainstaluj / napraw mod**, a następnie **GRAJ**. Launcher zapisuje adres do
+3. Kliknij **Zainstaluj**, a następnie **GRAJ**. Launcher zapisuje adres do
    `BepInEx/config/StarTruckerMP.Client.cfg` przed każdym uruchomieniem.
 
 Gracze instalujący ręcznie edytują `[Connection] ServerAddress` i `ServerPort` w tym pliku.

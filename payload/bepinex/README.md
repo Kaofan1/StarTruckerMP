@@ -1,7 +1,7 @@
 # BepInEx payload (optional)
 
 Ten folder jest **osobny** od launchera i od pluginu. Launcher instaluje się i działa bez niego -
-BepInEx jest czytany tylko wtedy, gdy klikniesz **Install / repair mod**.
+BepInEx jest czytany tylko wtedy, gdy klikniesz **Zainstaluj**.
 
 ## Jak używać
 

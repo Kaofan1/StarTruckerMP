@@ -25,7 +25,7 @@ so Steam authentication keeps working.
 1. Download `StarTruckerMP-Setup.exe` from [Releases](https://github.com/Kaofan1/StarTruckerMP/releases)
 2. Run it - it installs per user, no administrator rights required
 3. Open **Star Trucker Multiplayer** from the Start menu
-4. Pick a server, press **Install / repair mod**, then **PLAY**
+4. Pick a server, press **Install**, then **PLAY**
 
 The portable build `StarTruckerMP-Launcher-win-x64.zip` needs no installation at all.
 Build steps, file locations and troubleshooting: [docs/launcher/README.en.md](docs/launcher/README.en.md).

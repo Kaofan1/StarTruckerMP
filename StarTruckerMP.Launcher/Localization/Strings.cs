@@ -57,8 +57,6 @@ internal static class Strings
 
     public static string ChooseFolder => T("Choose folder…", "Wybierz folder…");
 
-    public static string InstallMod => T("Install / repair mod", "Zainstaluj / napraw mod");
-
     public static string OpenGameFolder => T("Open game folder", "Otwórz folder gry");
 
     public static string OpenConfig => T("Open config", "Otwórz konfigurację");
@@ -128,6 +126,57 @@ internal static class Strings
 
     public static string LocalServerNote =>
         T("lets this PC host the session", "pozwala temu komputerowi hostować sesję");
+
+    public static string InstallAction => T("Install", "Zainstaluj");
+
+    public static string RepairMod => T("Repair mod", "Napraw mod");
+
+    public static string RepairLoader => T("Repair loader", "Napraw loader");
+
+    public static string UninstallAction => T("Uninstall", "Odinstaluj");
+
+    public static string ModAlreadyInstalled =>
+        T("The mod is already installed.", "Mod jest już zainstalowany.");
+
+    public static string ModRepairing => T("Repairing the mod…", "Naprawiam mod…");
+
+    public static string ModRepairCompleted => T("The mod was repaired.", "Mod został naprawiony.");
+
+    public static string ModRepairFailed(string reason) =>
+        T($"Repair failed: {reason}", $"Naprawa nie powiodła się: {reason}");
+
+    public static string ModUninstalling => T("Uninstalling the mod…", "Odinstalowuję mod…");
+
+    public static string ModUninstallCompleted =>
+        T("The mod was removed from the game folder.", "Mod został usunięty z folderu gry.");
+
+    public static string ModUninstallFailed(string reason) =>
+        T($"Uninstall failed: {reason}", $"Odinstalowanie nie powiodło się: {reason}");
+
+    public static string ModUninstallSkipped =>
+        T("The mod is not installed.", "Mod nie jest zainstalowany.");
+
+    public static string LoaderRepairing => T("Repairing the loader…", "Naprawiam loader…");
+
+    public static string LoaderRepairCompleted =>
+        T("The BepInEx loader was repaired.", "Loader BepInEx został naprawiony.");
+
+    public static string LoaderRepairFailed(string reason) =>
+        T($"Loader repair failed: {reason}", $"Naprawa loadera nie powiodła się: {reason}");
+
+    public static string LoaderUninstalling => T("Removing the loader…", "Usuwam loader…");
+
+    public static string LoaderUninstallCompleted =>
+        T("The BepInEx loader was removed.", "Loader BepInEx został usunięty.");
+
+    public static string LoaderUninstallKeptPlugins =>
+        T("BepInEx plugins and config were kept.", "Pluginy i konfiguracja BepInEx zostały zachowane.");
+
+    public static string LoaderUninstallFailed(string reason) =>
+        T($"Loader uninstall failed: {reason}", $"Odinstalowanie loadera nie powiodło się: {reason}");
+
+    public static string LoaderNotInstalled =>
+        T("The BepInEx loader is not installed.", "Loader BepInEx nie jest zainstalowany.");
 
     public static string StartLocalServer => T("Start server", "Uruchom serwer");
 
@@ -217,16 +266,16 @@ internal static class Strings
             "Zainstalowany (BepInEx 6 IL2CPP + klient + overlay). Gotowy do gry.");
 
     public static string ModMono =>
-        T("BepInEx 5 (Mono) is installed here. Star Trucker needs BepInEx 6 IL2CPP - press “Install / repair mod” to replace it.",
-            "W folderze gry jest BepInEx 5 (Mono). Star Trucker wymaga BepInEx 6 IL2CPP - kliknij „Zainstaluj / napraw mod”, aby go podmienić.");
+        T("BepInEx 5 (Mono) is installed here. Star Trucker needs BepInEx 6 IL2CPP - press “Repair loader” to replace it.",
+            "W folderze gry jest BepInEx 5 (Mono). Star Trucker wymaga BepInEx 6 IL2CPP - kliknij „Napraw loader”, aby go podmienić.");
 
     public static string ModNotInstalled =>
         T("Not installed - the launcher still starts Star Trucker normally. The multiplayer mod is optional.",
             "Niezainstalowany - launcher nadal normalnie uruchamia Star Trucker. Mod multiplayer jest opcjonalny.");
 
     public static string ModPartial(string missing) =>
-        T($"Partial install - missing: {missing}. Press “Install / repair mod”.",
-            $"Częściowa instalacja - brakuje: {missing}. Kliknij „Zainstaluj / napraw mod”.");
+        T($"Partial install - missing: {missing}. Press “Repair mod”.",
+            $"Częściowa instalacja - brakuje: {missing}. Kliknij „Napraw mod”.");
 
     public static string MissingBepInEx => "BepInEx 6 IL2CPP";
 
@@ -247,8 +296,6 @@ internal static class Strings
     public static string LoaderMono =>
         T("BepInEx 5 (Mono) detected. Star Trucker needs BepInEx 6 IL2CPP - press “Install / repair BepInEx”.",
             "Wykryto BepInEx 5 (Mono). Star Trucker wymaga BepInEx 6 IL2CPP - kliknij „Zainstaluj / napraw BepInEx”.");
-
-    public static string InstallLoader => T("Install / repair BepInEx", "Zainstaluj / napraw BepInEx");
 
     public static string LoaderCaption =>
         T("Only the loader. The multiplayer client stays optional and can be added later.",

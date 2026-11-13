@@ -104,7 +104,7 @@ valid for one year and saves it as a PFX. Players connecting to such a server mu
 
 1. Install the launcher from Releases and open the **Server bookmarks** card.
 2. Click **Add**, enter a name, the server IP or host name and port `7777`, then **Save server**.
-3. Click **Install / repair mod**, then **PLAY**. The launcher writes the address into
+3. Click **Install**, then **PLAY**. The launcher writes the address into
    `BepInEx/config/StarTruckerMP.Client.cfg` before every launch.
 
 Manual players edit `[Connection] ServerAddress` and `ServerPort` in that file instead.

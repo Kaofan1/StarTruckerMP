@@ -72,6 +72,30 @@ internal sealed class ModInstaller
 
     public static bool HasOverlay(string gamePath) => File.Exists(OverlayExecutablePath(gamePath));
 
+    /// <summary>True when any part of the client is in the game folder.</summary>
+    public static bool IsModInstalled(string gamePath) =>
+        HasPlugin(gamePath) || HasOverlay(gamePath) || Directory.Exists(LegacyPluginDirectory(gamePath));
+
+    /// <summary>
+    /// Removes the client plugin and its overlay, leaving BepInEx, its plugins folder and its
+    /// config alone so the loader card keeps working. Throws when the game holds the files open.
+    /// </summary>
+    public static bool Uninstall(string gamePath)
+    {
+        var removed = false;
+
+        foreach (var directory in new[] { PluginDirectory(gamePath), LegacyPluginDirectory(gamePath) })
+        {
+            if (!Directory.Exists(directory))
+                continue;
+
+            Directory.Delete(directory, recursive: true);
+            removed = true;
+        }
+
+        return removed;
+    }
+
     /// <summary>Windows keeps plugin DLLs locked while the game runs, so it has to be closed first.</summary>
     public static bool IsGameRunning()
     {

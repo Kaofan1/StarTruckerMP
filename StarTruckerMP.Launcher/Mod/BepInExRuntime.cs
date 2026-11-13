@@ -21,6 +21,14 @@ internal static class BepInExRuntime
     private const string Il2CppCoreMarker = "BepInEx.Unity.IL2CPP.dll";
     private const string MonoCoreMarker = "BepInEx.dll";
 
+    /// <summary>Loader files the install places in the game root, removed again on uninstall.</summary>
+    private static readonly string[] LoaderRootFiles =
+    {
+        "winhttp.dll",
+        "doorstop_config.ini",
+        ".doorstop_version"
+    };
+
     public static string CoreDirectory(string gamePath) => Path.Combine(gamePath, "BepInEx", "core");
 
     /// <summary>Optional offline payload folder shipped next to the launcher executable.</summary>
@@ -40,6 +48,35 @@ internal static class BepInExRuntime
     public static bool HasMonoBepInEx(string gamePath) =>
         !HasBepInEx(gamePath) &&
         File.Exists(Path.Combine(CoreDirectory(gamePath), MonoCoreMarker));
+
+    /// <summary>
+    /// Removes the loader files and <c>BepInEx\core</c>, but keeps <c>BepInEx\plugins</c> and
+    /// <c>BepInEx\config</c>: a repair or a later reinstall must not throw away mod settings.
+    /// Throws when the game holds the files open.
+    /// </summary>
+    public static bool Uninstall(string gamePath)
+    {
+        var removed = false;
+
+        foreach (var name in LoaderRootFiles)
+        {
+            var path = Path.Combine(gamePath, name);
+            if (!File.Exists(path))
+                continue;
+
+            File.Delete(path);
+            removed = true;
+        }
+
+        var core = CoreDirectory(gamePath);
+        if (Directory.Exists(core))
+        {
+            Directory.Delete(core, recursive: true);
+            removed = true;
+        }
+
+        return removed;
+    }
 
     /// <summary>
     /// Ensures the IL2CPP loader is present in the game folder. Does nothing when it already is -

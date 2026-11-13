@@ -33,6 +33,9 @@ internal static class LocalServer
     /// <summary>Release tag of the installed package, so a newer release can replace it.</summary>
     private const string InstalledTagFileName = "package-tag.txt";
 
+    /// <summary>Status page of the running server, shown on the card so it opens in one click.</summary>
+    public const string StatusPageUrl = "https://localhost:7777/";
+
     /// <summary>Server files live in the launcher data folder, never in the game folder.</summary>
     public static string InstallDirectory => Path.Combine(SettingsStore.DataDirectory, "server");
 
@@ -69,10 +72,16 @@ internal static class LocalServer
         var directory = Path.GetDirectoryName(executable)!;
         Directory.CreateDirectory(directory);
 
-        var process = Process.Start(new ProcessStartInfo(executable)
+        // No console window: the card shows the status page, and the server output goes to the
+        // log files next to it, so nothing disappears when the launcher closes.
+        var process = Process.Start(new ProcessStartInfo("cmd.exe")
         {
+            // The .\ prefix matters: cmd does not search the working directory when
+            // NoDefaultCurrentDirectoryInExePath is set, which PowerShell hosts do.
+            Arguments = $"/c \".\\{ExecutableName} > server-out.log 2> server-err.log\"",
             WorkingDirectory = directory,
-            UseShellExecute = false
+            UseShellExecute = false,
+            CreateNoWindow = true
         }) ?? throw new InvalidOperationException(Strings.LocalServerStartFailed(Strings.LocalServerPortHint));
 
         await Task.Delay(1500, cancellationToken).ConfigureAwait(false);
@@ -81,7 +90,10 @@ internal static class LocalServer
         if (process.HasExited)
             throw new InvalidOperationException(Strings.LocalServerStartFailed(Strings.LocalServerPortHint));
 
-        return new LocalServerStatus(LocalServerState.Running, executable, process.Id);
+        // The started process is the shell that keeps the log redirection alive; the card and
+        // the stop button work on the server process itself.
+        var server = FindRunning();
+        return new LocalServerStatus(LocalServerState.Running, executable, server?.Id ?? process.Id);
     }
 
     public static bool Stop()
