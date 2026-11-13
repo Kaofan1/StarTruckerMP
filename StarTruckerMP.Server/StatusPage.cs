@@ -8,12 +8,18 @@ using StarTruckerMP.Shared;
 namespace StarTruckerMP.Server;
 
 /// <summary>
-/// Status page served at the root of the server. It reports only aggregates: the version, how many
-/// players are connected and which sectors they are in. Names, addresses and tokens never appear
-/// here, so the page can stay open without a session token.
+/// Status page served at the root of the server. The summary (version, player count, sectors) is
+/// public, because it is just aggregates. Player names are personal data, so they only appear when
+/// the request carries a valid session token, either in the <c>X-Session-Token</c> header or in the
+/// cookie the token form sets.
 /// </summary>
 internal static class StatusPage
 {
+    public const string TokenHeader = "X-Session-Token";
+    public const string TokenCookie = "stmp_status_token";
+    public const string TokenField = "token";
+    public const string RejectedQuery = "token";
+
     private static readonly string ServerVersion =
         Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "unknown";
 
@@ -23,7 +29,29 @@ internal static class StatusPage
             .TrimStart()
             .StartsWith("pl", StringComparison.OrdinalIgnoreCase);
 
-    public static string Render(ServerSettings settings, PlayerContainer players, bool polish)
+    /// <summary>Session token from the API header or from the form cookie, or null when absent.</summary>
+    public static string? ReadToken(HttpContext context)
+    {
+        if (context.Request.Headers.TryGetValue(TokenHeader, out var header))
+        {
+            var value = header.ToString().Trim();
+            if (value.Length > 0)
+                return value;
+        }
+
+        if (context.Request.Cookies.TryGetValue(TokenCookie, out var cookie) &&
+            !string.IsNullOrWhiteSpace(cookie))
+            return cookie;
+
+        return null;
+    }
+
+    public static string Render(
+        ServerSettings settings,
+        PlayerContainer players,
+        bool polish,
+        bool showPlayers,
+        bool tokenRejected)
     {
         var online = new List<Player>();
         foreach (var player in players.SnapshotPlayers())
@@ -44,7 +72,7 @@ internal static class StatusPage
             .ThenBy(pair => pair.Key, StringComparer.OrdinalIgnoreCase)
             .ToArray();
 
-        var html = new StringBuilder(4096);
+        var html = new StringBuilder(6144);
 
         html.Append("<!DOCTYPE html><html lang=\"").Append(polish ? "pl" : "en").Append("\"><head>");
         html.Append("<meta charset=\"utf-8\">");
@@ -74,7 +102,15 @@ internal static class StatusPage
         html.Append("th{font-weight:500;color:#8b98a9}");
         html.Append("td:last-child,th:last-child{text-align:right}");
         html.Append("tr:last-child td{border-bottom:none}");
-        html.Append(".empty{color:#8b98a9;padding:12px 0}");
+        html.Append(".empty{color:#8b98a9;padding:12px 0;margin:0}");
+        html.Append("form{display:flex;gap:8px;margin:0 0 6px}");
+        html.Append("input[type=password]{flex:1;min-width:0;background:#0f141a;border:1px solid #2b3646;");
+        html.Append("border-radius:8px;color:#e6edf3;padding:9px 12px;font:inherit}");
+        html.Append("button{background:#f0a33c;color:#11151b;border:0;border-radius:8px;padding:9px 16px;");
+        html.Append("font:inherit;font-weight:600;cursor:pointer}");
+        html.Append("button.ghost{background:transparent;color:#8b98a9;border:1px solid #2b3646;font-weight:500}");
+        html.Append(".hint{color:#6d7887;font-size:13px;margin:8px 0 0}");
+        html.Append(".error{color:#e2725b;margin:0 0 10px}");
         html.Append("footer{margin-top:22px;color:#6d7887;font-size:13px}");
         html.Append("</style></head><body><main>");
 
@@ -86,9 +122,9 @@ internal static class StatusPage
             polish ? "<span class=\"ok\">Działa</span>" : "<span class=\"ok\">Running</span>");
         AppendRow(html, polish ? "Wersja serwera" : "Server version", WebUtility.HtmlEncode(ServerVersion));
         AppendRow(html, polish ? "Wersja protokołu" : "Protocol version",
-            $"{NetProtocol.CurrentVersion} ({WebUtility.HtmlEncode((polish ? "min. " : "min. ") + NetProtocol.MinSupportedVersion)})");
+            $"{NetProtocol.CurrentVersion} (min. {NetProtocol.MinSupportedVersion})");
         AppendRow(html, polish ? "Gracze" : "Players",
-            (polish ? $"{online.Count} z {settings.MaxPlayers}" : $"{online.Count} of {settings.MaxPlayers}"));
+            polish ? $"{online.Count} z {settings.MaxPlayers}" : $"{online.Count} of {settings.MaxPlayers}");
         AppendRow(html, polish ? "Port" : "Port", settings.Port.ToString());
         html.Append("</dl></div>");
 
@@ -110,17 +146,19 @@ internal static class StatusPage
 
             foreach (var pair in orderedSectors)
             {
-                // Players who are connected but not in a sector (main menu, loading) report "none".
-                var name = string.Equals(pair.Key, "none", StringComparison.OrdinalIgnoreCase)
-                    ? (polish ? "(poza sektorem)" : "(no sector)")
-                    : pair.Key;
-
-                html.Append("<tr><td>").Append(WebUtility.HtmlEncode(name))
+                html.Append("<tr><td>").Append(WebUtility.HtmlEncode(SectorLabel(pair.Key, polish)))
                     .Append("</td><td>").Append(pair.Value).Append("</td></tr>");
             }
 
             html.Append("</table></div>");
         }
+
+        html.Append("<h2>").Append(polish ? "Gracze" : "Players").Append("</h2>");
+
+        if (showPlayers)
+            AppendPlayerTable(html, online, polish);
+        else
+            AppendTokenForm(html, polish, tokenRejected);
 
         html.Append("<footer>")
             .Append(polish ? "Strona odświeża się co 5 sekund - " : "This page refreshes every 5 seconds - ")
@@ -130,6 +168,75 @@ internal static class StatusPage
         html.Append("</main></body></html>");
 
         return html.ToString();
+    }
+
+    private static void AppendPlayerTable(StringBuilder html, List<Player> online, bool polish)
+    {
+        if (online.Count == 0)
+        {
+            html.Append("<p class=\"empty\">")
+                .Append(polish ? "Nikt nie jest podłączony." : "Nobody is connected.")
+                .Append("</p>");
+        }
+        else
+        {
+            html.Append("<div class=\"card\"><table><tr><th>")
+                .Append(polish ? "Nick" : "Name")
+                .Append("</th><th>")
+                .Append(polish ? "Sektor" : "Sector")
+                .Append("</th><th>ID</th></tr>");
+
+            foreach (var player in online
+                         .OrderBy(p => p.Sector, StringComparer.OrdinalIgnoreCase)
+                         .ThenBy(p => p.Name, StringComparer.OrdinalIgnoreCase))
+            {
+                var name = string.IsNullOrWhiteSpace(player.Name) ? $"Player #{player.Id}" : player.Name;
+
+                html.Append("<tr><td>").Append(WebUtility.HtmlEncode(name))
+                    .Append("</td><td>").Append(WebUtility.HtmlEncode(SectorLabel(player.Sector, polish)))
+                    .Append("</td><td>").Append(player.Id).Append("</td></tr>");
+            }
+
+            html.Append("</table></div>");
+        }
+
+        html.Append("<form method=\"post\" action=\"/status/logout\"><button class=\"ghost\" type=\"submit\">")
+            .Append(polish ? "Ukryj nicki" : "Hide names")
+            .Append("</button></form>");
+    }
+
+    private static void AppendTokenForm(StringBuilder html, bool polish, bool tokenRejected)
+    {
+        if (tokenRejected)
+        {
+            html.Append("<p class=\"error\">")
+                .Append(polish ? "Ten token jest nieprawidłowy lub wygasł." : "That token is invalid or expired.")
+                .Append("</p>");
+        }
+
+        html.Append("<div class=\"card\">");
+        html.Append("<form method=\"post\" action=\"/status/token\">");
+        html.Append("<input type=\"password\" name=\"").Append(TokenField).Append("\" placeholder=\"")
+            .Append(polish ? "Token sesji" : "Session token")
+            .Append("\" autocomplete=\"off\" spellcheck=\"false\">");
+        html.Append("<button type=\"submit\">")
+            .Append(polish ? "Pokaż nicki" : "Show names")
+            .Append("</button></form>");
+        html.Append("<p class=\"hint\">")
+            .Append(polish
+                ? "Token sesji znajdziesz w logu gry, w linii [Auth] Token: . Nicki widzi tylko osoba z ważnym tokenem."
+                : "The session token is in the game log, on the [Auth] Token: line. Only a valid token can see the names.")
+            .Append("</p>");
+        html.Append("</div>");
+    }
+
+    private static string SectorLabel(string sector, bool polish)
+    {
+        // Players who are connected but not in a sector (main menu, loading) report "none".
+        if (string.IsNullOrWhiteSpace(sector) || string.Equals(sector, "none", StringComparison.OrdinalIgnoreCase))
+            return polish ? "(poza sektorem)" : "(no sector)";
+
+        return sector;
     }
 
     private static void AppendRow(StringBuilder html, string label, string value)

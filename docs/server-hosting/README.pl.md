@@ -58,9 +58,15 @@ język do przeglądarki (angielski lub polski). Działa też jako health check d
 w przeglądarce i pokazuje `ERR_ADDRESS_INVALID`. Wpisuj IP serwera, `127.0.0.1` albo `localhost`.
 Certyfikat jest samopodpisany, więc przy pierwszej wizycie przeglądarka poprosi o potwierdzenie.
 
-Strona pokazuje tylko wartości zbiorcze: żadnych nicków, adresów IP ani tokenów. Widzi ją każdy, kto
-ma dostęp do portu. UI overlaya zostaje pod `/overlay` i wymaga tokenu sesji, więc wejście tam bez
-niego zwraca `401`.
+Bez tokenu sesji strona pokazuje tylko wartości zbiorcze, więc każdy, kto ma dostęp do portu, widzi
+sam skrót: żadnych nicków, adresów IP ani tokenów. Formularz na stronie przyjmuje token sesji i wtedy
+wyświetla podłączonych graczy z nickiem, sektorem i ID gracza. Token trzymany jest w ciasteczku
+HttpOnly z `SameSite=Strict`, a **Ukryj nicki** je usuwa; skrypty mogą go podać w nagłówku
+`X-Session-Token`.
+
+Token weźmiesz z logu gry swojego klienta: wypisuje go w linii `[Auth] Token:`, a ważny jest przez
+`ApiTokenLifetime`. UI overlaya zostaje pod `/overlay` i wymaga tego samego tokenu, więc wejście tam
+bez niego zwraca `401`.
 
 ## server.json
 

@@ -156,13 +156,46 @@ internal class Program
         app.MapControllers();
         
         // The root shows a small status page instead of a bare string, so the server can be checked
-        // from a browser: version, online players and the sectors they are in.
-        app.MapGet("/", (HttpContext context, PlayerContainer players, ServerSettings settings) =>
+        // from a browser: version, online players and the sectors they are in. Player names are
+        // personal data, so they only appear for a request that carries a valid session token.
+        app.MapGet("/", (HttpContext context, PlayerContainer players, ServerSettings settings, AuthService auth) =>
         {
             context.Response.Headers.CacheControl = "no-store";
+            var token = StatusPage.ReadToken(context);
+            var showPlayers = token is not null && auth.IsTokenValid(token);
+            var tokenRejected = !showPlayers && context.Request.Query.ContainsKey(StatusPage.RejectedQuery);
+
             return Results.Content(
-                StatusPage.Render(settings, players, StatusPage.WantsPolish(context)),
+                StatusPage.Render(settings, players, StatusPage.WantsPolish(context), showPlayers, tokenRejected),
                 "text/html; charset=utf-8");
+        });
+
+        // The token form keeps the token in an HttpOnly cookie, so it stays out of the address bar
+        // and out of the page source. The header stays supported for scripts and curl.
+        app.MapPost("/status/token", (HttpContext context, AuthService auth) =>
+        {
+            var token = context.Request.Form[StatusPage.TokenField].ToString().Trim();
+            if (token.Length == 0 || !auth.IsTokenValid(token))
+            {
+                context.Response.Cookies.Delete(StatusPage.TokenCookie);
+                return Results.Redirect("/?token=invalid");
+            }
+
+            context.Response.Cookies.Append(StatusPage.TokenCookie, token, new CookieOptions
+            {
+                HttpOnly = true,
+                Secure = context.Request.IsHttps,
+                SameSite = SameSiteMode.Strict,
+                Path = "/"
+            });
+
+            return Results.Redirect("/");
+        });
+
+        app.MapPost("/status/logout", (HttpContext context) =>
+        {
+            context.Response.Cookies.Delete(StatusPage.TokenCookie);
+            return Results.Redirect("/");
         });
 
         var startupLogger = app.Services.GetRequiredService<ILogger<Program>>();

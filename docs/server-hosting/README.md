@@ -59,9 +59,15 @@ for an uptime monitor.
 browser and shows `ERR_ADDRESS_INVALID`. Use the server IP, `127.0.0.1` or `localhost` instead. The
 certificate is self-signed, so the browser asks for confirmation on the first visit.
 
-The page reports aggregates only: no player names, IP addresses or tokens. Anyone who can reach the
-port can read it. The overlay UI stays under `/overlay` and requires a session token, so opening it
-directly without one returns `401`.
+Without a session token the page reports aggregates only, so anyone who can reach the port sees just
+the summary: no player names, IP addresses or tokens. A form on the page accepts a session token and
+then lists the connected players with their nick, sector and player ID. The token is kept in an
+HttpOnly, `SameSite=Strict` cookie and **Hide names** clears it again; scripts can send it in the
+`X-Session-Token` header instead.
+
+You can take the token from the game log of your own client: it prints the session token on the
+`[Auth] Token:` line, and the token stays valid for `ApiTokenLifetime`. The overlay UI stays under
+`/overlay` and requires the same token, so opening it directly without one returns `401`.
 
 ## server.json
 
