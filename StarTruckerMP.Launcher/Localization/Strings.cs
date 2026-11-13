@@ -201,8 +201,13 @@ internal static class Strings
 
     public static string DirectoryNote => T("search public servers", "szukaj publicznych serwerów");
 
-    public static string DirectoryUrlPlaceholder =>
-        T("Directory address, e.g. https://hub.example:7777", "Adres katalogu, np. https://hub.example:7777");
+    public static string DirectoryColumnServer => T("SERVER", "SERWER");
+
+    public static string DirectoryColumnMap => T("MAP", "MAPA");
+
+    public static string DirectoryColumnPlayers => T("PLAYERS", "GRACZE");
+
+    public static string DirectoryColumnPing => T("PING", "PING");
 
     public static string DirectorySearchPlaceholder =>
         T("Server name or host", "Nazwa serwera lub host");
@@ -212,11 +217,11 @@ internal static class Strings
     public static string DirectoryAddAction => T("Add", "Dodaj");
 
     public static string DirectoryCaption =>
-        T("The list comes from a server that hosts the directory. Add a result to keep it in your server list.",
-            "Lista pochodzi z serwera, który hostuje katalog. Dodaj wynik, żeby zapisać go na liście serwerów.");
+        T("The list comes from the server that hosts the directory. Pick a server and add it with + to keep it in your server list.",
+            "Lista pochodzi z serwera, który hostuje katalog. Wybierz serwer i dodaj go plusem, żeby zapisać go na liście serwerów.");
 
     public static string DirectoryNeedsUrl =>
-        T("Enter the directory address first.", "Najpierw wpisz adres katalogu.");
+        T("Enter the directory host and port first.", "Najpierw wpisz host i port katalogu.");
 
     public static string DirectorySearching => T("Searching the directory…", "Szukam w katalogu…");
 

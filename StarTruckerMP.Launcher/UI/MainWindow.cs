@@ -215,9 +215,15 @@ internal sealed class MainWindow : Window
     /// <summary>Path of the plugin row the player picked, so Remove knows what to delete.</summary>
     private string? _selectedPluginPath;
 
-    private readonly TextBox _directoryUrlBox = LauncherTheme.StyleInput(new TextBox
+    private readonly TextBox _directoryHostBox = LauncherTheme.StyleInput(new TextBox
     {
-        Watermark = Strings.DirectoryUrlPlaceholder,
+        Watermark = "127.0.0.1",
+        FontSize = 12
+    });
+
+    private readonly TextBox _directoryPortBox = LauncherTheme.StyleInput(new TextBox
+    {
+        Watermark = "7777",
         FontSize = 12
     });
 
@@ -231,6 +237,13 @@ internal sealed class MainWindow : Window
         Strings.DirectorySearchAction,
         ActionVariant.Accent);
 
+    private readonly Button _directoryAddButton = LauncherTheme.MakeButton(
+        "+",
+        ActionVariant.Ghost,
+        stretch: false,
+        fontSize: 14,
+        padding: new Thickness(8, 2));
+
     private readonly TextBlock _directoryStatusText = new()
     {
         TextWrapping = TextWrapping.Wrap,
@@ -238,7 +251,29 @@ internal sealed class MainWindow : Window
         Foreground = LauncherTheme.MutedBrush
     };
 
-    private readonly StackPanel _directoryResults = new() { Spacing = 4 };
+    private readonly StackPanel _directoryRowsPanel = new() { Spacing = 0 };
+    private readonly List<DirectoryRowState> _directoryRows = new();
+    private DirectoryRowState? _selectedDirectory;
+    private DirectorySort _directorySort = DirectorySort.Ping;
+    private bool _directorySortAscending = true;
+    private int _directoryGeneration;
+
+    /// <summary>Which column the browser is sorted by; the arrow in the header shows it.</summary>
+    private enum DirectorySort
+    {
+        Name,
+        Players,
+        Ping
+    }
+
+    /// <summary>A search result plus the ping this launcher measured for it.</summary>
+    private sealed class DirectoryRowState
+    {
+        public required DirectoryServer Server { get; init; }
+
+        /// <summary>Round trip in milliseconds, or -1 while it is unknown.</summary>
+        public int PingMs { get; set; } = -1;
+    }
 
     /// <summary>Shown while the local server runs, so its status page is one click away.</summary>
     private readonly Button _serverPageButton = LauncherTheme.MakeButton(
@@ -346,7 +381,7 @@ internal sealed class MainWindow : Window
         _sslCheck.IsChecked = _settings.IgnoreSslValidation;
         _closeCheck.IsChecked = _settings.CloseLauncherAfterLaunch;
         _versionText.Text = $"Launcher v{GetType().Assembly.GetName().Version?.ToString(3) ?? "1.0.0"}  ·  github.com/Kaofan1/StarTruckerMP";
-        _directoryUrlBox.Text = _settings.DirectoryUrl ?? string.Empty;
+        FillDirectoryFields(_settings.DirectoryUrl);
 
         Content = BuildLayout();
 
@@ -676,28 +711,243 @@ internal sealed class MainWindow : Window
             _ = SearchDirectoryAsync();
         };
 
+        // The directory lives on a server, so it is addressed like one: host and port, no URL to type.
+        var addressRow = new Grid { ColumnDefinitions = new ColumnDefinitions("*,110") };
+        addressRow.Children.Add(LauncherTheme.Field(Strings.FieldHost, _directoryHostBox));
+
+        var portField = LauncherTheme.Field(Strings.FieldPort, _directoryPortBox);
+        portField.Margin = new Thickness(12, 0, 0, 0);
+        addressRow.Children.Add(portField);
+        Grid.SetColumn(portField, 1);
+
         var searchRow = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto") };
         _directorySearchBox.Margin = new Thickness(0, 0, 8, 0);
         searchRow.Children.Add(_directorySearchBox);
         searchRow.Children.Add(_directorySearchButton);
         Grid.SetColumn(_directorySearchButton, 1);
 
-        var results = new ScrollViewer
+        var table = new StackPanel
         {
-            Content = _directoryResults,
-            MaxHeight = 220,
-            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
-            HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled
+            Spacing = 0,
+            Children =
+            {
+                BuildDirectoryHeader(),
+                new ScrollViewer
+                {
+                    Content = _directoryRowsPanel,
+                    MaxHeight = 190,
+                    VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                    HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled
+                }
+            }
         };
 
         return LauncherTheme.Card(
             Strings.CardDirectory,
             Strings.DirectoryNote,
-            _directoryUrlBox,
+            addressRow,
             searchRow,
             _directoryStatusText,
-            results,
+            table,
             LauncherTheme.Caption(Strings.DirectoryCaption));
+    }
+
+    /// <summary>Column titles behave like a server browser: click one to sort, again to reverse.</summary>
+    private Control BuildDirectoryHeader()
+    {
+        var header = new Grid
+        {
+            ColumnDefinitions = new ColumnDefinitions("*,118,74,64,32"),
+            Margin = new Thickness(0, 2, 0, 0)
+        };
+
+        header.Children.Add(DirectoryHeaderCell(Strings.DirectoryColumnServer, DirectorySort.Name, 0));
+        header.Children.Add(DirectoryHeaderCell(Strings.DirectoryColumnMap, null, 1));
+        header.Children.Add(DirectoryHeaderCell(Strings.DirectoryColumnPlayers, DirectorySort.Players, 2));
+        header.Children.Add(DirectoryHeaderCell(Strings.DirectoryColumnPing, DirectorySort.Ping, 3));
+
+        _directoryAddButton.Click += (_, _) => AddSelectedDirectoryServer();
+        ToolTip.SetTip(_directoryAddButton, Strings.DirectoryAddAction);
+        header.Children.Add(_directoryAddButton);
+        Grid.SetColumn(_directoryAddButton, 4);
+
+        return new Border
+        {
+            BorderBrush = LauncherTheme.EdgeBrush,
+            BorderThickness = new Thickness(0, 0, 0, 1),
+            Padding = new Thickness(6, 0, 0, 4),
+            Child = header
+        };
+    }
+
+    private Control DirectoryHeaderCell(string text, DirectorySort? sort, int column)
+    {
+        var active = sort is not null && _directorySort == sort.Value;
+        var right = column >= 2;
+
+        var label = new TextBlock
+        {
+            Text = active ? text + (_directorySortAscending ? " ▲" : " ▼") : text,
+            FontSize = 10,
+            FontWeight = FontWeight.SemiBold,
+            Foreground = active ? LauncherTheme.AmberBrush : LauncherTheme.MutedBrush,
+            VerticalAlignment = VerticalAlignment.Center,
+            HorizontalAlignment = right ? HorizontalAlignment.Right : HorizontalAlignment.Left
+        };
+
+        if (sort is not null)
+        {
+            var target = sort.Value;
+            label.Cursor = new Cursor(StandardCursorType.Hand);
+            label.PointerPressed += (_, args) =>
+            {
+                if (_directorySort == target)
+                    _directorySortAscending = !_directorySortAscending;
+                else
+                {
+                    _directorySort = target;
+                    _directorySortAscending = target != DirectorySort.Players;
+                }
+
+                args.Handled = true;
+                RenderDirectoryRows();
+            };
+        }
+
+        Grid.SetColumn(label, column);
+        return label;
+    }
+
+    private void RenderDirectoryRows()
+    {
+        _directoryRowsPanel.Children.Clear();
+        _directoryAddButton.IsEnabled = !_busy && _selectedDirectory is not null;
+
+        foreach (var row in OrderDirectoryRows())
+            _directoryRowsPanel.Children.Add(BuildDirectoryRow(row));
+    }
+
+    private IEnumerable<DirectoryRowState> OrderDirectoryRows()
+    {
+        IEnumerable<DirectoryRowState> rows = _directoryRows;
+
+        return _directorySort switch
+        {
+            DirectorySort.Name => _directorySortAscending
+                ? rows.OrderBy(row => row.Server.Name, StringComparer.OrdinalIgnoreCase)
+                : rows.OrderByDescending(row => row.Server.Name, StringComparer.OrdinalIgnoreCase),
+            DirectorySort.Players => _directorySortAscending
+                ? rows.OrderBy(row => row.Server.Players).ThenBy(row => row.Server.Name, StringComparer.OrdinalIgnoreCase)
+                : rows.OrderByDescending(row => row.Server.Players).ThenBy(row => row.Server.Name, StringComparer.OrdinalIgnoreCase),
+            _ => _directorySortAscending
+                ? rows.OrderBy(row => row.PingMs < 0 ? int.MaxValue : row.PingMs)
+                    .ThenBy(row => row.Server.Name, StringComparer.OrdinalIgnoreCase)
+                : rows.OrderByDescending(row => row.PingMs < 0 ? int.MinValue : row.PingMs)
+                    .ThenBy(row => row.Server.Name, StringComparer.OrdinalIgnoreCase)
+        };
+    }
+
+    private Control BuildDirectoryRow(DirectoryRowState row)
+    {
+        var server = row.Server;
+        var selected = ReferenceEquals(_selectedDirectory, row);
+
+        var name = new TextBlock
+        {
+            Text = server.Name,
+            FontSize = 12.5,
+            Foreground = selected ? LauncherTheme.AmberBrush : LauncherTheme.TextBrush,
+            TextTrimming = TextTrimming.CharacterEllipsis,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        ToolTip.SetTip(name, $"{server.Host}:{server.Port}");
+
+        var map = DirectoryCell(server.Map is { Length: > 0 } ? server.Map : "-", TextAlignment.Left);
+        var players = DirectoryCell($"{server.Players}/{server.Capacity}", TextAlignment.Right);
+
+        var ping = DirectoryCell(row.PingMs < 0 ? "…" : $"{row.PingMs} ms", TextAlignment.Right);
+        if (row.PingMs >= 0)
+            ping.Foreground = row.PingMs < 80
+                ? LauncherTheme.TealBrush
+                : row.PingMs < 200 ? LauncherTheme.TextBrush : LauncherTheme.AmberBrush;
+
+        var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("*,118,74,64,32") };
+        grid.Children.Add(name);
+        grid.Children.Add(map);
+        grid.Children.Add(players);
+        grid.Children.Add(ping);
+        Grid.SetColumn(map, 1);
+        Grid.SetColumn(players, 2);
+        Grid.SetColumn(ping, 3);
+
+        var border = new Border
+        {
+            Background = selected ? LauncherTheme.PanelRaisedBrush : null,
+            Padding = new Thickness(6, 5),
+            Margin = new Thickness(0, 1, 0, 0),
+            Cursor = new Cursor(StandardCursorType.Hand),
+            Child = grid
+        };
+
+        border.PointerPressed += (_, _) =>
+        {
+            _selectedDirectory = row;
+            RenderDirectoryRows();
+        };
+
+        return border;
+    }
+
+    private static TextBlock DirectoryCell(string text, TextAlignment alignment) => new()
+    {
+        Text = text,
+        FontSize = 11.5,
+        Foreground = LauncherTheme.MutedBrush,
+        VerticalAlignment = VerticalAlignment.Center,
+        HorizontalAlignment = alignment == TextAlignment.Right
+            ? HorizontalAlignment.Right
+            : HorizontalAlignment.Left,
+        TextTrimming = TextTrimming.CharacterEllipsis
+    };
+
+    /// <summary>Host and port of the directory; a pasted URL is accepted and split into them.</summary>
+    private string? ReadDirectoryUrl()
+    {
+        var host = (_directoryHostBox.Text ?? string.Empty).Trim();
+        var portText = (_directoryPortBox.Text ?? string.Empty).Trim();
+        if (host.Length == 0)
+            return null;
+
+        if (host.Contains("://", StringComparison.Ordinal))
+        {
+            if (!Uri.TryCreate(host, UriKind.Absolute, out var parsed))
+                return null;
+
+            _directoryHostBox.Text = parsed.Host;
+            _directoryPortBox.Text = parsed.Port.ToString();
+            return $"https://{parsed.Host}:{parsed.Port}";
+        }
+
+        if (!int.TryParse(portText, out var port) || port is < 1 or > 65535)
+            return null;
+
+        return $"https://{host}:{port}";
+    }
+
+    private void FillDirectoryFields(string? url)
+    {
+        if (string.IsNullOrWhiteSpace(url))
+            return;
+
+        var text = url.Trim();
+        if (!text.Contains("://", StringComparison.Ordinal))
+            text = "https://" + text;
+
+        if (!Uri.TryCreate(text, UriKind.Absolute, out var parsed))
+            return;
+
+        _directoryHostBox.Text = parsed.Host;
+        _directoryPortBox.Text = parsed.Port.ToString();
     }
 
     /// <summary>
@@ -2162,7 +2412,7 @@ internal sealed class MainWindow : Window
         if (_busy)
             return;
 
-        var url = ServerDirectoryClient.NormalizeBaseUrl(_directoryUrlBox.Text);
+        var url = ReadDirectoryUrl();
         if (url is null)
         {
             _directoryStatusText.Text = Strings.DirectoryNeedsUrl;
@@ -2173,7 +2423,11 @@ internal sealed class MainWindow : Window
         _settings.DirectoryUrl = url;
         _store.Save(_settings);
 
-        _directoryResults.Children.Clear();
+        _directoryGeneration++;
+        _directoryRows.Clear();
+        _selectedDirectory = null;
+        RenderDirectoryRows();
+
         _directoryStatusText.Text = Strings.DirectorySearching;
         _directoryStatusText.Foreground = LauncherTheme.MutedBrush;
         SetBusy(true, Strings.DirectorySearching);
@@ -2200,8 +2454,9 @@ internal sealed class MainWindow : Window
             _directoryStatusText.Text = Strings.DirectoryFound(servers.Count);
             _directoryStatusText.Foreground = LauncherTheme.TealBrush;
 
-            foreach (var server in servers)
-                _directoryResults.Children.Add(BuildDirectoryRow(server));
+            _directoryRows.AddRange(servers.Select(server => new DirectoryRowState { Server = server }));
+            RenderDirectoryRows();
+            MeasureDirectoryPings(_directoryGeneration);
         }
         catch (Exception exception)
         {
@@ -2214,47 +2469,29 @@ internal sealed class MainWindow : Window
         }
     }
 
-    private Control BuildDirectoryRow(DirectoryServer server)
+    /// <summary>Pings the listed addresses, so the PING column is measured rather than guessed.</summary>
+    private void MeasureDirectoryPings(int generation)
     {
-        var title = new TextBlock
-        {
-            Text = server.Name,
-            FontSize = 12.5,
-            FontWeight = FontWeight.SemiBold,
-            Foreground = LauncherTheme.TextBrush,
-            TextTrimming = TextTrimming.CharacterEllipsis
-        };
+        foreach (var row in _directoryRows.ToList())
+            _ = MeasureDirectoryPingAsync(row, generation);
+    }
 
-        var details = LauncherTheme.Caption(
-            $"{server.Host}:{server.Port} · {Strings.DirectoryPlayers(server.Players, server.Capacity)}",
-            10.5);
+    private async System.Threading.Tasks.Task MeasureDirectoryPingAsync(DirectoryRowState row, int generation)
+    {
+        var ping = await ServerDirectoryClient.MeasurePingAsync(
+            row.Server.Host, row.Server.Port, CancellationToken.None);
 
-        var text = new StackPanel
-        {
-            Spacing = 1,
-            Children = { title, details }
-        };
+        if (generation != _directoryGeneration)
+            return;
 
-        var add = LauncherTheme.MakeButton(
-            Strings.DirectoryAddAction,
-            ActionVariant.Ghost,
-            stretch: false,
-            fontSize: 11.5,
-            padding: new Thickness(12, 6));
-        add.Click += (_, _) => AddDirectoryServer(server);
+        row.PingMs = ping;
+        RenderDirectoryRows();
+    }
 
-        var row = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto") };
-        row.Children.Add(text);
-        row.Children.Add(add);
-        Grid.SetColumn(add, 1);
-
-        return new Border
-        {
-            BorderBrush = LauncherTheme.EdgeBrush,
-            BorderThickness = new Thickness(0, 0, 0, 1),
-            Padding = new Thickness(0, 4),
-            Child = row
-        };
+    private void AddSelectedDirectoryServer()
+    {
+        if (_selectedDirectory is not null)
+            AddDirectoryServer(_selectedDirectory.Server);
     }
 
     /// <summary>Bookmarks a directory result, so it survives the next search and a restart.</summary>
@@ -2426,8 +2663,10 @@ internal sealed class MainWindow : Window
         _updateButton.IsEnabled = !busy && _pendingUpdate is not null;
         _serverToggleButton.IsEnabled = !busy;
         _directorySearchButton.IsEnabled = !busy;
-        _directoryUrlBox.IsEnabled = !busy;
+        _directoryHostBox.IsEnabled = !busy;
+        _directoryPortBox.IsEnabled = !busy;
         _directorySearchBox.IsEnabled = !busy;
+        _directoryAddButton.IsEnabled = !busy && _selectedDirectory is not null;
         _addPluginButton.IsEnabled = !busy && _install is not null;
         _openPluginsButton.IsEnabled = !busy && _install is not null;
         _refreshPluginsButton.IsEnabled = !busy && _install is not null;

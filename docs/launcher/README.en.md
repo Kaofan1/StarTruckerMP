@@ -108,12 +108,13 @@ be removed or disabled here (use **Uninstall** in the MOD STATUS card for that).
 
 ## Dedicated server search
 
-The **DEDICATED SERVERS** card reads a public server directory. Put the address of the server that
-hosts that directory in the first field (for example `https://hub.example:7777`), type a name or
-host in the second one and press **Search** or Enter. Results show the name, address and player
-count, and **Add** stores the server in your bookmarks so you can pick it and press **PLAY**.
+The **DEDICATED SERVERS** card reads a public server directory. Enter the host and port of the server
+that hosts that directory, type a name or host in the search field and press **Search** or Enter.
+Results are a server browser table: name, map, players and the ping the launcher measured, and
+clicking a column title sorts by it (click again to reverse). Pick a server and add it with + to
+store it in your bookmarks, ready for **PLAY**.
 
-The directory address is saved in `launcher.json`, so it has to be typed once. The directory may use
+The directory host and port are saved in `launcher.json`, so they have to be typed once. The directory may use
 a self-signed certificate, because the launcher only reads public data; when https does not answer it
 retries over http. Any StarTruckerMP server can host the directory: the endpoints are described in
 the [hosting documentation](../server-hosting/README.md).

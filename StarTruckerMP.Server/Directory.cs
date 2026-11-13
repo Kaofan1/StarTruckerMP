@@ -14,6 +14,7 @@ internal sealed record AnnounceRequest(
     int Players,
     int Capacity,
     string? Description,
+    string? Map,
     string? Protocol,
     string? Version);
 
@@ -43,6 +44,7 @@ internal sealed class ServerDirectory
         public int Players { get; set; }
         public int Capacity { get; set; }
         public string? Description { get; set; }
+        public string? Map { get; set; }
         public string? Protocol { get; set; }
         public string? Version { get; set; }
         public DateTime LastSeenUtc { get; set; }
@@ -68,6 +70,7 @@ internal sealed class ServerDirectory
         var name = Sanitize(request.Name, 64);
         var host = Sanitize(request.Host, 255);
         var description = Sanitize(request.Description, 200);
+        var map = Sanitize(request.Map, 64);
         var protocol = Sanitize(request.Protocol, 32);
         var version = Sanitize(request.Version, 32);
 
@@ -101,6 +104,7 @@ internal sealed class ServerDirectory
                 Players = request.Players,
                 Capacity = request.Capacity,
                 Description = description,
+                Map = map,
                 Protocol = protocol,
                 Version = version,
                 LastSeenUtc = now
@@ -119,6 +123,7 @@ internal sealed class ServerDirectory
         existing.Players = request.Players;
         existing.Capacity = request.Capacity;
         existing.Description = description;
+        existing.Map = map;
         existing.Protocol = protocol;
         existing.Version = version;
         existing.LastSeenUtc = now;
@@ -149,6 +154,7 @@ internal sealed class ServerDirectory
                 server.Players,
                 server.Capacity,
                 server.Description,
+                server.Map,
                 server.Protocol,
                 server.Version,
                 lastSeenSeconds = (int)(now - server.LastSeenUtc).TotalSeconds

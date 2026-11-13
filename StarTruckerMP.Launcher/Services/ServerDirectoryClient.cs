@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Net.Http;
 using System.Text.Json;
 using System.Threading;
@@ -16,6 +17,7 @@ internal sealed record DirectoryServer(
     int Players,
     int Capacity,
     string? Description,
+    string? Map,
     int LastSeenSeconds);
 
 /// <summary>
@@ -65,6 +67,34 @@ internal static class ServerDirectoryClient
         return (lastError ?? Localization.Strings.DirectoryUnreachable, Array.Empty<DirectoryServer>());
     }
 
+    /// <summary>
+    /// Round trip of a plain status request, which is what a browser-like server list calls ping.
+    /// The hub answers on https with its self-signed certificate, so plain http is the fallback.
+    /// </summary>
+    public static async Task<int> MeasurePingAsync(string host, int port, CancellationToken cancellationToken)
+    {
+        foreach (var scheme in new[] { "https", "http" })
+        {
+            var stopwatch = Stopwatch.StartNew();
+
+            try
+            {
+                using var response = await PingClient
+                    .GetAsync($"{scheme}://{host}:{port}/", HttpCompletionOption.ResponseHeadersRead, cancellationToken)
+                    .ConfigureAwait(false);
+
+                if (response.IsSuccessStatusCode)
+                    return (int)stopwatch.ElapsedMilliseconds;
+            }
+            catch (Exception exception) when (exception is HttpRequestException or TaskCanceledException)
+            {
+                // Try the other scheme; an address that answers neither shows as unknown.
+            }
+        }
+
+        return -1;
+    }
+
     /// <summary>Turns user input into a base URL; missing scheme means https.</summary>
     public static string? NormalizeBaseUrl(string? url)
     {
@@ -112,6 +142,7 @@ internal static class ServerDirectoryClient
                 ReadInt(item, "players"),
                 ReadInt(item, "capacity"),
                 ReadString(item, "description"),
+                ReadString(item, "map"),
                 ReadInt(item, "lastSeenSeconds")));
         }
 
@@ -125,6 +156,15 @@ internal static class ServerDirectoryClient
 
     private static int ReadInt(JsonElement item, string property) =>
         item.TryGetProperty(property, out var value) && value.TryGetInt32(out var number) ? number : 0;
+
+    private static HttpClient PingClient { get; } = CreatePingClient();
+
+    private static HttpClient CreatePingClient()
+    {
+        var client = CreateClient();
+        client.Timeout = TimeSpan.FromSeconds(4);
+        return client;
+    }
 
     private static HttpClient CreateClient()
     {

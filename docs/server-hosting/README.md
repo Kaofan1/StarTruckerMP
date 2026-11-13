@@ -108,7 +108,7 @@ itself listed with a heartbeat; the first call returns an id and a token, later 
 ```
 POST /directory/announce
 {"name":"EU Freight","host":"203.0.113.10","port":7777,"players":3,"capacity":8,
- "description":"evenings, EU","protocol":"1","version":"1.0.64"}
+ "description":"evenings, EU","map":"North Iziva County","protocol":"1","version":"1.0.64"}
 
 200 {"id":"...","token":"...","ttlSeconds":180}
 ```
@@ -118,8 +118,9 @@ session fills. Entries expire after three minutes without a beat, the first anno
 is accepted once per second, and a wrong token is rejected with 403 so a listing cannot be hijacked.
 
 `GET /directory/servers?q=freight` returns the public list (`name`, `host`, `port`, `players`,
-`capacity`, `description`, `lastSeenSeconds`); the same list is what the launcher's **DEDICATED
-SERVERS** card shows. The directory lives in memory, so after a hub restart servers re-register with
+`capacity`, `description`, `map`, `lastSeenSeconds`); the same list is what the launcher's **DEDICATED
+SERVERS** browser shows. `map` is the sector name to display in the MAP column, and the launcher
+fills the PING column itself by timing a status request to `host:port`. The directory lives in memory, so after a hub restart servers re-register with
 their next heartbeat and receive a new id.
 
 ## Connecting players
