@@ -16,7 +16,7 @@ internal enum LocalServerState
     Running
 }
 
-internal sealed record LocalServerStatus(LocalServerState State, string? ExecutablePath, int ProcessId, bool IsService = false);
+internal sealed record LocalServerStatus(LocalServerState State, string? ExecutablePath, int ProcessId);
 
 /// <summary>
 /// Starts the multiplayer server on this PC and keeps the installed copy in step with the
@@ -30,9 +30,6 @@ internal static class LocalServer
     public const string ProcessName = "StarTruckerMP.Server";
     public const string ExecutableName = "StarTruckerMP.Server.exe";
 
-    /// <summary>The service the standalone Windows installer registers.</summary>
-    public const string ServiceName = "StarTruckerMPServer";
-
     /// <summary>Release tag of the installed package, so a newer release can replace it.</summary>
     private const string InstalledTagFileName = "package-tag.txt";
 
@@ -44,25 +41,13 @@ internal static class LocalServer
 
     public static string InstalledExecutable => Path.Combine(InstallDirectory, ExecutableName);
 
-    /// <summary>
-    /// Where the standalone Setup keeps the live settings. The folder is writable for normal
-    /// users, so the file can be edited without administrator rights.
-    /// </summary>
-    public static string SharedConfigDirectory => Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
-        "StarTruckerMP");
-
-    /// <summary>The settings file the server actually reads, or null when none exists yet.</summary>
+    /// <summary>Settings of this copy, next to its executable, or null before the first run.</summary>
     public static string? ConfigPath
     {
         get
         {
-            var shared = Path.Combine(SharedConfigDirectory, "server.json");
-            if (File.Exists(shared))
-                return shared;
-
-            var local = Path.Combine(InstallDirectory, "server.json");
-            return File.Exists(local) ? local : null;
+            var path = Path.Combine(InstallDirectory, "server.json");
+            return File.Exists(path) ? path : null;
         }
     }
 
@@ -91,24 +76,8 @@ internal static class LocalServer
     public static LocalServerStatus Detect()
     {
         var running = FindRunning();
-        var service = QueryServiceState();
-
-        // A server installed by StarTruckerMP-Server-Setup.exe runs as a service owned by
-        // Windows, not by the launcher, so it is reported separately and managed through sc.
         if (running is not null)
-        {
-            var isService = service == WindowsServiceState.Running;
-            // The path must match the process being reported, otherwise the card mixes the
-            // launcher's copy with the installed service.
-            var executable = isService ? ServiceExecutablePath() ?? InstalledExecutable : InstalledExecutable;
-            return new LocalServerStatus(LocalServerState.Running, executable, running.Id, isService);
-        }
-
-        if (service == WindowsServiceState.Running)
-            return new LocalServerStatus(LocalServerState.Running, ServiceExecutablePath() ?? InstalledExecutable, 0, true);
-
-        if (service == WindowsServiceState.Stopped)
-            return new LocalServerStatus(LocalServerState.Stopped, ServiceExecutablePath() ?? InstalledExecutable, 0, true);
+            return new LocalServerStatus(LocalServerState.Running, InstalledExecutable, running.Id);
 
         if (File.Exists(InstalledExecutable))
             return new LocalServerStatus(LocalServerState.Stopped, InstalledExecutable, 0);
@@ -155,11 +124,8 @@ internal static class LocalServer
         return new LocalServerStatus(LocalServerState.Running, executable, server?.Id ?? process.Id);
     }
 
-    public static bool Stop(LocalServerStatus status)
+    public static bool Stop()
     {
-        if (status.IsService)
-            return StopService();
-
         var process = FindRunning();
         if (process is null)
             return false;
@@ -173,165 +139,6 @@ internal static class LocalServer
         catch
         {
             return false;
-        }
-    }
-
-    /// <summary>
-    /// Starts the installed Windows service. Windows refuses with access denied unless the
-    /// launcher is elevated, so the caller reports that instead of a generic failure.
-    /// </summary>
-    public static bool StartService()
-    {
-        if (!RunServiceCommand($"start {ServiceName}", alreadyInState: 1056))
-            return false;
-
-        return WaitForService(WindowsServiceState.Running);
-    }
-
-    private static bool StopService()
-    {
-        if (!RunServiceCommand($"stop {ServiceName}", alreadyInState: 1062))
-            return false;
-
-        return WaitForService(WindowsServiceState.Stopped);
-    }
-
-    /// <summary>
-    /// Sends one sc command. Windows answers access denied for a normal user, so the command is
-    /// repeated with the UAC prompt instead of sending the operator to services.msc by hand.
-    /// </summary>
-    private static bool RunServiceCommand(string arguments, int alreadyInState)
-    {
-        var (exitCode, _) = RunServiceControl(arguments);
-
-        if (exitCode == 5)
-            return RunServiceControlElevated(arguments);
-
-        return exitCode == 0 || exitCode == alreadyInState;
-    }
-
-    private static bool RunServiceControlElevated(string arguments)
-    {
-        try
-        {
-            using var process = Process.Start(new ProcessStartInfo("sc.exe", arguments)
-            {
-                UseShellExecute = true,
-                Verb = "runas",
-                CreateNoWindow = true,
-                WindowStyle = ProcessWindowStyle.Hidden
-            });
-
-            if (process is null)
-                return false;
-
-            if (!process.WaitForExit(30000))
-                return false;
-
-            return process.ExitCode == 0;
-        }
-        catch (System.ComponentModel.Win32Exception)
-        {
-            // The elevation prompt was declined, which is a normal answer.
-            return false;
-        }
-        catch
-        {
-            return false;
-        }
-    }
-
-    private static bool WaitForService(WindowsServiceState expected)
-    {
-        for (var attempt = 0; attempt < 20; attempt++)
-        {
-            Thread.Sleep(250);
-            if (QueryServiceState() == expected)
-                return true;
-        }
-
-        return QueryServiceState() == expected;
-    }
-
-    private enum WindowsServiceState
-    {
-        NotInstalled,
-        Stopped,
-        Running
-    }
-
-    private static WindowsServiceState QueryServiceState()
-    {
-        if (!OperatingSystem.IsWindows())
-            return WindowsServiceState.NotInstalled;
-
-        var (exitCode, output) = RunServiceControl($"query {ServiceName}");
-        if (exitCode != 0)
-            return WindowsServiceState.NotInstalled;
-
-        if (output.Contains("RUNNING", StringComparison.OrdinalIgnoreCase))
-            return WindowsServiceState.Running;
-
-        return output.Contains("STOPPED", StringComparison.OrdinalIgnoreCase)
-            ? WindowsServiceState.Stopped
-            : WindowsServiceState.NotInstalled;
-    }
-
-    private static (int ExitCode, string Output) RunServiceControl(string arguments)
-    {
-        try
-        {
-            using var process = Process.Start(new ProcessStartInfo("sc.exe", arguments)
-            {
-                UseShellExecute = false,
-                CreateNoWindow = true,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true
-            });
-
-            if (process is null)
-                return (-1, string.Empty);
-
-            var output = process.StandardOutput.ReadToEnd() + process.StandardError.ReadToEnd();
-            if (!process.WaitForExit(5000))
-            {
-                try
-                {
-                    process.Kill();
-                }
-                catch
-                {
-                    // Nothing to do; the query below already timed out.
-                }
-
-                return (-1, output);
-            }
-
-            return (process.ExitCode, output);
-        }
-        catch
-        {
-            return (-1, string.Empty);
-        }
-    }
-
-    private static string? ServiceExecutablePath()
-    {
-        if (!OperatingSystem.IsWindows())
-            return null;
-
-        try
-        {
-            using var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey($@"SYSTEM\CurrentControlSet\Services\{ServiceName}");
-            if (key?.GetValue("ImagePath") is not string imagePath || string.IsNullOrWhiteSpace(imagePath))
-                return null;
-
-            imagePath = imagePath.Trim();
-            return imagePath.StartsWith('"') ? imagePath.Trim('"') : imagePath;
-        }
-        catch
-        {
-            return null;
         }
     }
 
@@ -371,11 +178,25 @@ internal static class LocalServer
     {
         try
         {
-            return Process.GetProcessesByName(ProcessName).FirstOrDefault();
+            // Services run in session 0. Without that check the launcher would see the dedicated
+            // service as its own server and try to stop a process Windows owns.
+            return Process.GetProcessesByName(ProcessName).FirstOrDefault(IsLauncherProcess);
         }
         catch
         {
             return null;
+        }
+    }
+
+    private static bool IsLauncherProcess(Process process)
+    {
+        try
+        {
+            return process.SessionId != 0;
+        }
+        catch
+        {
+            return true;
         }
     }
 

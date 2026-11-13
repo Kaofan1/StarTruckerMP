@@ -134,10 +134,13 @@ działa na `https://localhost:7777` i pisze log do `server-out.log` oraz `server
 folderze, więc nie otwiera osobnego okna konsoli. Gdy serwer działa, karta pokazuje adres strony
 statusu, a **Zatrzymaj serwer** kończy proces.
 
-Gdy serwer został zainstalowany przez `StarTruckerMP-Server-Setup.exe`, karta pokazuje go jako usługę
-Windows `StarTruckerMPServer`, a nie jako własny proces. **Zatrzymaj serwer** i **Uruchom serwer**
-sterują wtedy usługą i Windows pokazuje pytanie o uprawnienia administratora, a **Edytuj server.json**
-otwiera w Notatniku plik z `%ProgramData%\StarTruckerMP`, bez podnoszenia uprawnień.
+Obok jest karta **SERWER DEDYKOWANY**, która dotyczy wyłącznie instalacji z
+`StarTruckerMP-Server-Setup.exe`: `C:\Program Files\StarTruckerMP Server` uruchamianego jako usługa
+Windows `StarTruckerMPServer`. Pokazuje stan usługi, ścieżkę folderu instalacji i pozwala ją
+zatrzymać lub uruchomić (**Windows pokazuje wtedy pytanie o uprawnienia administratora**). Przycisk
+**Edytuj server.json** otwiera `%ProgramData%\StarTruckerMP\server.json` bez podnoszenia uprawnień.
+Obie karty są niezależne, ale na porcie 7777 działa tylko jedna z nich, więc przy działającej usłudze
+karta **SERWER LOKALNY** odmówi startu i poprosi o zatrzymanie serwera dedykowanego.
 
 Launcher sam pilnuje też aktualności tej paczki: przy starcie porównuje tag zapisany w
 `package-tag.txt` z najnowszym wydaniem i podmienia pliki serwera, zostawiając `server.json`,

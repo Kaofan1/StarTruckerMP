@@ -411,20 +411,6 @@ internal static class Strings
     public static string LocalServerStopFailed =>
         T("The server could not be stopped.", "Nie udało się zatrzymać serwera.");
 
-    public static string LocalServerRunningAsService(int processId) =>
-        processId > 0
-            ? T($"Running as the Windows service StarTruckerMPServer (PID {processId}).",
-                $"Działa jako usługa Windows StarTruckerMPServer (PID {processId}).")
-            : T("Running as the Windows service StarTruckerMPServer.",
-                "Działa jako usługa Windows StarTruckerMPServer.");
-
-    public static string LocalServerServiceNeedsAdmin =>
-        T("The server runs as the Windows service StarTruckerMPServer. Start the launcher as administrator to control it, or use services.msc.",
-            "Serwer działa jako usługa Windows StarTruckerMPServer. Uruchom launcher jako administrator, żeby nim sterować, albo użyj services.msc.");
-
-    public static string LocalServerServiceStarted =>
-        T("Windows service StarTruckerMPServer started.", "Uruchomiono usługę Windows StarTruckerMPServer.");
-
     public static string EditServerConfig =>
         T("Edit server.json", "Edytuj server.json");
 
@@ -435,15 +421,64 @@ internal static class Strings
     public static string LocalServerConfigFailed(string reason) =>
         T($"Could not open server.json: {reason}", $"Nie udało się otworzyć server.json: {reason}");
 
-    public static string LocalServerServicePath(string path) =>
-        T($"Windows service: {path}", $"Usługa Windows: {path}");
-
     public static string LocalServerFolderPath(string path) =>
         T($"Server folder: {path}", $"Folder serwera: {path}");
 
     public static string LocalServerCaption =>
-        T(@"Without a Windows service this card uses the launcher's own copy in %APPDATA%\StarTruckerMP\server. When StarTruckerMPServer is installed, the card controls that service and the settings come from %ProgramData%\StarTruckerMP.",
-            @"Bez usługi Windows karta używa kopii launchera w %APPDATA%\StarTruckerMP\server. Gdy jest zainstalowana usługa StarTruckerMPServer, karta steruje nią, a ustawienia czyta z %ProgramData%\StarTruckerMP.");
+        T(@"This copy belongs to the launcher: it is downloaded here and updated from GitHub Releases. A server installed by the separate Setup has its own card.",
+            @"Ta kopia należy do launchera: tutaj jest pobierana i aktualizowana z GitHub Releases. Serwer z osobnego instalatora ma własną kartę.");
+
+    public static string LocalServerPortTakenByDedicated =>
+        T("Port 7777 is held by the dedicated server. Stop it on the DEDICATED SERVER card to start the launcher's copy.",
+            "Port 7777 zajmuje serwer dedykowany. Zatrzymaj go na karcie SERWER DEDYKOWANY, żeby uruchomić kopię launchera.");
+
+    public static string CardDedicatedServer => T("DEDICATED SERVER", "SERWER DEDYKOWANY");
+
+    public static string DedicatedServerNote =>
+        T("Program Files install, runs as a Windows service",
+            "instalacja w Program Files, działa jako usługa Windows");
+
+    public static string DedicatedServerRunning(int processId) =>
+        T($"Running (PID {processId}).", $"Działa (PID {processId}).");
+
+    public static string DedicatedServerStopped =>
+        T("Stopped. The service is registered and starts with the system.",
+            "Zatrzymany. Usługa jest zarejestrowana i startuje z systemem.");
+
+    public static string DedicatedServerMissing =>
+        T("Not installed. Run StarTruckerMP-Server-Setup.exe to add it.",
+            "Nie zainstalowano. Uruchom StarTruckerMP-Server-Setup.exe, żeby go dodać.");
+
+    public static string DedicatedServerInstallFolder(string path) =>
+        T($"Install folder: {path}", $"Folder instalacji: {path}");
+
+    public static string StartDedicatedServer => T("Start service", "Uruchom usługę");
+
+    public static string StopDedicatedServer => T("Stop service", "Zatrzymaj usługę");
+
+    public static string DedicatedServerStartedLog =>
+        T("StarTruckerMPServer service started.", "Uruchomiono usługę StarTruckerMPServer.");
+
+    public static string DedicatedServerStoppedLog =>
+        T("StarTruckerMPServer service stopped.", "Zatrzymano usługę StarTruckerMPServer.");
+
+    public static string DedicatedServerNeedsAdmin =>
+        T("The Windows service needs administrator rights. Accept the UAC prompt or use services.msc.",
+            "Usługa Windows wymaga uprawnień administratora. Zaakceptuj pytanie UAC albo użyj services.msc.");
+
+    public static string DedicatedServerFailed(string reason) =>
+        T($"Could not control the service: {reason}", $"Nie udało się sterować usługą: {reason}");
+
+    public static string DedicatedServerConfigMissing =>
+        T(@"%ProgramData%\StarTruckerMP\server.json does not exist. Install the server with Setup first.",
+            @"%ProgramData%\StarTruckerMP\server.json nie istnieje. Najpierw zainstaluj serwer przez Setup.");
+
+    public static string DedicatedServerConfigFailed(string reason) =>
+        T($"Could not open server.json: {reason}", $"Nie udało się otworzyć server.json: {reason}");
+
+    public static string DedicatedServerCaption =>
+        T(@"Settings: %ProgramData%\StarTruckerMP\server.json. Status page: https://localhost:7777/.",
+            @"Ustawienia: %ProgramData%\StarTruckerMP\server.json. Strona statusu: https://localhost:7777/.");
 
     public static string ModNote => T("BepInEx + client + overlay", "BepInEx + klient + overlay");
 

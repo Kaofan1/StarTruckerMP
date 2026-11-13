@@ -135,10 +135,13 @@ well; the server itself listens on `https://localhost:7777` and writes its log t
 and `server-err.log` in that folder, so no separate console window opens. While the server runs the
 card shows the status page address, and **Stop server** ends the process.
 
-When the server was installed by `StarTruckerMP-Server-Setup.exe`, the card reports it as the Windows
-service `StarTruckerMPServer` instead of the launcher's own process. **Stop server** and **Start server**
-then control that service, and Windows asks for administrator rights, while **Edit server.json** opens the
-file from `%ProgramData%\StarTruckerMP` in Notepad without elevation.
+Next to it, the **DEDICATED SERVER** card covers only an install made by
+`StarTruckerMP-Server-Setup.exe`: `C:\Program Files\StarTruckerMP Server` running as the Windows
+service `StarTruckerMPServer`. It shows the service state, the install folder and lets you stop or
+start it (**Windows asks for administrator rights**). **Edit server.json** opens
+`%ProgramData%\StarTruckerMP\server.json` in Notepad without elevation. Both cards are independent,
+but only one server can own port 7777, so while the service runs the **LOCAL SERVER** card refuses to
+start and asks you to stop the dedicated server first.
 
 The launcher also keeps that package current: on start it compares the tag stored in
 `package-tag.txt` with the newest release and replaces the server files, leaving `server.json`, the

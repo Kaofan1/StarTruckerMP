@@ -293,12 +293,45 @@ internal sealed class MainWindow : Window
         Strings.OpenConfig,
         ActionVariant.Ghost);
 
-    /// <summary>Opens server.json, which the installed server keeps in ProgramData.</summary>
+    /// <summary>Opens server.json of the launcher's own copy.</summary>
     private readonly Button _serverConfigButton = LauncherTheme.MakeButton(
         Strings.EditServerConfig,
         ActionVariant.Ghost,
         stretch: false,
         fontSize: 12);
+
+    private readonly TextBlock _dedicatedStatusText = new()
+    {
+        TextWrapping = TextWrapping.Wrap,
+        FontSize = 12.5,
+        Foreground = LauncherTheme.MutedBrush
+    };
+
+    /// <summary>The Program Files installation this card drives, separate from the local copy.</summary>
+    private readonly TextBlock _dedicatedPathText = new()
+    {
+        TextWrapping = TextWrapping.Wrap,
+        FontSize = 11.5,
+        Foreground = LauncherTheme.MutedBrush
+    };
+
+    private readonly Button _dedicatedToggleButton = LauncherTheme.MakeButton(
+        Strings.StartDedicatedServer,
+        ActionVariant.Secondary);
+
+    private readonly Button _dedicatedConfigButton = LauncherTheme.MakeButton(
+        Strings.EditServerConfig,
+        ActionVariant.Ghost,
+        stretch: false,
+        fontSize: 12);
+
+    private readonly Button _dedicatedPageButton = LauncherTheme.MakeButton(
+        DedicatedServer.StatusPageUrl,
+        ActionVariant.Secondary,
+        stretch: false,
+        fontSize: 12);
+
+    private DedicatedServerStatus? _dedicatedServer;
 
     private readonly Button _playButton = LauncherTheme.MakeButton(
         Strings.Play,
@@ -427,7 +460,11 @@ internal sealed class MainWindow : Window
         // The release list is polled while the window is open, so a new build shows up
         // without closing and reopening the launcher.
         _updateTimer.Tick += (_, _) => _ = CheckForUpdatesAsync(logUpToDate: false);
-        _serverTimer.Tick += (_, _) => RefreshLocalServerState();
+        _serverTimer.Tick += (_, _) =>
+        {
+            RefreshLocalServerState();
+            RefreshDedicatedServerState();
+        };
 
         Opened += (_, _) =>
         {
@@ -438,6 +475,7 @@ internal sealed class MainWindow : Window
             _ = UpdateLocalServerAsync();
             _updateTimer.Start();
             RefreshLocalServerState();
+            RefreshDedicatedServerState();
             _serverTimer.Start();
         };
         Closing += (_, _) =>
@@ -589,6 +627,7 @@ internal sealed class MainWindow : Window
                 BuildServerCard(),
                 BuildDirectoryCard(),
                 BuildLocalServerCard(),
+                BuildDedicatedServerCard(),
                 BuildLaunchCard()
             }
         };
@@ -980,6 +1019,23 @@ internal sealed class MainWindow : Window
             LauncherTheme.Caption(Strings.LocalServerCaption));
     }
 
+    /// <summary>
+    /// The server from StarTruckerMP-Server-Setup.exe lives in Program Files and runs as a
+    /// Windows service, so it gets its own card instead of sharing the local server card.
+    /// </summary>
+    private Control BuildDedicatedServerCard()
+    {
+        return LauncherTheme.Card(
+            Strings.CardDedicatedServer,
+            Strings.DedicatedServerNote,
+            _dedicatedStatusText,
+            _dedicatedPathText,
+            _dedicatedPageButton,
+            _dedicatedToggleButton,
+            _dedicatedConfigButton,
+            LauncherTheme.Caption(Strings.DedicatedServerCaption));
+    }
+
     private Control BuildLaunchCard()
     {
         var microphoneRow = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto") };
@@ -1186,6 +1242,9 @@ internal sealed class MainWindow : Window
         _applyServerButton.Click += (_, _) => ApplyServerEdits();
         _serverToggleButton.Click += async (_, _) => await ToggleLocalServerAsync();
         _serverConfigButton.Click += (_, _) => OpenServerConfig();
+        _dedicatedToggleButton.Click += async (_, _) => await ToggleDedicatedServerAsync();
+        _dedicatedConfigButton.Click += (_, _) => OpenDedicatedConfig();
+        _dedicatedPageButton.Click += (_, _) => OpenServerPage();
         _serverCombo.SelectionChanged += (_, _) => LoadSelectedServerIntoEditor();
     }
 
@@ -1694,16 +1753,12 @@ internal sealed class MainWindow : Window
         var status = LocalServer.Detect();
         _localServer = status;
         _serverPageButton.IsVisible = status.State == LocalServerState.Running;
-        _localServerPathText.Text = status.IsService
-            ? Strings.LocalServerServicePath(status.ExecutablePath ?? LocalServer.InstalledExecutable)
-            : Strings.LocalServerFolderPath(LocalServer.InstallDirectory);
+        _localServerPathText.Text = Strings.LocalServerFolderPath(LocalServer.InstallDirectory);
 
         switch (status.State)
         {
             case LocalServerState.Running:
-                _localServerStatusText.Text = status.IsService
-                    ? Strings.LocalServerRunningAsService(status.ProcessId)
-                    : Strings.LocalServerRunning(status.ProcessId);
+                _localServerStatusText.Text = Strings.LocalServerRunning(status.ProcessId);
                 _localServerStatusText.Foreground = LauncherTheme.TealBrush;
                 SetButtonText(_serverToggleButton, Strings.StopLocalServer);
                 break;
@@ -1719,6 +1774,91 @@ internal sealed class MainWindow : Window
                 _localServerStatusText.Foreground = LauncherTheme.MutedBrush;
                 SetButtonText(_serverToggleButton, Strings.StartLocalServer);
                 break;
+        }
+    }
+
+    /// <summary>
+    /// Reads the Program Files installation. It is a different server from the launcher copy even
+    /// though both listen on 7777, so this card reports only the service and its own paths.
+    /// </summary>
+    private void RefreshDedicatedServerState()
+    {
+        if (_busy)
+            return;
+
+        var status = DedicatedServer.Detect();
+        _dedicatedServer = status;
+        _dedicatedPageButton.IsVisible = status.State == DedicatedServerState.Running;
+        _dedicatedToggleButton.IsVisible = status.State != DedicatedServerState.Missing;
+        _dedicatedConfigButton.IsVisible = status.State != DedicatedServerState.Missing;
+        _dedicatedPathText.Text = Strings.DedicatedServerInstallFolder(DedicatedServer.InstallDirectory);
+
+        switch (status.State)
+        {
+            case DedicatedServerState.Running:
+                _dedicatedStatusText.Text = Strings.DedicatedServerRunning(status.ProcessId);
+                _dedicatedStatusText.Foreground = LauncherTheme.TealBrush;
+                SetButtonText(_dedicatedToggleButton, Strings.StopDedicatedServer);
+                break;
+
+            case DedicatedServerState.Stopped:
+                _dedicatedStatusText.Text = Strings.DedicatedServerStopped;
+                _dedicatedStatusText.Foreground = LauncherTheme.AmberBrush;
+                SetButtonText(_dedicatedToggleButton, Strings.StartDedicatedServer);
+                break;
+
+            default:
+                _dedicatedStatusText.Text = Strings.DedicatedServerMissing;
+                _dedicatedStatusText.Foreground = LauncherTheme.MutedBrush;
+                SetButtonText(_dedicatedToggleButton, Strings.StartDedicatedServer);
+                break;
+        }
+    }
+
+    private async System.Threading.Tasks.Task ToggleDedicatedServerAsync()
+    {
+        if (_busy)
+            return;
+
+        var status = _dedicatedServer ?? DedicatedServer.Detect();
+        if (status.State == DedicatedServerState.Missing)
+            return;
+
+        var running = status.State == DedicatedServerState.Running;
+        SetBusy(true, running ? Strings.StopDedicatedServer : Strings.StartDedicatedServer);
+
+        try
+        {
+            // sc start and stop may sit behind a UAC prompt, so the UI thread stays free.
+            var done = await System.Threading.Tasks.Task.Run(() => running ? DedicatedServer.Stop() : DedicatedServer.Start());
+
+            if (done)
+                _log.Log(running ? Strings.DedicatedServerStoppedLog : Strings.DedicatedServerStartedLog);
+            else
+                _log.Log(Strings.DedicatedServerNeedsAdmin);
+        }
+        catch (Exception exception)
+        {
+            _log.Log(Strings.DedicatedServerFailed(exception.Message));
+        }
+        finally
+        {
+            SetBusy(false, string.Empty);
+            RefreshDedicatedServerState();
+            RefreshLocalServerState();
+        }
+    }
+
+    private void OpenDedicatedConfig()
+    {
+        try
+        {
+            if (!DedicatedServer.OpenConfig())
+                _log.Log(Strings.DedicatedServerConfigMissing);
+        }
+        catch (Exception exception)
+        {
+            _log.Log(Strings.DedicatedServerConfigFailed(exception.Message));
         }
     }
 
@@ -1777,10 +1917,10 @@ internal sealed class MainWindow : Window
 
             try
             {
-                if (LocalServer.Stop(status))
+                if (LocalServer.Stop())
                     _log.Log(Strings.LocalServerStoppedLog);
                 else
-                    _log.Log(status.IsService ? Strings.LocalServerServiceNeedsAdmin : Strings.LocalServerStopFailed);
+                    _log.Log(Strings.LocalServerStopFailed);
             }
             catch (Exception exception)
             {
@@ -1795,24 +1935,17 @@ internal sealed class MainWindow : Window
             return;
         }
 
-        SetBusy(true, status.IsService ? Strings.StartLocalServer : Strings.LocalServerLookingUp);
+        // The dedicated service owns port 7777 while it runs, so the launcher copy cannot start.
+        if (DedicatedServer.Detect().State == DedicatedServerState.Running)
+        {
+            _log.Log(Strings.LocalServerPortTakenByDedicated);
+            return;
+        }
+
+        SetBusy(true, Strings.LocalServerLookingUp);
 
         try
         {
-            // The installed server is a Windows service, so starting it is sc's job and Windows
-            // asks for elevation when the launcher is not elevated.
-            if (status.IsService)
-            {
-                if (LocalServer.StartService())
-                    _log.Log(Strings.LocalServerServiceStarted);
-                else
-                    _log.Log(Strings.LocalServerServiceNeedsAdmin);
-
-                SetBusy(false, string.Empty);
-                RefreshLocalServerState();
-                return;
-            }
-
             var started = await LocalServer.StartAsync(new Progress<string>(_log.Log), System.Threading.CancellationToken.None);
             _log.Log(Strings.LocalServerStarted(started.ExecutablePath ?? string.Empty));
             SetBusy(false, Strings.LocalServerRunning(started.ProcessId));
