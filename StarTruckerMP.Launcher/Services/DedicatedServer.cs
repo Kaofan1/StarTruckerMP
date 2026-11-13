@@ -20,6 +20,14 @@ internal sealed record DedicatedServerStatus(
     int ProcessId,
     string? ConfigPath);
 
+/// <summary>Outcome of one start or stop, so the card can report the real reason.</summary>
+internal enum ServiceActionResult
+{
+    Success,
+    NeedsElevation,
+    Timeout
+}
+
 /// <summary>
 /// The server from StarTruckerMP-Server-Setup.exe: Program Files plus the StarTruckerMPServer
 /// Windows service with settings in ProgramData. It is a separate installation from the
@@ -73,21 +81,11 @@ internal static class DedicatedServer
     /// Starts the service. Windows answers access denied to a normal user, so the command is
     /// repeated with the UAC prompt instead of sending the operator to services.msc.
     /// </summary>
-    public static bool Start()
-    {
-        if (!RunServiceCommand($"start {ServiceName}", alreadyInState: 1056))
-            return false;
+    public static ServiceActionResult Start() =>
+        RunServiceCommand($"start {ServiceName}", alreadyInState: 1056, target: WindowsServiceState.Running);
 
-        return WaitForService(WindowsServiceState.Running);
-    }
-
-    public static bool Stop()
-    {
-        if (!RunServiceCommand($"stop {ServiceName}", alreadyInState: 1062))
-            return false;
-
-        return WaitForService(WindowsServiceState.Stopped);
-    }
+    public static ServiceActionResult Stop() =>
+        RunServiceCommand($"stop {ServiceName}", alreadyInState: 1062, target: WindowsServiceState.Stopped);
 
     /// <summary>Opens the ProgramData settings in Notepad; false when Setup never wrote them.</summary>
     public static bool OpenConfig()
@@ -160,25 +158,45 @@ internal static class DedicatedServer
         if (exitCode != 0)
             return WindowsServiceState.NotInstalled;
 
-        if (output.Contains("RUNNING", StringComparison.OrdinalIgnoreCase))
+        // sc answers STOP_PENDING or START_PENDING during a transition. Treating those as
+        // "not installed" hid the buttons and showed a wrong state in the card.
+        if (output.Contains("STOPPED", StringComparison.OrdinalIgnoreCase))
+            return WindowsServiceState.Stopped;
+
+        if (output.Contains("RUNNING", StringComparison.OrdinalIgnoreCase) ||
+            output.Contains("PENDING", StringComparison.OrdinalIgnoreCase) ||
+            output.Contains("PAUSED", StringComparison.OrdinalIgnoreCase))
             return WindowsServiceState.Running;
 
-        return output.Contains("STOPPED", StringComparison.OrdinalIgnoreCase)
-            ? WindowsServiceState.Stopped
-            : WindowsServiceState.NotInstalled;
+        return WindowsServiceState.NotInstalled;
     }
 
-    private static bool RunServiceCommand(string arguments, int alreadyInState)
+    private static ServiceActionResult RunServiceCommand(
+        string arguments,
+        int alreadyInState,
+        WindowsServiceState target)
     {
         var (exitCode, _) = RunServiceControl(arguments);
 
         if (exitCode == 5)
-            return RunServiceControlElevated(arguments);
+        {
+            var elevated = RunServiceControlElevated(arguments);
+            if (!elevated.Ran)
+                return ServiceActionResult.NeedsElevation;
 
-        return exitCode == 0 || exitCode == alreadyInState;
+            exitCode = elevated.ExitCode;
+        }
+
+        if (exitCode == 5)
+            return ServiceActionResult.NeedsElevation;
+
+        if (exitCode != 0 && exitCode != alreadyInState)
+            return ServiceActionResult.Timeout;
+
+        return WaitForService(target) ? ServiceActionResult.Success : ServiceActionResult.Timeout;
     }
 
-    private static bool RunServiceControlElevated(string arguments)
+    private static (bool Ran, int ExitCode) RunServiceControlElevated(string arguments)
     {
         try
         {
@@ -191,27 +209,28 @@ internal static class DedicatedServer
             });
 
             if (process is null)
-                return false;
+                return (false, 5);
 
             if (!process.WaitForExit(30000))
-                return false;
+                return (true, -1);
 
-            return process.ExitCode == 0;
+            return (true, process.ExitCode);
         }
         catch (System.ComponentModel.Win32Exception)
         {
-            // The elevation prompt was declined, which is a normal answer.
-            return false;
+            // The elevation prompt was declined or cancelled, which is a normal answer.
+            return (false, 5);
         }
         catch
         {
-            return false;
+            return (false, 5);
         }
     }
 
     private static bool WaitForService(WindowsServiceState expected)
     {
-        for (var attempt = 0; attempt < 20; attempt++)
+        // The server shuts down gracefully, which can take a few seconds, so give it 15 seconds.
+        for (var attempt = 0; attempt < 60; attempt++)
         {
             Thread.Sleep(250);
             if (QueryServiceState() == expected)

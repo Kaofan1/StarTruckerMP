@@ -1830,12 +1830,22 @@ internal sealed class MainWindow : Window
         try
         {
             // sc start and stop may sit behind a UAC prompt, so the UI thread stays free.
-            var done = await System.Threading.Tasks.Task.Run(() => running ? DedicatedServer.Stop() : DedicatedServer.Start());
+            var result = await System.Threading.Tasks.Task.Run(() => running ? DedicatedServer.Stop() : DedicatedServer.Start());
 
-            if (done)
-                _log.Log(running ? Strings.DedicatedServerStoppedLog : Strings.DedicatedServerStartedLog);
-            else
-                _log.Log(Strings.DedicatedServerNeedsAdmin);
+            switch (result)
+            {
+                case ServiceActionResult.Success:
+                    _log.Log(running ? Strings.DedicatedServerStoppedLog : Strings.DedicatedServerStartedLog);
+                    break;
+
+                case ServiceActionResult.NeedsElevation:
+                    _log.Log(Strings.DedicatedServerNeedsAdmin);
+                    break;
+
+                default:
+                    _log.Log(Strings.DedicatedServerTimeout);
+                    break;
+            }
         }
         catch (Exception exception)
         {

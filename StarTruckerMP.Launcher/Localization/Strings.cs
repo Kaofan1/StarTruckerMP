@@ -466,6 +466,10 @@ internal static class Strings
         T("The Windows service needs administrator rights. Accept the UAC prompt or use services.msc.",
             "Usługa Windows wymaga uprawnień administratora. Zaakceptuj pytanie UAC albo użyj services.msc.");
 
+    public static string DedicatedServerTimeout =>
+        T("The service did not change state in time. Check services.msc for its current state.",
+            "Usługa nie zmieniła stanu w wyznaczonym czasie. Sprawdź jej stan w services.msc.");
+
     public static string DedicatedServerFailed(string reason) =>
         T($"Could not control the service: {reason}", $"Nie udało się sterować usługą: {reason}");
 
