@@ -123,7 +123,9 @@ jest w [dokumentacji hostingu](../server-hosting/README.pl.md).
 
 Karta **SERWER LOKALNY** uruchamia i zatrzymuje serwer multiplayera na tym komputerze oraz
 pokazuje jego stan (działa z PID-em, zatrzymany, brak plików). Stan odświeża się co 3 sekundy,
-więc widać też serwer uruchomiony poza launcherem.
+więc widać też serwer uruchomiony poza launcherem. Pod stanem karta wypisuje, którym serwerem
+steruje: `Usługa Windows: C:\Program Files\StarTruckerMP Server\...` dla instalacji z Setupu albo
+`Folder serwera: %APPDATA%\StarTruckerMP\server` dla własnej kopii launchera.
 
 Serwer jest szukany w `payload\server` obok launchera (offline), a gdy tego folderu nie ma,
 launcher pobiera `StarTruckerMP-server-win-x64.zip` z GitHub Releases i rozpakowuje go do

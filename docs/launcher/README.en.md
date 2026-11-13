@@ -124,7 +124,9 @@ the [hosting documentation](../server-hosting/README.md).
 
 The **LOCAL SERVER** card starts and stops the multiplayer server on this PC and shows its state
 (running with a PID, stopped, files missing). The state refreshes every 3 seconds, so a server
-started outside the launcher shows up too.
+started outside the launcher shows up too. Below the state the card names what it is driving:
+`Windows service: C:\Program Files\StarTruckerMP Server\...` for a Setup install, or
+`Server folder: %APPDATA%\StarTruckerMP\server` for the launcher's own copy.
 
 The server is looked up in `payload\server` next to the launcher (offline); when that folder is
 missing, the launcher downloads `StarTruckerMP-server-win-x64.zip` from GitHub Releases and

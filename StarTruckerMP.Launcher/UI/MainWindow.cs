@@ -63,6 +63,14 @@ internal sealed class MainWindow : Window
         Foreground = LauncherTheme.MutedBrush
     };
 
+    /// <summary>Shows which copy the card is driving, so the service and the launcher copy never blur.</summary>
+    private readonly TextBlock _localServerPathText = new()
+    {
+        TextWrapping = TextWrapping.Wrap,
+        FontSize = 11.5,
+        Foreground = LauncherTheme.MutedBrush
+    };
+
     private readonly Button _serverToggleButton = LauncherTheme.MakeButton(
         Strings.StartLocalServer,
         ActionVariant.Secondary);
@@ -965,6 +973,7 @@ internal sealed class MainWindow : Window
             Strings.CardLocalServer,
             Strings.LocalServerNote,
             _localServerStatusText,
+            _localServerPathText,
             _serverPageButton,
             _serverToggleButton,
             _serverConfigButton,
@@ -1685,6 +1694,9 @@ internal sealed class MainWindow : Window
         var status = LocalServer.Detect();
         _localServer = status;
         _serverPageButton.IsVisible = status.State == LocalServerState.Running;
+        _localServerPathText.Text = status.IsService
+            ? Strings.LocalServerServicePath(status.ExecutablePath ?? LocalServer.InstalledExecutable)
+            : Strings.LocalServerFolderPath(LocalServer.InstallDirectory);
 
         switch (status.State)
         {

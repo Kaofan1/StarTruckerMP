@@ -435,9 +435,15 @@ internal static class Strings
     public static string LocalServerConfigFailed(string reason) =>
         T($"Could not open server.json: {reason}", $"Nie udało się otworzyć server.json: {reason}");
 
+    public static string LocalServerServicePath(string path) =>
+        T($"Windows service: {path}", $"Usługa Windows: {path}");
+
+    public static string LocalServerFolderPath(string path) =>
+        T($"Server folder: {path}", $"Folder serwera: {path}");
+
     public static string LocalServerCaption =>
-        T(@"server.json and the certificate sit next to the server executable, or in %ProgramData%\StarTruckerMP when the server came from the separate Setup; the log is server-out.log in that folder.",
-            @"server.json i certyfikat leżą obok pliku wykonywalnego serwera, a przy serwerze z osobnego instalatora w %ProgramData%\StarTruckerMP; log to server-out.log w tym folderze.");
+        T(@"Without a Windows service this card uses the launcher's own copy in %APPDATA%\StarTruckerMP\server. When StarTruckerMPServer is installed, the card controls that service and the settings come from %ProgramData%\StarTruckerMP.",
+            @"Bez usługi Windows karta używa kopii launchera w %APPDATA%\StarTruckerMP\server. Gdy jest zainstalowana usługa StarTruckerMPServer, karta steruje nią, a ustawienia czyta z %ProgramData%\StarTruckerMP.");
 
     public static string ModNote => T("BepInEx + client + overlay", "BepInEx + klient + overlay");
 

@@ -96,7 +96,13 @@ internal static class LocalServer
         // A server installed by StarTruckerMP-Server-Setup.exe runs as a service owned by
         // Windows, not by the launcher, so it is reported separately and managed through sc.
         if (running is not null)
-            return new LocalServerStatus(LocalServerState.Running, InstalledExecutable, running.Id, service == WindowsServiceState.Running);
+        {
+            var isService = service == WindowsServiceState.Running;
+            // The path must match the process being reported, otherwise the card mixes the
+            // launcher's copy with the installed service.
+            var executable = isService ? ServiceExecutablePath() ?? InstalledExecutable : InstalledExecutable;
+            return new LocalServerStatus(LocalServerState.Running, executable, running.Id, isService);
+        }
 
         if (service == WindowsServiceState.Running)
             return new LocalServerStatus(LocalServerState.Running, ServiceExecutablePath() ?? InstalledExecutable, 0, true);
