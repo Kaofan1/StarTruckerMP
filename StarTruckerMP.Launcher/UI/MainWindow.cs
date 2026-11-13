@@ -237,13 +237,6 @@ internal sealed class MainWindow : Window
         Strings.DirectorySearchAction,
         ActionVariant.Accent);
 
-    private readonly Button _directoryAddButton = LauncherTheme.MakeButton(
-        "+",
-        ActionVariant.Ghost,
-        stretch: false,
-        fontSize: 14,
-        padding: new Thickness(8, 2));
-
     private readonly TextBlock _directoryStatusText = new()
     {
         TextWrapping = TextWrapping.Wrap,
@@ -252,10 +245,12 @@ internal sealed class MainWindow : Window
     };
 
     private readonly StackPanel _directoryRowsPanel = new() { Spacing = 0 };
+    private readonly ContentControl _directoryHeaderHost = new();
     private readonly List<DirectoryRowState> _directoryRows = new();
     private DirectoryRowState? _selectedDirectory;
     private DirectorySort _directorySort = DirectorySort.Ping;
     private bool _directorySortAscending = true;
+    private bool _directoryPingClicked;
     private int _directoryGeneration;
 
     /// <summary>Which column the browser is sorted by; the arrow in the header shows it.</summary>
@@ -670,29 +665,23 @@ internal sealed class MainWindow : Window
         Grid.SetColumn(_addServerButton, 1);
         Grid.SetColumn(_removeServerButton, 2);
 
-        // Name and host sit side by side, and the port keeps the save button company:
-        // three short rows instead of five keep the card inside the window height.
-        var nameHostRow = new Grid { ColumnDefinitions = new ColumnDefinitions("*,*") };
-        nameHostRow.Children.Add(LauncherTheme.Field(Strings.FieldName, _nameBox));
+        // Host and port belong together, so they share one compact row with the address fields
+        // starting at the left edge instead of stretching across the card.
+        var addressRow = new Grid { ColumnDefinitions = new ColumnDefinitions("300,210,*") };
+        addressRow.Children.Add(LauncherTheme.Field(Strings.FieldHost, _addressBox));
 
-        var hostField = LauncherTheme.Field(Strings.FieldHost, _addressBox);
-        hostField.Margin = new Thickness(12, 0, 0, 0);
-        nameHostRow.Children.Add(hostField);
-        Grid.SetColumn(hostField, 1);
-
-        var portRow = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*") };
-        portRow.Children.Add(LauncherTheme.Field(Strings.FieldPort, _portBox));
-
-        _applyServerButton.Margin = new Thickness(12, 0, 0, 0);
-        portRow.Children.Add(_applyServerButton);
-        Grid.SetColumn(_applyServerButton, 1);
+        var portField = LauncherTheme.Field(Strings.FieldPort, _portBox);
+        portField.Margin = new Thickness(12, 0, 0, 0);
+        addressRow.Children.Add(portField);
+        Grid.SetColumn(portField, 1);
 
         return LauncherTheme.Card(
             Strings.CardServers,
             null,
             toolbar,
-            nameHostRow,
-            portRow,
+            LauncherTheme.Field(Strings.FieldName, _nameBox),
+            addressRow,
+            _applyServerButton,
             LauncherTheme.Caption(Strings.ServerCaption));
     }
 
@@ -712,7 +701,7 @@ internal sealed class MainWindow : Window
         };
 
         // The directory lives on a server, so it is addressed like one: host and port, no URL to type.
-        var addressRow = new Grid { ColumnDefinitions = new ColumnDefinitions("*,110") };
+        var addressRow = new Grid { ColumnDefinitions = new ColumnDefinitions("300,210,*") };
         addressRow.Children.Add(LauncherTheme.Field(Strings.FieldHost, _directoryHostBox));
 
         var portField = LauncherTheme.Field(Strings.FieldPort, _directoryPortBox);
@@ -726,12 +715,14 @@ internal sealed class MainWindow : Window
         searchRow.Children.Add(_directorySearchButton);
         Grid.SetColumn(_directorySearchButton, 1);
 
+        _directoryHeaderHost.Content = BuildDirectoryHeader();
+
         var table = new StackPanel
         {
             Spacing = 0,
             Children =
             {
-                BuildDirectoryHeader(),
+                _directoryHeaderHost,
                 new ScrollViewer
                 {
                     Content = _directoryRowsPanel,
@@ -757,19 +748,13 @@ internal sealed class MainWindow : Window
     {
         var header = new Grid
         {
-            ColumnDefinitions = new ColumnDefinitions("*,118,74,64,32"),
+            ColumnDefinitions = new ColumnDefinitions("*,90,80"),
             Margin = new Thickness(0, 2, 0, 0)
         };
 
         header.Children.Add(DirectoryHeaderCell(Strings.DirectoryColumnServer, DirectorySort.Name, 0));
-        header.Children.Add(DirectoryHeaderCell(Strings.DirectoryColumnMap, null, 1));
-        header.Children.Add(DirectoryHeaderCell(Strings.DirectoryColumnPlayers, DirectorySort.Players, 2));
-        header.Children.Add(DirectoryHeaderCell(Strings.DirectoryColumnPing, DirectorySort.Ping, 3));
-
-        _directoryAddButton.Click += (_, _) => AddSelectedDirectoryServer();
-        ToolTip.SetTip(_directoryAddButton, Strings.DirectoryAddAction);
-        header.Children.Add(_directoryAddButton);
-        Grid.SetColumn(_directoryAddButton, 4);
+        header.Children.Add(DirectoryHeaderCell(Strings.DirectoryColumnPlayers, DirectorySort.Players, 1));
+        header.Children.Add(DirectoryHeaderCell(Strings.DirectoryColumnPing, DirectorySort.Ping, 2));
 
         return new Border
         {
@@ -783,7 +768,7 @@ internal sealed class MainWindow : Window
     private Control DirectoryHeaderCell(string text, DirectorySort? sort, int column)
     {
         var active = sort is not null && _directorySort == sort.Value;
-        var right = column >= 2;
+        var right = column >= 1;
 
         var label = new TextBlock
         {
@@ -801,15 +786,26 @@ internal sealed class MainWindow : Window
             label.Cursor = new Cursor(StandardCursorType.Hand);
             label.PointerPressed += (_, args) =>
             {
-                if (_directorySort == target)
-                    _directorySortAscending = !_directorySortAscending;
-                else
+                // Ping starts already sorted best first, so its first press confirms that order
+                // (arrow up) and the next press flips it to the worst connections (arrow down).
+                if (_directorySort != target)
                 {
                     _directorySort = target;
                     _directorySortAscending = target != DirectorySort.Players;
+                    _directoryPingClicked = target == DirectorySort.Ping;
+                }
+                else if (target == DirectorySort.Ping && !_directoryPingClicked)
+                {
+                    _directoryPingClicked = true;
+                    _directorySortAscending = true;
+                }
+                else
+                {
+                    _directorySortAscending = !_directorySortAscending;
                 }
 
                 args.Handled = true;
+                _directoryHeaderHost.Content = BuildDirectoryHeader();
                 RenderDirectoryRows();
             };
         }
@@ -821,7 +817,6 @@ internal sealed class MainWindow : Window
     private void RenderDirectoryRows()
     {
         _directoryRowsPanel.Children.Clear();
-        _directoryAddButton.IsEnabled = !_busy && _selectedDirectory is not null;
 
         foreach (var row in OrderDirectoryRows())
             _directoryRowsPanel.Children.Add(BuildDirectoryRow(row));
@@ -862,7 +857,6 @@ internal sealed class MainWindow : Window
         };
         ToolTip.SetTip(name, $"{server.Host}:{server.Port}");
 
-        var map = DirectoryCell(server.Map is { Length: > 0 } ? server.Map : "-", TextAlignment.Left);
         var players = DirectoryCell($"{server.Players}/{server.Capacity}", TextAlignment.Right);
 
         var ping = DirectoryCell(row.PingMs < 0 ? "…" : $"{row.PingMs} ms", TextAlignment.Right);
@@ -871,14 +865,12 @@ internal sealed class MainWindow : Window
                 ? LauncherTheme.TealBrush
                 : row.PingMs < 200 ? LauncherTheme.TextBrush : LauncherTheme.AmberBrush;
 
-        var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("*,118,74,64,32") };
+        var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("*,90,80") };
         grid.Children.Add(name);
-        grid.Children.Add(map);
         grid.Children.Add(players);
         grid.Children.Add(ping);
-        Grid.SetColumn(map, 1);
-        Grid.SetColumn(players, 2);
-        Grid.SetColumn(ping, 3);
+        Grid.SetColumn(players, 1);
+        Grid.SetColumn(ping, 2);
 
         var border = new Border
         {
@@ -893,6 +885,12 @@ internal sealed class MainWindow : Window
         {
             _selectedDirectory = row;
             RenderDirectoryRows();
+        };
+
+        border.DoubleTapped += (_, args) =>
+        {
+            args.Handled = true;
+            AddDirectoryServer(server);
         };
 
         return border;
@@ -2488,12 +2486,6 @@ internal sealed class MainWindow : Window
         RenderDirectoryRows();
     }
 
-    private void AddSelectedDirectoryServer()
-    {
-        if (_selectedDirectory is not null)
-            AddDirectoryServer(_selectedDirectory.Server);
-    }
-
     /// <summary>Bookmarks a directory result, so it survives the next search and a restart.</summary>
     private void AddDirectoryServer(DirectoryServer server)
     {
@@ -2666,7 +2658,6 @@ internal sealed class MainWindow : Window
         _directoryHostBox.IsEnabled = !busy;
         _directoryPortBox.IsEnabled = !busy;
         _directorySearchBox.IsEnabled = !busy;
-        _directoryAddButton.IsEnabled = !busy && _selectedDirectory is not null;
         _addPluginButton.IsEnabled = !busy && _install is not null;
         _openPluginsButton.IsEnabled = !busy && _install is not null;
         _refreshPluginsButton.IsEnabled = !busy && _install is not null;

@@ -108,7 +108,7 @@ utrzymuje się na liście heartbeatem; pierwsze wywołanie zwraca id i token, a 
 ```
 POST /directory/announce
 {"name":"EU Freight","host":"203.0.113.10","port":7777,"players":3,"capacity":8,
- "description":"wieczorami, EU","map":"North Iziva County","protocol":"1","version":"1.0.64"}
+ "description":"wieczorami, EU","protocol":"1","version":"1.0.64"}
 
 200 {"id":"...","token":"...","ttlSeconds":180}
 ```
@@ -118,9 +118,8 @@ sesji. Wpis wygasa po trzech minutach bez heartbeatu, pierwsze zgłoszenie z dan
 przyjmowane raz na sekundę, a zły token kończy się kodem 403, więc nie da się przejąć cudzego wpisu.
 
 `GET /directory/servers?q=freight` zwraca publiczną listę (`name`, `host`, `port`, `players`,
-`capacity`, `description`, `map`, `lastSeenSeconds`); to samo pokazuje przeglądarka **SERWERY
-DEDYKOWANE** w launcherze. `map` to nazwa sektora widoczna w kolumnie MAPA, a kolumnę PING launcher
-wypełnia sam, mierząc czas odpowiedzi na `host:port`. Katalog trzyma wpisy w pamięci, więc po restarcie huba serwery zarejestrują się ponownie
+`capacity`, `description`, `lastSeenSeconds`); to samo pokazuje przeglądarka **SERWERY DEDYKOWANE**
+w launcherze. Kolumnę PING launcher wypełnia sam, mierząc czas odpowiedzi na `host:port`. Katalog trzyma wpisy w pamięci, więc po restarcie huba serwery zarejestrują się ponownie
 następnym heartbeatem i dostaną nowe id.
 
 ## Podłączanie graczy

@@ -203,8 +203,6 @@ internal static class Strings
 
     public static string DirectoryColumnServer => T("SERVER", "SERWER");
 
-    public static string DirectoryColumnMap => T("MAP", "MAPA");
-
     public static string DirectoryColumnPlayers => T("PLAYERS", "GRACZE");
 
     public static string DirectoryColumnPing => T("PING", "PING");
@@ -214,11 +212,9 @@ internal static class Strings
 
     public static string DirectorySearchAction => T("Search", "Szukaj");
 
-    public static string DirectoryAddAction => T("Add", "Dodaj");
-
     public static string DirectoryCaption =>
-        T("The list comes from the server that hosts the directory. Pick a server and add it with + to keep it in your server list.",
-            "Lista pochodzi z serwera, który hostuje katalog. Wybierz serwer i dodaj go plusem, żeby zapisać go na liście serwerów.");
+        T("The list comes from the server that hosts the directory. Double click a server to keep it in your server list.",
+            "Lista pochodzi z serwera, który hostuje katalog. Kliknij serwer dwukrotnie, żeby zapisać go na liście serwerów.");
 
     public static string DirectoryNeedsUrl =>
         T("Enter the directory host and port first.", "Najpierw wpisz host i port katalogu.");

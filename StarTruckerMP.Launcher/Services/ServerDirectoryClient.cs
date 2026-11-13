@@ -17,7 +17,6 @@ internal sealed record DirectoryServer(
     int Players,
     int Capacity,
     string? Description,
-    string? Map,
     int LastSeenSeconds);
 
 /// <summary>
@@ -142,7 +141,6 @@ internal static class ServerDirectoryClient
                 ReadInt(item, "players"),
                 ReadInt(item, "capacity"),
                 ReadString(item, "description"),
-                ReadString(item, "map"),
                 ReadInt(item, "lastSeenSeconds")));
         }
 

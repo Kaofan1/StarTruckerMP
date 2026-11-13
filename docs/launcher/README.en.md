@@ -110,9 +110,10 @@ be removed or disabled here (use **Uninstall** in the MOD STATUS card for that).
 
 The **DEDICATED SERVERS** card reads a public server directory. Enter the host and port of the server
 that hosts that directory, type a name or host in the search field and press **Search** or Enter.
-Results are a server browser table: name, map, players and the ping the launcher measured, and
-clicking a column title sorts by it (click again to reverse). Pick a server and add it with + to
-store it in your bookmarks, ready for **PLAY**.
+Results are a server browser table: name, players and the ping the launcher measured, and clicking a
+column title sorts by it (click again to reverse). The first ping click puts the best connections on
+top, the second one the worst. Double click a server to store it in your bookmarks, ready for
+**PLAY**.
 
 The directory host and port are saved in `launcher.json`, so they have to be typed once. The directory may use
 a self-signed certificate, because the launcher only reads public data; when https does not answer it

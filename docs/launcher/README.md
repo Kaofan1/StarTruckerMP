@@ -109,9 +109,10 @@ w karcie STATUS MODA).
 
 Karta **SERWERY DEDYKOWANE** czyta publiczny katalog serwerów. Podaj host i port serwera, który ten
 katalog hostuje, wpisz nazwę lub host w polu szukania i kliknij **Szukaj** albo naciśnij Enter.
-Wyniki są tabelą jak w przeglądarce serwerów: nazwa, mapa, gracze i ping mierzony przez launcher,
-a kliknięcie nagłówka sortuje według tej kolumny (drugie kliknięcie odwraca kolejność). Zaznacz
-serwer i dodaj go plusem, żeby zapisać go w zakładkach i móc kliknąć **GRAJ**.
+Wyniki są tabelą jak w przeglądarce serwerów: nazwa, gracze i ping mierzony przez launcher, a kliknięcie
+nagłówka sortuje według tej kolumny (drugie kliknięcie odwraca kolejność). Ping po pierwszym kliknięciu
+pokazuje najlepsze łącza, po drugim najgorsze. Kliknij serwer dwukrotnie, żeby zapisać go w zakładkach
+i móc kliknąć **GRAJ**.
 
 Host i port katalogu są zapamiętywane w `launcher.json`, więc wystarczy wpisać je raz. Katalog może
 działać na certyfikacie self-signed, bo launcher czyta wyłącznie publiczne dane; gdy https nie
