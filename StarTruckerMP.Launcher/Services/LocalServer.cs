@@ -44,6 +44,46 @@ internal static class LocalServer
 
     public static string InstalledExecutable => Path.Combine(InstallDirectory, ExecutableName);
 
+    /// <summary>
+    /// Where the standalone Setup keeps the live settings. The folder is writable for normal
+    /// users, so the file can be edited without administrator rights.
+    /// </summary>
+    public static string SharedConfigDirectory => Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+        "StarTruckerMP");
+
+    /// <summary>The settings file the server actually reads, or null when none exists yet.</summary>
+    public static string? ConfigPath
+    {
+        get
+        {
+            var shared = Path.Combine(SharedConfigDirectory, "server.json");
+            if (File.Exists(shared))
+                return shared;
+
+            var local = Path.Combine(InstallDirectory, "server.json");
+            return File.Exists(local) ? local : null;
+        }
+    }
+
+    /// <summary>
+    /// Opens the settings in Notepad, because the default handler for .json is often a browser.
+    /// Returns false when the server has not written its settings yet.
+    /// </summary>
+    public static bool OpenConfig()
+    {
+        var path = ConfigPath;
+        if (path is null)
+            return false;
+
+        Process.Start(new ProcessStartInfo("notepad.exe", "\"" + path + "\"")
+        {
+            UseShellExecute = true
+        });
+
+        return true;
+    }
+
     public static string PayloadDirectory => Path.Combine(AppContext.BaseDirectory, "payload", "server");
 
     private static string InstalledTagPath => Path.Combine(InstallDirectory, InstalledTagFileName);

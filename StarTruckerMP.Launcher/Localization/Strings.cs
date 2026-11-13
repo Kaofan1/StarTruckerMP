@@ -425,9 +425,19 @@ internal static class Strings
     public static string LocalServerServiceStarted =>
         T("Windows service StarTruckerMPServer started.", "Uruchomiono usługę Windows StarTruckerMPServer.");
 
+    public static string EditServerConfig =>
+        T("Edit server.json", "Edytuj server.json");
+
+    public static string LocalServerConfigMissing =>
+        T("server.json does not exist yet. Start the server once so it writes its settings.",
+            "server.json jeszcze nie istnieje. Uruchom serwer raz, żeby zapisał ustawienia.");
+
+    public static string LocalServerConfigFailed(string reason) =>
+        T($"Could not open server.json: {reason}", $"Nie udało się otworzyć server.json: {reason}");
+
     public static string LocalServerCaption =>
-        T(@"The server keeps server.json and its certificate in %APPDATA%\StarTruckerMP\server and writes its log to server-out.log in that folder.",
-            @"Serwer trzyma server.json i certyfikat w %APPDATA%\StarTruckerMP\server, a log zapisuje do server-out.log w tym folderze.");
+        T(@"server.json and the certificate sit next to the server executable, or in %ProgramData%\StarTruckerMP when the server came from the separate Setup; the log is server-out.log in that folder.",
+            @"server.json i certyfikat leżą obok pliku wykonywalnego serwera, a przy serwerze z osobnego instalatora w %ProgramData%\StarTruckerMP; log to server-out.log w tym folderze.");
 
     public static string ModNote => T("BepInEx + client + overlay", "BepInEx + klient + overlay");
 

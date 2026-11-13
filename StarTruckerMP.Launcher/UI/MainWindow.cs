@@ -285,6 +285,13 @@ internal sealed class MainWindow : Window
         Strings.OpenConfig,
         ActionVariant.Ghost);
 
+    /// <summary>Opens server.json, which the installed server keeps in ProgramData.</summary>
+    private readonly Button _serverConfigButton = LauncherTheme.MakeButton(
+        Strings.EditServerConfig,
+        ActionVariant.Ghost,
+        stretch: false,
+        fontSize: 12);
+
     private readonly Button _playButton = LauncherTheme.MakeButton(
         Strings.Play,
         ActionVariant.Primary,
@@ -960,6 +967,7 @@ internal sealed class MainWindow : Window
             _localServerStatusText,
             _serverPageButton,
             _serverToggleButton,
+            _serverConfigButton,
             LauncherTheme.Caption(Strings.LocalServerCaption));
     }
 
@@ -1168,6 +1176,7 @@ internal sealed class MainWindow : Window
         _directorySearchButton.Click += async (_, _) => await SearchDirectoryAsync();
         _applyServerButton.Click += (_, _) => ApplyServerEdits();
         _serverToggleButton.Click += async (_, _) => await ToggleLocalServerAsync();
+        _serverConfigButton.Click += (_, _) => OpenServerConfig();
         _serverCombo.SelectionChanged += (_, _) => LoadSelectedServerIntoEditor();
     }
 
@@ -1727,6 +1736,19 @@ internal sealed class MainWindow : Window
         {
             // An update problem must never block the launcher; the start path retries it.
             _log.Log(Strings.LocalServerUpdateFailed(exception.Message));
+        }
+    }
+
+    private void OpenServerConfig()
+    {
+        try
+        {
+            if (!LocalServer.OpenConfig())
+                _log.Log(Strings.LocalServerConfigMissing);
+        }
+        catch (Exception exception)
+        {
+            _log.Log(Strings.LocalServerConfigFailed(exception.Message));
         }
     }
 
