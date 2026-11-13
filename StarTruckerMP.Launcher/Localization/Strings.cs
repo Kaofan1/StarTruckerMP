@@ -490,9 +490,9 @@ internal static class Strings
     public static string DedicatedServerConfigFailed(string reason) =>
         T($"Could not open server.json: {reason}", $"Nie udało się otworzyć server.json: {reason}");
 
-    public static string DedicatedServerCaption =>
-        T(@"Settings: %ProgramData%\StarTruckerMP\server.json. Status page: https://localhost:7777/.",
-            @"Ustawienia: %ProgramData%\StarTruckerMP\server.json. Strona statusu: https://localhost:7777/.");
+    public static string DedicatedServerCaption(string url) =>
+        T($@"Settings: %ProgramData%\StarTruckerMP\server.json. Status page: {url}.",
+            $@"Ustawienia: %ProgramData%\StarTruckerMP\server.json. Strona statusu: {url}.");
 
     public static string ModNote => T("BepInEx + client + overlay", "BepInEx + klient + overlay");
 

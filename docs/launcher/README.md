@@ -145,6 +145,9 @@ Obok jest karta **SERWER DEDYKOWANY**, która dotyczy wyłącznie instalacji z
 Windows `StarTruckerMPServer`. Pokazuje stan usługi, ścieżkę folderu instalacji i pozwala ją
 zatrzymać lub uruchomić (**Windows pokazuje wtedy pytanie o uprawnienia administratora**). Przycisk
 **Edytuj server.json** otwiera `%ProgramData%\StarTruckerMP\server.json` bez podnoszenia uprawnień.
+Adres strony statusu w tej karcie to adres serwera, a nie `localhost`: launcher bierze `IpAddress`
+z `server.json`, potem `DirectoryHost`, a przy `0.0.0.0` pierwszy adres LAN IPv4 tego komputera, np.
+`https://192.168.100.43:7777/`.
 Obie karty są niezależne, ale na porcie 7777 działa tylko jedna z nich, więc przy działającej usłudze
 karta **SERWER LOKALNY** odmówi startu i poprosi o zatrzymanie serwera dedykowanego.
 

@@ -145,7 +145,10 @@ Next to it, the **DEDICATED SERVER** card covers only an install made by
 `StarTruckerMP-Server-Setup.exe`: `C:\Program Files\StarTruckerMP Server` running as the Windows
 service `StarTruckerMPServer`. It shows the service state, the install folder and lets you stop or
 start it (**Windows asks for administrator rights**). **Edit server.json** opens
-`%ProgramData%\StarTruckerMP\server.json` in Notepad without elevation. Both cards are independent,
+`%ProgramData%\StarTruckerMP\server.json` in Notepad without elevation. The status page address in
+this card is the server's address, not `localhost`: the launcher uses `IpAddress` from `server.json`,
+then `DirectoryHost`, and for `0.0.0.0` the first LAN IPv4 of this computer, for example
+`https://192.168.100.43:7777/`. Both cards are independent,
 but only one server can own port 7777, so while the service runs the **LOCAL SERVER** card refuses to
 start and asks you to stop the dedicated server first.
 

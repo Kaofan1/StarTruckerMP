@@ -347,6 +347,9 @@ internal sealed class MainWindow : Window
         stretch: false,
         fontSize: 12);
 
+    /// <summary>Shows the address players use for this server, which is not localhost.</summary>
+    private readonly TextBlock _dedicatedCaptionText = LauncherTheme.Caption(string.Empty);
+
     private DedicatedServerStatus? _dedicatedServer;
 
     private readonly Button _playButton = LauncherTheme.MakeButton(
@@ -1057,7 +1060,7 @@ internal sealed class MainWindow : Window
             _dedicatedPageButton,
             _dedicatedToggleButton,
             _dedicatedConfigButton,
-            LauncherTheme.Caption(Strings.DedicatedServerCaption));
+            _dedicatedCaptionText);
     }
 
     private Control BuildLaunchCard()
@@ -1282,7 +1285,7 @@ internal sealed class MainWindow : Window
         _serverConfigButton.Click += (_, _) => OpenServerConfig();
         _dedicatedToggleButton.Click += async (_, _) => await ToggleDedicatedServerAsync();
         _dedicatedConfigButton.Click += (_, _) => OpenDedicatedConfig();
-        _dedicatedPageButton.Click += (_, _) => OpenServerPage();
+        _dedicatedPageButton.Click += (_, _) => OpenDedicatedServerPage();
         _serverCombo.SelectionChanged += (_, _) => LoadSelectedServerIntoEditor();
     }
 
@@ -1830,6 +1833,8 @@ internal sealed class MainWindow : Window
         _dedicatedToggleButton.IsVisible = status.State != DedicatedServerState.Missing;
         _dedicatedConfigButton.IsVisible = status.State != DedicatedServerState.Missing;
         _dedicatedPathText.Text = Strings.DedicatedServerInstallFolder(DedicatedServer.InstallDirectory);
+        SetButtonText(_dedicatedPageButton, status.StatusPageUrl);
+        _dedicatedCaptionText.Text = Strings.DedicatedServerCaption(status.StatusPageUrl);
 
         switch (status.State)
         {
@@ -2210,6 +2215,23 @@ internal sealed class MainWindow : Window
         try
         {
             System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(LocalServer.StatusPageUrl)
+            {
+                UseShellExecute = true
+            });
+        }
+        catch (Exception exception)
+        {
+            _log.Log(Strings.ReleasePageFailed(exception.Message));
+        }
+    }
+
+    /// <summary>Opens the address players reach the dedicated server at, not localhost.</summary>
+    private void OpenDedicatedServerPage()
+    {
+        try
+        {
+            var url = _dedicatedServer?.StatusPageUrl ?? DedicatedServer.StatusPageUrl;
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(url)
             {
                 UseShellExecute = true
             });

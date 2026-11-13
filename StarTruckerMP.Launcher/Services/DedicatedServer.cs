@@ -2,6 +2,9 @@ using System;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Net;
+using System.Net.Sockets;
+using System.Text.Json;
 using System.Threading;
 using Microsoft.Win32;
 
@@ -18,7 +21,8 @@ internal sealed record DedicatedServerStatus(
     DedicatedServerState State,
     string? ExecutablePath,
     int ProcessId,
-    string? ConfigPath);
+    string? ConfigPath,
+    string StatusPageUrl);
 
 /// <summary>Outcome of one start or stop, so the card can report the real reason.</summary>
 internal enum ServiceActionResult
@@ -37,7 +41,6 @@ internal static class DedicatedServer
 {
     public const string ServiceName = "StarTruckerMPServer";
     public const string ExecutableName = "StarTruckerMP.Server.exe";
-    public const string StatusPageUrl = "https://localhost:7777/";
 
     private const string InstallRegistryKey = @"Software\StarTruckerMP Server";
 
@@ -62,6 +65,20 @@ internal static class DedicatedServer
         "StarTruckerMP",
         "server.json");
 
+    /// <summary>
+    /// Address players reach this server at, not localhost: the configured bind address, then the
+    /// public DirectoryHost, then the LAN IPv4 of this machine. The status page listens on the
+    /// same port as the game.
+    /// </summary>
+    public static string StatusPageUrl
+    {
+        get
+        {
+            var (host, port) = ReadStatusPageTarget();
+            return BuildStatusPageUrl(host, port);
+        }
+    }
+
     public static DedicatedServerStatus Detect()
     {
         var state = QueryServiceState();
@@ -70,10 +87,10 @@ internal static class DedicatedServer
         return state switch
         {
             WindowsServiceState.Running => new DedicatedServerStatus(
-                DedicatedServerState.Running, executable, ServiceProcessId(), ConfigPath),
+                DedicatedServerState.Running, executable, ServiceProcessId(), ConfigPath, StatusPageUrl),
             WindowsServiceState.Stopped => new DedicatedServerStatus(
-                DedicatedServerState.Stopped, executable, 0, ConfigPath),
-            _ => new DedicatedServerStatus(DedicatedServerState.Missing, null, 0, null)
+                DedicatedServerState.Stopped, executable, 0, ConfigPath, StatusPageUrl),
+            _ => new DedicatedServerStatus(DedicatedServerState.Missing, null, 0, null, StatusPageUrl)
         };
     }
 
@@ -100,6 +117,84 @@ internal static class DedicatedServer
         });
 
         return true;
+    }
+
+    private static (string Host, int Port) ReadStatusPageTarget()
+    {
+        var host = string.Empty;
+        var port = 7777;
+
+        try
+        {
+            if (File.Exists(ConfigPath))
+            {
+                using var document = JsonDocument.Parse(File.ReadAllText(ConfigPath));
+                var root = document.RootElement;
+
+                if (root.TryGetProperty("IpAddress", out var ip) && ip.ValueKind == JsonValueKind.String)
+                    host = ip.GetString()?.Trim() ?? string.Empty;
+
+                if (root.TryGetProperty("Port", out var portValue) &&
+                    portValue.TryGetInt32(out var parsedPort) && parsedPort is >= 1 and <= 65535)
+                    port = parsedPort;
+
+                if (string.IsNullOrEmpty(host) || IsAnyAddress(host))
+                {
+                    if (root.TryGetProperty("DirectoryHost", out var directoryHost) &&
+                        directoryHost.ValueKind == JsonValueKind.String)
+                    {
+                        var configured = directoryHost.GetString()?.Trim();
+                        if (!string.IsNullOrEmpty(configured))
+                            host = HostOnly(configured);
+                    }
+                }
+            }
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or JsonException)
+        {
+            // A missing or broken server.json falls back to the LAN address below.
+        }
+
+        if (string.IsNullOrEmpty(host) || IsAnyAddress(host))
+            host = LanAddress() ?? "127.0.0.1";
+
+        return (host, port);
+    }
+
+    private static bool IsAnyAddress(string host) =>
+        host is "0.0.0.0" or "::" or "[::]";
+
+    /// <summary>A DirectoryHost may carry a scheme or a path; the page only needs its host.</summary>
+    private static string HostOnly(string value)
+    {
+        if (!value.Contains("://", StringComparison.Ordinal))
+            return value.TrimEnd('/');
+
+        return Uri.TryCreate(value, UriKind.Absolute, out var parsed) ? parsed.Host : value;
+    }
+
+    private static string? LanAddress()
+    {
+        try
+        {
+            return Dns.GetHostAddresses(Dns.GetHostName())
+                .FirstOrDefault(address =>
+                    address.AddressFamily == AddressFamily.InterNetwork && !IPAddress.IsLoopback(address))
+                ?.ToString();
+        }
+        catch (SocketException)
+        {
+            return null;
+        }
+    }
+
+    private static string BuildStatusPageUrl(string host, int port)
+    {
+        var value = host.Trim();
+        if (value.Contains(':') && !value.StartsWith("[", StringComparison.Ordinal))
+            value = $"[{value}]";
+
+        return $"https://{value}:{port}/";
     }
 
     private static string ReadInstallDirectory()
