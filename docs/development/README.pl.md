@@ -95,6 +95,11 @@ Wydanie zawiera do sześciu plików:
 - `StarTruckerMP-server-linux-x64.zip`
 - `StarTruckerMP-server-docker.zip`
 
+Każde wydanie zawiera paczkę serwera dla Windows, nawet gdy sam serwer się nie zmienił: launcher
+pobiera `StarTruckerMP-server-win-x64.zip` z najnowszego wydania i porównuje tag wydania z plikiem
+`package-tag.txt`, więc brak tego assetu zatrzymałby paczkę serwera na starym tagu. Buduj ją z
+`-p:Version=1.0.<N>`, żeby wersja pliku zgadzała się z tagiem.
+
 Wersja launchera jest stemplowana jako `1.0.<run_number>` i odpowiada tagowi `alpha-v<N>`, z którym
 porównuje się checker aktualizacji.
 

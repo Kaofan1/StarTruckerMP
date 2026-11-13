@@ -95,6 +95,11 @@ A release contains up to six files:
 - `StarTruckerMP-server-linux-x64.zip`
 - `StarTruckerMP-server-docker.zip`
 
+Every release ships the Windows server package, even when the server did not change: the launcher
+downloads `StarTruckerMP-server-win-x64.zip` from the newest release and compares the release tag with
+`package-tag.txt`, so a missing asset would freeze the server package on an old tag. Rebuild it with
+`-p:Version=1.0.<N>` so the file version matches the tag.
+
 The launcher version is stamped as `1.0.<run_number>`, which matches the `alpha-v<N>` release tag the
 update checker compares against.
 
