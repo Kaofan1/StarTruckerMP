@@ -28,6 +28,34 @@ trailers, cargo and sectors. It builds for Windows, Linux and Docker.
 On Linux the server also installs itself as a systemd service when started by systemd
 (`UseSystemd()`); on Windows the same build supports `sc.exe` service hosting (`UseWindowsService()`).
 
+## Installer scripts
+
+The repository ships a one-shot installer for both systems. It downloads the server package from the
+newest release, keeps an existing `server.json` and `certs` folder, writes a configuration with your
+port and a random API admin password, then registers the service and starts it.
+
+Windows, from an elevated PowerShell:
+
+```
+powershell -ExecutionPolicy Bypass -File .\install-server-windows.ps1 -Port 7777
+```
+
+Linux, as root:
+
+```
+sudo ./install-server-linux.sh --port 7777
+```
+
+`-Version` or `--version` pins a release tag, `-InstallDir` or `--dir` changes the folder
+(`C:\Program Files\StarTruckerMP Server`, `/opt/startruckermp`), `-MaxPlayers` or `--max-players` sets
+the limit, and `-AdminPassword` sets the API password on Windows (Linux generates one and writes it to
+`server.json`). The scripts create the `StarTruckerMPServer` service on Windows or
+`startruckermp.service` on Linux. Windows adds the firewall rules; on Linux open TCP and UDP `7777`
+yourself, the script prints the `ufw` and `firewall-cmd` commands.
+
+The server resolves `server.json`, `certs` and `wwwroot` next to its executable, so the service works
+regardless of the working directory it is started from.
+
 ## Docker
 
 1. Download `StarTruckerMP-server-docker.zip` from Releases.

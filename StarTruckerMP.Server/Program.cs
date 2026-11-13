@@ -14,16 +14,25 @@ internal class Program
 {
     public static void Main(string[] args)
     {
-        var builder = WebApplication.CreateBuilder(args);
-        
-        if (!File.Exists("server.json"))
+        // A service starts in an arbitrary working directory, so every file the server owns is
+        // resolved next to the executable: server.json, the certificate and wwwroot.
+        var appDirectory = AppContext.BaseDirectory;
+        var settingsPath = Path.Combine(appDirectory, "server.json");
+
+        var builder = WebApplication.CreateBuilder(new WebApplicationOptions
+        {
+            Args = args,
+            ContentRootPath = appDirectory
+        });
+
+        if (!File.Exists(settingsPath))
         {
             Console.WriteLine("server.json not found, creating a new one with default settings.");
             var defaultSettings = new ServerSettings();
-            File.WriteAllText("server.json", JsonSerializer.Serialize(defaultSettings, App.JsonOptionsWrite));
+            File.WriteAllText(settingsPath, JsonSerializer.Serialize(defaultSettings, App.JsonOptionsWrite));
         }
 
-        builder.Configuration.AddJsonFile("server.json", false, true);
+        builder.Configuration.AddJsonFile(settingsPath, false, true);
 
         builder.Host
             .UseSystemd()
@@ -54,6 +63,9 @@ internal class Program
             {
                 var certPath = builder.Configuration["CertificatePath"] ?? "certs/localhost.pfx";
                 var certPassword = builder.Configuration["CertificatePassword"] ?? "changeit";
+
+                if (!Path.IsPathRooted(certPath))
+                    certPath = Path.Combine(appDirectory, certPath);
 
                 Directory.CreateDirectory(Path.GetDirectoryName(certPath)!);
 
@@ -126,11 +138,11 @@ internal class Program
                     : "Critical");
 
             var serverSettings = JsonSerializer.Deserialize<ServerSettings>(
-                File.ReadAllText("server.json"), App.JsonOptionsRead) ?? new ServerSettings();
+                File.ReadAllText(settingsPath), App.JsonOptionsRead) ?? new ServerSettings();
 
             // rewrite the settings file on every startup to ensure it has all the latest fields,
             // and to fix any formatting issues.
-            File.WriteAllText("server.json", JsonSerializer.Serialize(serverSettings, App.JsonOptionsWrite));
+            File.WriteAllText(settingsPath, JsonSerializer.Serialize(serverSettings, App.JsonOptionsWrite));
             return serverSettings;
         });
 

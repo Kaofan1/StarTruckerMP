@@ -28,6 +28,34 @@ naczepy, ładunek i sektory. Buduje się na Windows, Linux i Docker.
 Na Linuksie ten sam build działa jako usługa systemd (`UseSystemd()`), a na Windows jako usługa
 `sc.exe` (`UseWindowsService()`).
 
+## Skrypty instalacyjne
+
+Repozytorium zawiera instalator dla obu systemów. Pobiera on paczkę serwera z najnowszego wydania,
+zostawia istniejący `server.json` i folder `certs`, zapisuje konfigurację z Twoim portem i losowym
+hasłem administratora API, a potem rejestruje usługę i ją uruchamia.
+
+Windows, w PowerShellu z uprawnieniami administratora:
+
+```
+powershell -ExecutionPolicy Bypass -File .\install-server-windows.ps1 -Port 7777
+```
+
+Linux, jako root:
+
+```
+sudo ./install-server-linux.sh --port 7777
+```
+
+`-Version` lub `--version` wskazuje tag wydania, `-InstallDir` lub `--dir` zmienia folder
+(`C:\Program Files\StarTruckerMP Server`, `/opt/startruckermp`), `-MaxPlayers` lub `--max-players`
+ustawia limit graczy, a `-AdminPassword` hasło API na Windows (Linux generuje je i zapisuje w
+`server.json`). Skrypty tworzą usługę `StarTruckerMPServer` na Windows albo `startruckermp.service`
+na Linuksie. Windows dodaje reguły firewalla; na Linuksie otwórz TCP i UDP `7777` sam, skrypt wypisuje
+gotowe polecenia `ufw` i `firewall-cmd`.
+
+Serwer szuka `server.json`, `certs` i `wwwroot` obok swojego pliku wykonywalnego, więc usługa działa
+niezależnie od katalogu, z którego została uruchomiona.
+
 ## Docker
 
 1. Pobierz `StarTruckerMP-server-docker.zip` z Releases.
