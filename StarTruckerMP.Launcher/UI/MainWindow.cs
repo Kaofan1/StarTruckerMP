@@ -187,6 +187,10 @@ internal sealed class MainWindow : Window
         Strings.OpenPluginsFolder,
         ActionVariant.Secondary);
 
+    private readonly Button _removePluginButton = LauncherTheme.MakeButton(
+        Strings.RemovePluginAction,
+        ActionVariant.Secondary);
+
     private readonly Button _refreshPluginsButton = LauncherTheme.MakeButton(
         Strings.RefreshPlugins,
         ActionVariant.Ghost,
@@ -202,6 +206,9 @@ internal sealed class MainWindow : Window
     };
 
     private readonly StackPanel _pluginList = new() { Spacing = 4 };
+
+    /// <summary>Path of the plugin row the player picked, so Remove knows what to delete.</summary>
+    private string? _selectedPluginPath;
 
     /// <summary>Shown while the local server runs, so its status page is one click away.</summary>
     private readonly Button _serverPageButton = LauncherTheme.MakeButton(
@@ -747,6 +754,7 @@ internal sealed class MainWindow : Window
             _pluginsStatusText,
             list,
             _addPluginButton,
+            _removePluginButton,
             row,
             LauncherTheme.Caption(Strings.PluginsCaption));
     }
@@ -820,6 +828,7 @@ internal sealed class MainWindow : Window
         _repairLoaderButton.Click += async (_, _) => await RepairLoaderAsync();
         _uninstallLoaderButton.Click += async (_, _) => await UninstallLoaderAsync();
         _addPluginButton.Click += async (_, _) => await AddPluginAsync();
+        _removePluginButton.Click += async (_, _) => await RemovePluginAsync();
         _openPluginsButton.Click += (_, _) => OpenPluginsFolder();
         _refreshPluginsButton.Click += (_, _) => RefreshPlugins();
         _serverPageButton.Click += (_, _) => OpenServerPage();
@@ -1813,35 +1822,128 @@ internal sealed class MainWindow : Window
         }
 
         var entries = BepInExPlugins.List(_install.Path);
+        if (_selectedPluginPath is not null && entries.All(entry => entry.Path != _selectedPluginPath))
+            _selectedPluginPath = null;
+
         _pluginsStatusText.Text = entries.Count == 0 ? Strings.PluginsEmpty : Strings.PluginsCount(entries.Count);
         _pluginsStatusText.Foreground = entries.Count == 0 ? LauncherTheme.AmberBrush : LauncherTheme.TealBrush;
 
         foreach (var entry in entries)
-        {
-            var name = new TextBlock
-            {
-                Text = entry.Name,
-                FontSize = 11.5,
-                Foreground = LauncherTheme.TextBrush,
-                TextTrimming = TextTrimming.CharacterEllipsis,
-                VerticalAlignment = VerticalAlignment.Center
-            };
-
-            var tag = LauncherTheme.Caption(
-                entry.IsOwnClient ? Strings.OwnClientTag : entry.IsDirectory ? Strings.PluginFolderTag : Strings.PluginDllTag,
-                10);
-            tag.VerticalAlignment = VerticalAlignment.Center;
-
-            var row = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto") };
-            row.Children.Add(name);
-            row.Children.Add(tag);
-            Grid.SetColumn(tag, 1);
-            _pluginList.Children.Add(row);
-        }
+            _pluginList.Children.Add(BuildPluginRow(entry));
 
         _addPluginButton.IsEnabled = !_busy;
         _openPluginsButton.IsEnabled = !_busy;
         _refreshPluginsButton.IsEnabled = !_busy;
+        _removePluginButton.IsEnabled = !_busy && _selectedPluginPath is not null;
+    }
+
+    /// <summary>One plugin row; clicking it selects the plugin that Remove will delete.</summary>
+    private Control BuildPluginRow(PluginEntry entry)
+    {
+        var selected = string.Equals(_selectedPluginPath, entry.Path, StringComparison.OrdinalIgnoreCase);
+
+        var name = new TextBlock
+        {
+            Text = entry.Name,
+            FontSize = 11.5,
+            Foreground = LauncherTheme.TextBrush,
+            TextTrimming = TextTrimming.CharacterEllipsis,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+
+        var tag = LauncherTheme.Caption(
+            entry.IsOwnClient ? Strings.OwnClientTag : entry.IsDirectory ? Strings.PluginFolderTag : Strings.PluginDllTag,
+            10);
+        tag.VerticalAlignment = VerticalAlignment.Center;
+
+        var content = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto") };
+        content.Children.Add(name);
+        content.Children.Add(tag);
+        Grid.SetColumn(tag, 1);
+
+        var surface = new Border
+        {
+            Background = selected ? LauncherTheme.PanelRaisedBrush : Brushes.Transparent,
+            BorderBrush = selected ? LauncherTheme.AmberBrush : LauncherTheme.EdgeBrush,
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(6),
+            Padding = new Thickness(8, 4),
+            Child = content
+        };
+
+        var path = entry.Path;
+        var rowButton = new Button
+        {
+            Content = surface,
+            Background = Brushes.Transparent,
+            BorderThickness = new Thickness(0),
+            Padding = new Thickness(0),
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            HorizontalContentAlignment = HorizontalAlignment.Stretch,
+            Cursor = LauncherTheme.HandCursor
+        };
+
+        rowButton.Click += (_, _) =>
+        {
+            _selectedPluginPath = path;
+            RefreshPlugins();
+        };
+
+        return rowButton;
+    }
+
+    /// <summary>Deletes the selected plugin after a confirmation dialog.</summary>
+    private async System.Threading.Tasks.Task RemovePluginAsync()
+    {
+        if (_install is null || _busy)
+            return;
+
+        if (string.IsNullOrWhiteSpace(_selectedPluginPath))
+        {
+            _log.Log(Strings.PluginSelectHint);
+            return;
+        }
+
+        if (ModInstaller.IsGameRunning())
+        {
+            _log.Log(Strings.GameRunningBlock);
+            return;
+        }
+
+        var gamePath = _install.Path;
+        var pluginPath = _selectedPluginPath;
+        var pluginName = System.IO.Path.GetFileName(pluginPath);
+
+        if (!await ConfirmDialog.AskAsync(
+                this,
+                Strings.RemovePluginConfirmTitle,
+                Strings.RemovePluginConfirm(pluginName, pluginPath),
+                Strings.RemovePluginAction,
+                Strings.CancelAction))
+        {
+            _log.Log(Strings.UninstallCancelled);
+            return;
+        }
+
+        SetBusy(true, Strings.PluginRemoving(pluginName));
+
+        try
+        {
+            var removed = await System.Threading.Tasks.Task.Run(() => BepInExPlugins.Remove(gamePath, pluginPath));
+            _log.Log(removed ? Strings.PluginRemoved(pluginName) : Strings.PluginAlreadyGone(pluginName));
+
+            if (removed)
+                _selectedPluginPath = null;
+        }
+        catch (Exception exception)
+        {
+            _log.Log(Strings.PluginRemoveFailed(exception.Message));
+        }
+        finally
+        {
+            SetBusy(false, string.Empty);
+            RefreshModState();
+        }
     }
 
     /// <summary>Adds a plugin DLL or a plugin archive from anywhere on disk into BepInEx\plugins.</summary>
@@ -2059,6 +2161,7 @@ internal sealed class MainWindow : Window
         _addPluginButton.IsEnabled = !busy && _install is not null;
         _openPluginsButton.IsEnabled = !busy && _install is not null;
         _refreshPluginsButton.IsEnabled = !busy && _install is not null;
+        _removePluginButton.IsEnabled = !busy && _install is not null && _selectedPluginPath is not null;
     }
 
     private void OnLogLine(string line)

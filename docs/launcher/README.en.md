@@ -100,8 +100,9 @@ The **BEPINEX MODS** card lists what is in `BepInEx\plugins` and lets you add yo
 **Add mod…** accepts a single `.dll` file or a `.zip` archive (for example a mod package with its
 folder) and copies it into `BepInEx\plugins`, overwriting only files with the same name.
 **Open plugins folder** opens that directory in Explorer, and **Refresh** scans it again after manual
-changes. The "our client" entry is the StarTruckerMP plugin, everything else is a mod you added;
-the launcher never deletes or edits those.
+changes. Clicking a row selects the plugin, and **Remove selected** deletes it after a confirmation
+dialog. The "our client" entry is the StarTruckerMP plugin and cannot be removed here (use
+**Uninstall** in the MOD STATUS card for that).
 
 ## Local server
 

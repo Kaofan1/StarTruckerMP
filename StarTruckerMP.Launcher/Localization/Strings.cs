@@ -202,8 +202,38 @@ internal static class Strings
     public static string PluginsNote => T("other mods and plugins", "inne mody i pluginy");
 
     public static string PluginsCaption =>
-        T("Plugins are loaded when the game starts. Original mods are not overwritten.",
-            "Pluginy są wczytywane przy starcie gry. Pliki innych modów nie są nadpisywane same z siebie.");
+        T("Plugins are loaded when the game starts. Click a plugin to select it, then remove it here.",
+            "Pluginy są wczytywane przy starcie gry. Kliknij plugin, aby go zaznaczyć, a potem usuń go tutaj.");
+
+    public static string RemovePluginAction => T("Remove selected", "Usuń zaznaczony");
+
+    public static string RemovePluginConfirmTitle => T("Remove this plugin?", "Usunąć ten plugin?");
+
+    public static string RemovePluginConfirm(string name, string target) =>
+        T($"The launcher deletes {name} from {target}. You can add it again with Add mod… at any time.",
+            $"Launcher usunie {name} z {target}. Możesz go dodać ponownie przez Dodaj moda… w każdej chwili.");
+
+    public static string PluginRemoving(string name) =>
+        T($"Removing {name}…", $"Usuwam {name}…");
+
+    public static string PluginAlreadyGone(string name) =>
+        T($"{name} was already gone.", $"{name} już nie było w folderze.");
+
+    public static string PluginRemoved(string name) =>
+        T($"{name} was removed from BepInEx\\plugins.", $"{name} został usunięty z BepInEx\\plugins.");
+
+    public static string PluginRemoveFailed(string reason) =>
+        T($"Could not remove the plugin: {reason}", $"Nie udało się usunąć pluginu: {reason}");
+
+    public static string PluginRemoveOwnClient =>
+        T("The StarTruckerMP client is managed by the mod card: use Uninstall there.",
+            "Klientem StarTruckerMP zarządza karta STATUS MODA: użyj tam przycisku Odinstaluj.");
+
+    public static string PluginOutsidePlugins(string path) =>
+        T($"That path is outside BepInEx\\plugins: {path}", $"Ta ścieżka jest poza BepInEx\\plugins: {path}");
+
+    public static string PluginSelectHint =>
+        T("Select a plugin above first.", "Najpierw zaznacz plugin na liście.");
 
     public static string AddPluginAction => T("Add mod…", "Dodaj moda…");
 

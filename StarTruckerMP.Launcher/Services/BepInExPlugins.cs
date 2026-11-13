@@ -51,6 +51,36 @@ internal static class BepInExPlugins
         folderName.Equals(LegacyClientFolder, StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
+    /// Deletes one plugin folder or DLL. The path is checked against the plugins folder first, and
+    /// our own client is refused because its own card owns that install.
+    /// </summary>
+    public static bool Remove(string gamePath, string pluginPath)
+    {
+        var directory = Path.GetFullPath(PluginsDirectory(gamePath)) + Path.DirectorySeparatorChar;
+        var target = Path.GetFullPath(pluginPath);
+
+        if (!target.StartsWith(directory, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException(Strings.PluginOutsidePlugins(pluginPath));
+
+        if (IsOwnClient(Path.GetFileName(target)))
+            throw new InvalidOperationException(Strings.PluginRemoveOwnClient);
+
+        if (Directory.Exists(target))
+        {
+            Directory.Delete(target, recursive: true);
+            return true;
+        }
+
+        if (File.Exists(target))
+        {
+            File.Delete(target);
+            return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
     /// Copies a single DLL or extracts a plugin archive into <c>BepInEx\plugins</c>. Existing files
     /// are overwritten, so dropping the same mod twice updates it instead of failing.
     /// </summary>

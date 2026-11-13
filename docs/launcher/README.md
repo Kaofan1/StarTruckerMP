@@ -98,8 +98,9 @@ Karta **MODY BEPINEX** pokazuje, co leży w `BepInEx\plugins`, i pozwala dorzuci
 **Dodaj moda…** przyjmuje pojedynczy plik `.dll` albo archiwum `.zip` (np. paczkę moda z jego
 folderem) i kopiuje je do `BepInEx\plugins`, nadpisując tylko pliki o tych samych nazwach.
 **Otwórz folder pluginów** otwiera ten katalog w Eksploratorze, a **Odśwież** przeczesuje go
-ponownie po ręcznych zmianach. Wpis „nasz klient” to plugin StarTruckerMP, reszta to mody
-dodane przez Ciebie; launcher ich nie usuwa ani nie modyfikuje.
+ponownie po ręcznych zmianach. Kliknięcie wiersza zaznacza plugin, a **Usuń zaznaczony** usuwa go
+po potwierdzeniu w oknie dialogowym. Wpis „nasz klient” to plugin StarTruckerMP i jego nie da się
+tu usunąć (służy do tego **Odinstaluj** w karcie STATUS MODA).
 
 ## Lokalny serwer
 
