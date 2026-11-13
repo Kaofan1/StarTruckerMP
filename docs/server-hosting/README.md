@@ -208,6 +208,7 @@ Manual players edit `[Connection] ServerAddress` and `ServerPort` in that file i
 | Players time out | UDP 7777 blocked | open UDP 7777 in the firewall and the host panel |
 | Launcher shows a certificate error | self-signed certificate | enable **Ignore SSL certificate errors** for that server |
 | `server.json` is recreated with defaults | the file was unreadable JSON | fix the JSON, the server rewrites it on every start |
+| `Access to the path ... server.json is denied` | the server was started by a normal user from `Program Files` | run it from a writable folder or through the service; a read-only install folder is supported, the certificate then goes to `%ProgramData%\StarTruckerMP` |
 | Everyone can join with any Steam account | `SteamWebApiKey` is empty | create a key and restart the server |
 | Port already in use | another instance or service | stop the other process or change `Port` in `server.json` |
 | Docker container restarts in a loop | missing `server.json` permissions or bad port mapping | check `docker logs`, mount a writable volume |

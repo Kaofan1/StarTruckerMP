@@ -1680,7 +1680,9 @@ internal sealed class MainWindow : Window
         switch (status.State)
         {
             case LocalServerState.Running:
-                _localServerStatusText.Text = Strings.LocalServerRunning(status.ProcessId);
+                _localServerStatusText.Text = status.IsService
+                    ? Strings.LocalServerRunningAsService(status.ProcessId)
+                    : Strings.LocalServerRunning(status.ProcessId);
                 _localServerStatusText.Foreground = LauncherTheme.TealBrush;
                 SetButtonText(_serverToggleButton, Strings.StopLocalServer);
                 break;
@@ -1741,10 +1743,10 @@ internal sealed class MainWindow : Window
 
             try
             {
-                if (LocalServer.Stop())
+                if (LocalServer.Stop(status))
                     _log.Log(Strings.LocalServerStoppedLog);
                 else
-                    _log.Log(Strings.LocalServerStopFailed);
+                    _log.Log(status.IsService ? Strings.LocalServerServiceNeedsAdmin : Strings.LocalServerStopFailed);
             }
             catch (Exception exception)
             {
@@ -1759,10 +1761,24 @@ internal sealed class MainWindow : Window
             return;
         }
 
-        SetBusy(true, Strings.LocalServerLookingUp);
+        SetBusy(true, status.IsService ? Strings.StartLocalServer : Strings.LocalServerLookingUp);
 
         try
         {
+            // The installed server is a Windows service, so starting it is sc's job and Windows
+            // asks for elevation when the launcher is not elevated.
+            if (status.IsService)
+            {
+                if (LocalServer.StartService())
+                    _log.Log(Strings.LocalServerServiceStarted);
+                else
+                    _log.Log(Strings.LocalServerServiceNeedsAdmin);
+
+                SetBusy(false, string.Empty);
+                RefreshLocalServerState();
+                return;
+            }
+
             var started = await LocalServer.StartAsync(new Progress<string>(_log.Log), System.Threading.CancellationToken.None);
             _log.Log(Strings.LocalServerStarted(started.ExecutablePath ?? string.Empty));
             SetBusy(false, Strings.LocalServerRunning(started.ProcessId));

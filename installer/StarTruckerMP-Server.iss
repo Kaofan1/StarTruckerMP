@@ -72,7 +72,7 @@ Root: HKLM; Subkey: "Software\StarTruckerMP Server"; ValueType: dword; ValueName
 
 [Icons]
 Name: "{group}\{#MyAppName}"; Filename: "https://localhost:{code:GetPortText}/"; Comment: "Status page of the local server"
-Name: "{group}\Server settings (server.json)"; Filename: "notepad.exe"; Parameters: """{app}\server.json"""
+Name: "{group}\Server settings (server.json)"; Filename: "notepad.exe"; Parameters: """{app}\server.json"""; Comment: "The settings file sits in Program Files, so saving it needs administrator rights"
 Name: "{group}\{cm:UninstallProgram,{#MyAppName}}"; Filename: "{uninstallexe}"
 
 [UninstallRun]

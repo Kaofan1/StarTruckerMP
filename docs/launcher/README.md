@@ -132,6 +132,10 @@ działa na `https://localhost:7777` i pisze log do `server-out.log` oraz `server
 folderze, więc nie otwiera osobnego okna konsoli. Gdy serwer działa, karta pokazuje adres strony
 statusu, a **Zatrzymaj serwer** kończy proces.
 
+Gdy serwer został zainstalowany przez `StarTruckerMP-Server-Setup.exe`, karta pokazuje go jako usługę
+Windows `StarTruckerMPServer`, a nie jako własny proces. **Zatrzymaj serwer** i **Uruchom serwer**
+sterują wtedy usługą i Windows pokazuje pytanie o uprawnienia administratora.
+
 Launcher sam pilnuje też aktualności tej paczki: przy starcie porównuje tag zapisany w
 `package-tag.txt` z najnowszym wydaniem i podmienia pliki serwera, zostawiając `server.json`,
 certyfikat i logi. Gdy serwer działa, aktualizacja czeka do następnego uruchomienia, bo Windows

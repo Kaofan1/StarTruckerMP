@@ -206,6 +206,7 @@ Gracze instalujący ręcznie edytują `[Connection] ServerAddress` i `ServerPort
 | Gracze dostają timeout | zablokowane UDP 7777 | otwórz UDP 7777 w firewallu i panelu hostingu |
 | Launcher pokazuje błąd certyfikatu | self-signed certyfikat | włącz **Ignore SSL certificate errors** dla tego serwera |
 | `server.json` wraca do domyślnych | plik był niepoprawnym JSON-em | popraw JSON, serwer przepisuje go przy starcie |
+| `Access to the path ... server.json is denied` | serwer uruchomiony przez zwykłego użytkownika z `Program Files` | uruchom go z zapisywalnego folderu albo przez usługę; folder tylko do odczytu jest obsługiwany, certyfikat trafia wtedy do `%ProgramData%\StarTruckerMP` |
 | Każdy wchodzi na dowolne konto Steam | puste `SteamWebApiKey` | wygeneruj klucz i zrestartuj serwer |
 | Port zajęty | inna instancja lub usługa | zatrzymaj tamten proces albo zmień `Port` w `server.json` |
 | Kontener Dockera restartuje się w pętli | brak praw do `server.json` lub złe mapowanie portów | sprawdź `docker logs`, zamontuj zapisywalny wolumen |

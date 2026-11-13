@@ -16,7 +16,7 @@ internal enum LocalServerState
     Running
 }
 
-internal sealed record LocalServerStatus(LocalServerState State, string? ExecutablePath, int ProcessId);
+internal sealed record LocalServerStatus(LocalServerState State, string? ExecutablePath, int ProcessId, bool IsService = false);
 
 /// <summary>
 /// Starts the multiplayer server on this PC and keeps the installed copy in step with the
@@ -29,6 +29,9 @@ internal static class LocalServer
 {
     public const string ProcessName = "StarTruckerMP.Server";
     public const string ExecutableName = "StarTruckerMP.Server.exe";
+
+    /// <summary>The service the standalone Windows installer registers.</summary>
+    public const string ServiceName = "StarTruckerMPServer";
 
     /// <summary>Release tag of the installed package, so a newer release can replace it.</summary>
     private const string InstalledTagFileName = "package-tag.txt";
@@ -48,8 +51,18 @@ internal static class LocalServer
     public static LocalServerStatus Detect()
     {
         var running = FindRunning();
+        var service = QueryServiceState();
+
+        // A server installed by StarTruckerMP-Server-Setup.exe runs as a service owned by
+        // Windows, not by the launcher, so it is reported separately and managed through sc.
         if (running is not null)
-            return new LocalServerStatus(LocalServerState.Running, InstalledExecutable, running.Id);
+            return new LocalServerStatus(LocalServerState.Running, InstalledExecutable, running.Id, service == WindowsServiceState.Running);
+
+        if (service == WindowsServiceState.Running)
+            return new LocalServerStatus(LocalServerState.Running, ServiceExecutablePath() ?? InstalledExecutable, 0, true);
+
+        if (service == WindowsServiceState.Stopped)
+            return new LocalServerStatus(LocalServerState.Stopped, ServiceExecutablePath() ?? InstalledExecutable, 0, true);
 
         if (File.Exists(InstalledExecutable))
             return new LocalServerStatus(LocalServerState.Stopped, InstalledExecutable, 0);
@@ -96,8 +109,11 @@ internal static class LocalServer
         return new LocalServerStatus(LocalServerState.Running, executable, server?.Id ?? process.Id);
     }
 
-    public static bool Stop()
+    public static bool Stop(LocalServerStatus status)
     {
+        if (status.IsService)
+            return StopService();
+
         var process = FindRunning();
         if (process is null)
             return false;
@@ -111,6 +127,165 @@ internal static class LocalServer
         catch
         {
             return false;
+        }
+    }
+
+    /// <summary>
+    /// Starts the installed Windows service. Windows refuses with access denied unless the
+    /// launcher is elevated, so the caller reports that instead of a generic failure.
+    /// </summary>
+    public static bool StartService()
+    {
+        if (!RunServiceCommand($"start {ServiceName}", alreadyInState: 1056))
+            return false;
+
+        return WaitForService(WindowsServiceState.Running);
+    }
+
+    private static bool StopService()
+    {
+        if (!RunServiceCommand($"stop {ServiceName}", alreadyInState: 1062))
+            return false;
+
+        return WaitForService(WindowsServiceState.Stopped);
+    }
+
+    /// <summary>
+    /// Sends one sc command. Windows answers access denied for a normal user, so the command is
+    /// repeated with the UAC prompt instead of sending the operator to services.msc by hand.
+    /// </summary>
+    private static bool RunServiceCommand(string arguments, int alreadyInState)
+    {
+        var (exitCode, _) = RunServiceControl(arguments);
+
+        if (exitCode == 5)
+            return RunServiceControlElevated(arguments);
+
+        return exitCode == 0 || exitCode == alreadyInState;
+    }
+
+    private static bool RunServiceControlElevated(string arguments)
+    {
+        try
+        {
+            using var process = Process.Start(new ProcessStartInfo("sc.exe", arguments)
+            {
+                UseShellExecute = true,
+                Verb = "runas",
+                CreateNoWindow = true,
+                WindowStyle = ProcessWindowStyle.Hidden
+            });
+
+            if (process is null)
+                return false;
+
+            if (!process.WaitForExit(30000))
+                return false;
+
+            return process.ExitCode == 0;
+        }
+        catch (System.ComponentModel.Win32Exception)
+        {
+            // The elevation prompt was declined, which is a normal answer.
+            return false;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static bool WaitForService(WindowsServiceState expected)
+    {
+        for (var attempt = 0; attempt < 20; attempt++)
+        {
+            Thread.Sleep(250);
+            if (QueryServiceState() == expected)
+                return true;
+        }
+
+        return QueryServiceState() == expected;
+    }
+
+    private enum WindowsServiceState
+    {
+        NotInstalled,
+        Stopped,
+        Running
+    }
+
+    private static WindowsServiceState QueryServiceState()
+    {
+        if (!OperatingSystem.IsWindows())
+            return WindowsServiceState.NotInstalled;
+
+        var (exitCode, output) = RunServiceControl($"query {ServiceName}");
+        if (exitCode != 0)
+            return WindowsServiceState.NotInstalled;
+
+        if (output.Contains("RUNNING", StringComparison.OrdinalIgnoreCase))
+            return WindowsServiceState.Running;
+
+        return output.Contains("STOPPED", StringComparison.OrdinalIgnoreCase)
+            ? WindowsServiceState.Stopped
+            : WindowsServiceState.NotInstalled;
+    }
+
+    private static (int ExitCode, string Output) RunServiceControl(string arguments)
+    {
+        try
+        {
+            using var process = Process.Start(new ProcessStartInfo("sc.exe", arguments)
+            {
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true
+            });
+
+            if (process is null)
+                return (-1, string.Empty);
+
+            var output = process.StandardOutput.ReadToEnd() + process.StandardError.ReadToEnd();
+            if (!process.WaitForExit(5000))
+            {
+                try
+                {
+                    process.Kill();
+                }
+                catch
+                {
+                    // Nothing to do; the query below already timed out.
+                }
+
+                return (-1, output);
+            }
+
+            return (process.ExitCode, output);
+        }
+        catch
+        {
+            return (-1, string.Empty);
+        }
+    }
+
+    private static string? ServiceExecutablePath()
+    {
+        if (!OperatingSystem.IsWindows())
+            return null;
+
+        try
+        {
+            using var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey($@"SYSTEM\CurrentControlSet\Services\{ServiceName}");
+            if (key?.GetValue("ImagePath") is not string imagePath || string.IsNullOrWhiteSpace(imagePath))
+                return null;
+
+            imagePath = imagePath.Trim();
+            return imagePath.StartsWith('"') ? imagePath.Trim('"') : imagePath;
+        }
+        catch
+        {
+            return null;
         }
     }
 

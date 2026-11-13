@@ -411,6 +411,20 @@ internal static class Strings
     public static string LocalServerStopFailed =>
         T("The server could not be stopped.", "Nie udało się zatrzymać serwera.");
 
+    public static string LocalServerRunningAsService(int processId) =>
+        processId > 0
+            ? T($"Running as the Windows service StarTruckerMPServer (PID {processId}).",
+                $"Działa jako usługa Windows StarTruckerMPServer (PID {processId}).")
+            : T("Running as the Windows service StarTruckerMPServer.",
+                "Działa jako usługa Windows StarTruckerMPServer.");
+
+    public static string LocalServerServiceNeedsAdmin =>
+        T("The server runs as the Windows service StarTruckerMPServer. Start the launcher as administrator to control it, or use services.msc.",
+            "Serwer działa jako usługa Windows StarTruckerMPServer. Uruchom launcher jako administrator, żeby nim sterować, albo użyj services.msc.");
+
+    public static string LocalServerServiceStarted =>
+        T("Windows service StarTruckerMPServer started.", "Uruchomiono usługę Windows StarTruckerMPServer.");
+
     public static string LocalServerCaption =>
         T(@"The server keeps server.json and its certificate in %APPDATA%\StarTruckerMP\server and writes its log to server-out.log in that folder.",
             @"Serwer trzyma server.json i certyfikat w %APPDATA%\StarTruckerMP\server, a log zapisuje do server-out.log w tym folderze.");

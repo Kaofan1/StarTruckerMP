@@ -133,6 +133,10 @@ well; the server itself listens on `https://localhost:7777` and writes its log t
 and `server-err.log` in that folder, so no separate console window opens. While the server runs the
 card shows the status page address, and **Stop server** ends the process.
 
+When the server was installed by `StarTruckerMP-Server-Setup.exe`, the card reports it as the Windows
+service `StarTruckerMPServer` instead of the launcher's own process. **Stop server** and **Start server**
+then control that service, and Windows asks for administrator rights.
+
 The launcher also keeps that package current: on start it compares the tag stored in
 `package-tag.txt` with the newest release and replaces the server files, leaving `server.json`, the
 certificate and the logs alone. While the server runs the update waits for its next start, because

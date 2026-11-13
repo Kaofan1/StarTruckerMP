@@ -17,7 +17,15 @@ internal class Program
         // A service starts in an arbitrary working directory, so every file the server owns is
         // resolved next to the executable: server.json, the certificate and wwwroot.
         var appDirectory = AppContext.BaseDirectory;
-        var settingsPath = Path.Combine(appDirectory, "server.json");
+        var appConfigPath = Path.Combine(appDirectory, "server.json");
+        var appDirectoryWritable = IsDirectoryWritable(appDirectory);
+
+        // Program Files belongs to the administrator. A copy started by hand still reads the
+        // settings installed there, but anything it has to write goes to a folder it may use.
+        var dataDirectory = appDirectoryWritable ? appDirectory : GetSharedDataDirectory();
+        var settingsPath = File.Exists(appConfigPath) || appDirectoryWritable
+            ? appConfigPath
+            : Path.Combine(dataDirectory, "server.json");
 
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions
         {
@@ -27,12 +35,21 @@ internal class Program
 
         if (!File.Exists(settingsPath))
         {
-            Console.WriteLine("server.json not found, creating a new one with default settings.");
-            var defaultSettings = new ServerSettings();
-            File.WriteAllText(settingsPath, JsonSerializer.Serialize(defaultSettings, App.JsonOptionsWrite));
+            try
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(settingsPath)!);
+                var defaultSettings = new ServerSettings();
+                File.WriteAllText(settingsPath, JsonSerializer.Serialize(defaultSettings, App.JsonOptionsWrite));
+                Console.WriteLine($"server.json not found, created {settingsPath} with default settings.");
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            {
+                // A read-only folder must not stop the server; the defaults work for a LAN game.
+                Console.WriteLine($"server.json could not be created in {Path.GetDirectoryName(settingsPath)}: {exception.Message}");
+            }
         }
 
-        builder.Configuration.AddJsonFile(settingsPath, false, true);
+        builder.Configuration.AddJsonFile(settingsPath, optional: true, reloadOnChange: true);
 
         builder.Host
             .UseSystemd()
@@ -65,7 +82,7 @@ internal class Program
                 var certPassword = builder.Configuration["CertificatePassword"] ?? "changeit";
 
                 if (!Path.IsPathRooted(certPath))
-                    certPath = Path.Combine(appDirectory, certPath);
+                    certPath = Path.Combine(dataDirectory, certPath);
 
                 Directory.CreateDirectory(Path.GetDirectoryName(certPath)!);
 
@@ -138,12 +155,25 @@ internal class Program
                     : logger.IsEnabled(LogLevel.Error) ? "Error"
                     : "Critical");
 
-            var serverSettings = JsonSerializer.Deserialize<ServerSettings>(
-                File.ReadAllText(settingsPath), App.JsonOptionsRead) ?? new ServerSettings();
+            var serverSettings = File.Exists(settingsPath)
+                ? JsonSerializer.Deserialize<ServerSettings>(File.ReadAllText(settingsPath), App.JsonOptionsRead) ?? new ServerSettings()
+                : new ServerSettings();
 
-            // rewrite the settings file on every startup to ensure it has all the latest fields,
-            // and to fix any formatting issues.
-            File.WriteAllText(settingsPath, JsonSerializer.Serialize(serverSettings, App.JsonOptionsWrite));
+            // Rewrite the settings file on every startup so it has all the latest fields and clean
+            // formatting. An installed server keeps it in Program Files, which a normal user may
+            // only read, so the rewrite is best effort and the server starts either way.
+            try
+            {
+                File.WriteAllText(settingsPath, JsonSerializer.Serialize(serverSettings, App.JsonOptionsWrite));
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            {
+                logger.LogWarning(
+                    "server.json is read only ({Path}), continuing with the values it holds: {Reason}",
+                    settingsPath,
+                    exception.Message);
+            }
+
             return serverSettings;
         });
 
@@ -249,10 +279,46 @@ internal class Program
         });
 
         var startupLogger = app.Services.GetRequiredService<ILogger<Program>>();
+        startupLogger.LogInformation("Settings: {SettingsPath}, data directory: {DataDirectory}", settingsPath, dataDirectory);
+
         var settings = app.Services.GetRequiredService<ServerSettings>();
         var bindAddress = IPAddress.TryParse(settings.IpAddress, out var bindIp) ? bindIp : IPAddress.Any;
         startupLogger.LogInformation("Kestrel HTTP server starting on https://{Address}:{Port}", bindAddress, settings.Port);
 
         app.Run();
+    }
+
+    /// <summary>
+    /// Checks for write access before choosing where the certificate lives. A probe file is the
+    /// only reliable answer on Windows, where ACLs decide and the folder is not simply read-only.
+    /// </summary>
+    private static bool IsDirectoryWritable(string directory)
+    {
+        try
+        {
+            var probe = Path.Combine(directory, $".write-test-{Guid.NewGuid():N}");
+
+            using (File.Create(probe))
+            {
+            }
+
+            File.Delete(probe);
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    /// <summary>Writable folder for the installed server: ProgramData on Windows, /var/lib elsewhere.</summary>
+    private static string GetSharedDataDirectory()
+    {
+        if (OperatingSystem.IsWindows())
+            return Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+                "StarTruckerMP");
+
+        return "/var/lib/startruckermp";
     }
 }
