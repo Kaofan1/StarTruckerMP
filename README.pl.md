@@ -20,8 +20,6 @@ Błędy zgłaszaj w zakładce [Issues](https://github.com/Kaofan1/StarTruckerMP/
 zapisuje połączenie z serwerem i uruchamia grę przez Steam, dzięki czemu logowanie SteamWorks działa
 normalnie.
 
-![Okno launchera](docs/images/launcher-pl.png)
-
 1. Pobierz `StarTruckerMP-Setup.exe` z [Releases](https://github.com/Kaofan1/StarTruckerMP/releases).
 2. Uruchom go - instaluje się per user, bez uprawnień administratora.
 3. Otwórz **Star Trucker Multiplayer** z menu Start.
