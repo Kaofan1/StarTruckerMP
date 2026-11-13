@@ -1437,6 +1437,17 @@ internal sealed class MainWindow : Window
             return;
         }
 
+        if (!await ConfirmDialog.AskAsync(
+                this,
+                Strings.ModUninstallConfirmTitle,
+                Strings.ModUninstallConfirm(gamePath),
+                Strings.UninstallAction,
+                Strings.CancelAction))
+        {
+            _log.Log(Strings.UninstallCancelled);
+            return;
+        }
+
         SetBusy(true, Strings.ModUninstalling);
 
         try
@@ -1514,6 +1525,17 @@ internal sealed class MainWindow : Window
         if (ModInstaller.IsGameRunning())
         {
             _log.Log(Strings.GameRunningBlock);
+            return;
+        }
+
+        if (!await ConfirmDialog.AskAsync(
+                this,
+                Strings.LoaderUninstallConfirmTitle,
+                Strings.LoaderUninstallConfirm(gamePath),
+                Strings.UninstallAction,
+                Strings.CancelAction))
+        {
+            _log.Log(Strings.UninstallCancelled);
             return;
         }
 

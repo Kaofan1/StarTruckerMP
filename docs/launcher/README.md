@@ -87,7 +87,9 @@ Bez moda przycisk **PLAY** po prostu uruchamia Star Trucker przez Steam.
 
 BepInEx ma też własną kartę w launcherze (**LOADER BEPINEX**): pokazuje, czy w folderze gry jest
 BepInEx 6 IL2CPP, BepInEx 5 (Mono), czy nic, a przyciski **Zainstaluj**, **Napraw loader** i **Odinstaluj**
-działają wyłącznie na loaderze i nie ruszają pluginu moda. Działa to nawet wtedy, gdy paczka klienta nie została jeszcze opublikowana w wydaniu, więc
+działają wyłącznie na loaderze i nie ruszają pluginu moda. **Odinstaluj** w obu kartach najpierw pyta
+o potwierdzenie, więc przypadkowe kliknięcie nie usuwa plików z folderu gry. Działa to nawet wtedy,
+gdy paczka klienta nie została jeszcze opublikowana w wydaniu, więc
 grę można przygotować pod pluginy niezależnie od moda multiplayer.
 
 ## Lokalny serwer

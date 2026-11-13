@@ -89,7 +89,9 @@ The launcher does not require BepInEx and does not touch the game folder until y
 
 BepInEx also has its own card in the launcher (**BEPINEX LOADER**): it shows whether BepInEx 6 IL2CPP,
 BepInEx 5 (Mono) or nothing is in the game folder, and **Install**, **Repair loader** and **Uninstall**
-work on the loader alone without touching the mod plugin. That works even when the client package has not been published in a release yet, so the game
+work on the loader alone without touching the mod plugin. **Uninstall** in both cards asks for
+confirmation first, so an accidental click never deletes files from the game folder. That works even
+when the client package has not been published in a release yet, so the game
 can be prepared for plugins independently from the multiplayer mod.
 
 ## Local server

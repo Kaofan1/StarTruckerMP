@@ -156,6 +156,13 @@ internal static class Strings
     public static string ModUninstallSkipped =>
         T("The mod is not installed.", "Mod nie jest zainstalowany.");
 
+    public static string ModUninstallConfirmTitle =>
+        T("Remove the mod from the game folder?", "Usunąć moda z folderu gry?");
+
+    public static string ModUninstallConfirm(string gamePath) =>
+        T($"The launcher deletes BepInEx\\plugins\\StarTruckerMP from {gamePath}. The game itself and the BepInEx loader stay in place, so you can install the mod again at any time.",
+            $"Launcher usunie folder BepInEx\\plugins\\StarTruckerMP z {gamePath}. Gra i loader BepInEx zostaną na miejscu, więc mod można w każdej chwili zainstalować ponownie.");
+
     public static string LoaderRepairing => T("Repairing the loader…", "Naprawiam loader…");
 
     public static string LoaderRepairCompleted =>
@@ -177,6 +184,18 @@ internal static class Strings
 
     public static string LoaderNotInstalled =>
         T("The BepInEx loader is not installed.", "Loader BepInEx nie jest zainstalowany.");
+
+    public static string LoaderUninstallConfirmTitle =>
+        T("Remove the BepInEx loader?", "Usunąć loader BepInEx?");
+
+    public static string LoaderUninstallConfirm(string gamePath) =>
+        T($"The launcher deletes winhttp.dll, doorstop_config.ini, .doorstop_version and BepInEx\\core from {gamePath}. Plugins in BepInEx\\plugins and the BepInEx\\config files are kept.",
+            $"Launcher usunie winhttp.dll, doorstop_config.ini, .doorstop_version oraz BepInEx\\core z {gamePath}. Pluginy z BepInEx\\plugins i pliki z BepInEx\\config zostaną zachowane.");
+
+    public static string UninstallCancelled =>
+        T("Uninstall cancelled.", "Odinstalowanie anulowane.");
+
+    public static string CancelAction => T("Cancel", "Anuluj");
 
     public static string StartLocalServer => T("Start server", "Uruchom serwer");
 
