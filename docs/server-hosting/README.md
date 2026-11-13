@@ -28,6 +28,26 @@ trailers, cargo and sectors. It builds for Windows, Linux and Docker.
 On Linux the server also installs itself as a systemd service when started by systemd
 (`UseSystemd()`); on Windows the same build supports `sc.exe` service hosting (`UseWindowsService()`).
 
+## Standalone installers
+
+Every release also ships an installer that already contains the server, so a host does not need a
+repository checkout or a working download during Setup.
+
+- **Windows:** `StarTruckerMP-Server-Setup.exe` installs into `Program Files`, writes `server.json` on
+the first install, opens TCP and UDP in Windows Firewall and registers the `StarTruckerMPServer`
+service. Run it as administrator; `StarTruckerMP-Server-Setup.exe /VERYSILENT /PORT=7778` does the
+same silently, and `/MAXPLAYERS=16` changes the limit. An upgrade stops the service, replaces the
+files and starts it again.
+- **Linux:** `StarTruckerMP-Server-linux-x64.run` is a self-extracting installer:
+  `sudo ./StarTruckerMP-Server-linux-x64.run --port 7777`. It takes `--dir`, `--max-players`,
+  `--user`, `--no-start` and `--uninstall`, creates the service user, the systemd unit and
+  `server.json`.
+
+Both keep an existing `server.json` and `certs` folder, so running the installer again is an upgrade,
+and leave them in place when the server is uninstalled, so a reinstall continues with the same
+settings. Add `DirectoryUrl` and `DirectoryHost` to `server.json` afterwards to publish the server in
+the launcher search.
+
 ## Installer scripts
 
 The repository ships a one-shot installer for both systems. It downloads the server package from the

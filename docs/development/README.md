@@ -86,7 +86,7 @@ The `build` job only runs when the repository variable `ENABLE_SELF_HOSTED_BUILD
 with those labels is online. Otherwise it is skipped and the release contains only the launcher and the
 installer.
 
-A release contains up to six files:
+A release contains up to eight files:
 
 - `StarTruckerMP-Setup.exe`
 - `StarTruckerMP-Launcher-win-x64.zip`
@@ -94,6 +94,8 @@ A release contains up to six files:
 - `StarTruckerMP-server-win-x64.zip`
 - `StarTruckerMP-server-linux-x64.zip`
 - `StarTruckerMP-server-docker.zip`
+- `StarTruckerMP-Server-Setup.exe`
+- `StarTruckerMP-Server-linux-x64.run`
 
 Every release ships the Windows server package, even when the server did not change: the launcher
 downloads `StarTruckerMP-server-win-x64.zip` from the newest release and compares the release tag with

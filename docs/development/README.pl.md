@@ -86,7 +86,7 @@ Job `build` uruchamia się tylko wtedy, gdy zmienna repozytorium `ENABLE_SELF_HO
 `true`, a runner z tymi etykietami jest online. Inaczej jest pomijany, a release zawiera wyłącznie
 launcher i instalator.
 
-Wydanie zawiera do sześciu plików:
+Wydanie zawiera do ośmiu plików:
 
 - `StarTruckerMP-Setup.exe`
 - `StarTruckerMP-Launcher-win-x64.zip`
@@ -94,6 +94,8 @@ Wydanie zawiera do sześciu plików:
 - `StarTruckerMP-server-win-x64.zip`
 - `StarTruckerMP-server-linux-x64.zip`
 - `StarTruckerMP-server-docker.zip`
+- `StarTruckerMP-Server-Setup.exe`
+- `StarTruckerMP-Server-linux-x64.run`
 
 Każde wydanie zawiera paczkę serwera dla Windows, nawet gdy sam serwer się nie zmienił: launcher
 pobiera `StarTruckerMP-server-win-x64.zip` z najnowszego wydania i porównuje tag wydania z plikiem

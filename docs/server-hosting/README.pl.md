@@ -28,6 +28,25 @@ naczepy, ładunek i sektory. Buduje się na Windows, Linux i Docker.
 Na Linuksie ten sam build działa jako usługa systemd (`UseSystemd()`), a na Windows jako usługa
 `sc.exe` (`UseWindowsService()`).
 
+## Instalatory samodzielne
+
+Każde wydanie zawiera też instalator z serwerem w środku, więc host nie potrzebuje repozytorium ani
+działającego pobierania w trakcie instalacji.
+
+- **Windows:** `StarTruckerMP-Server-Setup.exe` instaluje do `Program Files`, tworzy `server.json` przy
+pierwszej instalacji, otwiera TCP i UDP w zaporze Windows i rejestruje usługę `StarTruckerMPServer`.
+Uruchom go jako administrator; `StarTruckerMP-Server-Setup.exe /VERYSILENT /PORT=7778` robi to samo
+po cichu, a `/MAXPLAYERS=16` zmienia limit. Aktualizacja zatrzymuje usługę, podmienia pliki i znów
+ją uruchamia.
+- **Linux:** `StarTruckerMP-Server-linux-x64.run` to instalator samorozpakowujący:
+  `sudo ./StarTruckerMP-Server-linux-x64.run --port 7777`. Przyjmuje `--dir`, `--max-players`,
+  `--user`, `--no-start` i `--uninstall`, zakłada użytkownika usługi, unit systemd i `server.json`.
+
+Oba zachowują istniejący `server.json` i folder `certs`, więc ponowne uruchomienie jest aktualizacją,
+a przy odinstalowaniu zostawiają je na miejscu, żeby reinstalacja przejęła te same ustawienia. Po
+instalacji dopisz `DirectoryUrl` i `DirectoryHost` w `server.json`, żeby serwer pojawił się w
+wyszukiwarce launchera.
+
 ## Skrypty instalacyjne
 
 Repozytorium zawiera instalator dla obu systemów. Pobiera on paczkę serwera z najnowszego wydania,
