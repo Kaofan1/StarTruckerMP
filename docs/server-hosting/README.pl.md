@@ -36,7 +36,8 @@ działającego pobierania w trakcie instalacji.
 - **Windows:** `StarTruckerMP-Server-Setup.exe` instaluje do `Program Files`, tworzy `server.json` przy
 pierwszej instalacji, otwiera TCP i UDP w zaporze Windows i rejestruje usługę `StarTruckerMPServer`.
 Uruchom go jako administrator; `StarTruckerMP-Server-Setup.exe /VERYSILENT /PORT=7778` robi to samo
-po cichu, a `/MAXPLAYERS=16` zmienia limit. Aktualizacja zatrzymuje usługę, podmienia pliki i znów
+po cichu, a `/MAXPLAYERS=16` zmienia limit; cicha instalacja rejestruje też usługę i regułę
+firewalla, chyba że `/TASKS=""` je wyłączy. Aktualizacja zatrzymuje usługę, podmienia pliki i znów
 ją uruchamia.
 - **Linux:** `StarTruckerMP-Server-linux-x64.run` to instalator samorozpakowujący:
   `sudo ./StarTruckerMP-Server-linux-x64.run --port 7777`. Przyjmuje `--dir`, `--max-players`,

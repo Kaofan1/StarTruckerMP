@@ -36,7 +36,8 @@ repository checkout or a working download during Setup.
 - **Windows:** `StarTruckerMP-Server-Setup.exe` installs into `Program Files`, writes `server.json` on
 the first install, opens TCP and UDP in Windows Firewall and registers the `StarTruckerMPServer`
 service. Run it as administrator; `StarTruckerMP-Server-Setup.exe /VERYSILENT /PORT=7778` does the
-same silently, and `/MAXPLAYERS=16` changes the limit. An upgrade stops the service, replaces the
+same silently, and `/MAXPLAYERS=16` changes the limit; a silent run registers the service and the
+firewall rule too, unless `/TASKS=""` turns them off. An upgrade stops the service, replaces the
 files and starts it again.
 - **Linux:** `StarTruckerMP-Server-linux-x64.run` is a self-extracting installer:
   `sudo ./StarTruckerMP-Server-linux-x64.run --port 7777`. It takes `--dir`, `--max-players`,

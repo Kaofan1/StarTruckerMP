@@ -61,7 +61,7 @@ Name: "polish"; MessagesFile: "compiler:Languages\Polish.isl"
 
 [Tasks]
 Name: "firewall"; Description: "Open TCP and UDP port {code:GetPortText} in Windows Firewall"; GroupDescription: "Network:"
-Name: "service"; Description: "Register and start the server as a Windows service"; GroupDescription: "Service:"; Flags: checkedonce
+Name: "service"; Description: "Register and start the server as a Windows service"; GroupDescription: "Service:"
 
 [Files]
 Source: "{#SourceDir}\*"; DestDir: "{app}"; Excludes: "*.pdb,server.json"; Flags: ignoreversion recursesubdirs createallsubdirs
@@ -86,6 +86,7 @@ var
   MaxPlayers: Integer;
   GeneratedPassword: String;
   ConfigCreated: Boolean;
+  ServiceWasInstalled: Boolean;
 
 function GetParamValue(const Name, Default: String): String;
 var
@@ -162,14 +163,18 @@ end;
 
 procedure StopAndDeleteService;
 var
-  Attempt: Integer;
+  Attempt, ResultCode: Integer;
 begin
   if ServiceQueryCode('query {#ServiceName}') <> 0 then
     Exit;
 
+  // Stop first so the server shuts down cleanly, then delete. The service object disappears
+  // only after its process exits, and until then the executable stays locked, so the loop below
+  // waits for that instead of sleeping a fixed time.
   ServiceQueryCode('stop {#ServiceName}');
+  ServiceQueryCode('delete {#ServiceName}');
 
-  for Attempt := 1 to 15 do
+  for Attempt := 1 to 30 do
   begin
     if ServiceQueryCode('query {#ServiceName}') <> 0 then
       Exit;
@@ -177,13 +182,18 @@ begin
     Sleep(1000);
   end;
 
-  ServiceQueryCode('delete {#ServiceName}');
-  Sleep(2000);
+  // Something kept the server alive; the files cannot be replaced while it runs.
+  Exec(ExpandConstant('{sys}\cmd.exe'),
+       '/c taskkill /f /im StarTruckerMP.Server.exe',
+       '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  Sleep(3000);
 end;
 
 function PrepareToInstall(var NeedsRestart: Boolean): String;
 begin
   // An upgrade replaces a running executable, so the service has to go before the files are copied.
+  // The service existed before the upgrade, so it is put back even when the task is not selected.
+  ServiceWasInstalled := ServiceQueryCode('query {#ServiceName}') = 0;
   StopAndDeleteService;
   Result := '';
 end;
@@ -280,10 +290,12 @@ begin
   begin
     WriteServerConfig;
 
-    if WizardIsTaskSelected('firewall') then
+    // A silent install cannot tick the boxes, and that is exactly how a host updates the
+    // server, so an unattended run always gets the firewall rule and the service.
+    if WizardIsTaskSelected('firewall') or WizardSilent then
       CreateFirewallRules;
 
-    if WizardIsTaskSelected('service') then
+    if WizardIsTaskSelected('service') or ServiceWasInstalled or WizardSilent then
       CreateAndStartService;
 
     Message := 'StarTruckerMP dedicated server is installed.' + #13#10#13#10 +
@@ -296,13 +308,14 @@ begin
                  'API admin: admin / ' + GeneratedPassword + #13#10 +
                  'Save that password, it is written in server.json and not shown again.';
 
-    MsgBox(Message, mbInformation, MB_OK);
+    if not WizardSilent then
+      MsgBox(Message, mbInformation, MB_OK);
   end;
 end;
 
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
 begin
-  if CurUninstallStep = usPostUninstall then
+  if (CurUninstallStep = usPostUninstall) and not UninstallSilent then
     MsgBox('server.json and the certs folder were kept in the install directory, so a reinstall continues with the same settings.' + #13#10 +
            'Remove that folder yourself when the server is no longer needed.',
            mbInformation, MB_OK);
