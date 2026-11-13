@@ -679,7 +679,7 @@ internal sealed class MainWindow : Window
             Strings.CardModStatus,
             Strings.ModNote,
             _modStatusText,
-            ButtonsRow(_installButton, _repairButton, _uninstallButton));
+            ActionButtons(_installButton, _repairButton, _uninstallButton));
     }
 
     /// <summary>
@@ -692,31 +692,37 @@ internal sealed class MainWindow : Window
             Strings.CardLoader,
             Strings.LoaderNote,
             _loaderStatusText,
-            ButtonsRow(_installLoaderButton, _repairLoaderButton, _uninstallLoaderButton),
+            ActionButtons(_installLoaderButton, _repairLoaderButton, _uninstallLoaderButton),
             LauncherTheme.Caption(Strings.LoaderCaption));
     }
 
-    /// <summary>Equal-width action row, so install, repair and uninstall stay separate buttons.</summary>
-    private static Control ButtonsRow(params Button[] buttons)
+    /// <summary>
+    /// Install and repair share the first row, uninstall sits below repair. Three equal columns
+    /// made the labels too narrow, so the card wraps instead of cutting the text off.
+    /// </summary>
+    private static Control ActionButtons(Button install, Button repair, Button uninstall)
     {
-        var columns = new System.Text.StringBuilder();
-
-        for (var index = 0; index < buttons.Length; index++)
-            columns.Append(index == 0 ? "*" : ",*");
-
-        var row = new Grid { ColumnDefinitions = new ColumnDefinitions(columns.ToString()) };
-
-        for (var index = 0; index < buttons.Length; index++)
+        var grid = new Grid
         {
-            var button = buttons[index];
-            if (index > 0)
-                button.Margin = new Thickness(8, 0, 0, 0);
+            ColumnDefinitions = new ColumnDefinitions("*,*"),
+            RowDefinitions = new RowDefinitions("Auto,Auto"),
+            RowSpacing = 8
+        };
 
-            row.Children.Add(button);
-            Grid.SetColumn(button, index);
-        }
+        install.Margin = new Thickness(0);
+        repair.Margin = new Thickness(8, 0, 0, 0);
+        uninstall.Margin = new Thickness(8, 0, 0, 0);
 
-        return row;
+        grid.Children.Add(install);
+        grid.Children.Add(repair);
+        grid.Children.Add(uninstall);
+
+        Grid.SetColumn(install, 0);
+        Grid.SetColumn(repair, 1);
+        Grid.SetColumn(uninstall, 1);
+        Grid.SetRow(uninstall, 1);
+
+        return grid;
     }
 
     private Control BuildShortcutsCard()

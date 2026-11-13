@@ -234,8 +234,8 @@ internal static class Strings
         T("The server could not be stopped.", "Nie udało się zatrzymać serwera.");
 
     public static string LocalServerCaption =>
-        T(@"The server keeps server.json and its certificate in %APPDATA%\StarTruckerMP\server and shows its log in the console window.",
-            @"Serwer trzyma server.json i certyfikat w %APPDATA%\StarTruckerMP\server, a log pokazuje w oknie konsoli.");
+        T(@"The server keeps server.json and its certificate in %APPDATA%\StarTruckerMP\server and writes its log to server-out.log in that folder.",
+            @"Serwer trzyma server.json i certyfikat w %APPDATA%\StarTruckerMP\server, a log zapisuje do server-out.log w tym folderze.");
 
     public static string ModNote => T("BepInEx + client + overlay", "BepInEx + klient + overlay");
 
