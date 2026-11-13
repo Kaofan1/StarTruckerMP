@@ -20,8 +20,6 @@ Please report bugs and issues in the [Issues](https://github.com/Kaofan1/StarTru
 downloads BepInEx + the client, writes the server connection for you and starts the game through Steam
 so Steam authentication keeps working.
 
-![Star Trucker Multiplayer launcher window](docs/images/launcher.png)
-
 1. Download `StarTruckerMP-Setup.exe` from [Releases](https://github.com/Kaofan1/StarTruckerMP/releases)
 2. Run it - it installs per user, no administrator rights required
 3. Open **Star Trucker Multiplayer** from the Start menu
