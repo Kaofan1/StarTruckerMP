@@ -1565,6 +1565,10 @@ internal sealed class MainWindow : Window
 
             if (logUpToDate)
                 _log.Log(Strings.UpdateFound(update.Name, update.Tag, update.PageUrl));
+
+            // An update should not wait for a click: download it now and let the helper swap the
+            // files when the window closes. The button remains the retry when a download fails.
+            await StageAndRestartAsync(update);
         }
         catch (Exception exception)
         {
@@ -1632,7 +1636,15 @@ internal sealed class MainWindow : Window
         if (_busy)
             return;
 
-        var update = _pendingUpdate;
+        await StageAndRestartAsync(_pendingUpdate);
+    }
+
+    /// <summary>
+    /// Downloads the release and lets a helper replace the launcher files after this window closes,
+    /// so the new build starts on its own. The update check and the banner button both end here.
+    /// </summary>
+    private async System.Threading.Tasks.Task StageAndRestartAsync(LauncherUpdate update)
+    {
         SetBusy(true, Strings.UpdateDownloading(update.Name));
         _updateButton.IsEnabled = false;
 
