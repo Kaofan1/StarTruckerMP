@@ -237,6 +237,7 @@ end;
 procedure MigrateServerConfig;
 var
   Source, Target, SourceCerts, TargetCerts: String;
+  Content: AnsiString;
   ResultCode: Integer;
 begin
   // An installation from an older release keeps server.json next to the executable. Copy it to
@@ -255,6 +256,19 @@ begin
     Exec(ExpandConstant('{sys}\cmd.exe'),
          '/c xcopy /E /I /Q /Y "' + SourceCerts + '" "' + TargetCerts + '"',
          '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+
+  // Once the shared copy exists, the old one goes: two server.json files that drift apart are
+  // worse than none, and the shortcut and the docs point at ProgramData.
+  if FileExists(Source) and FileExists(Target) then
+  begin
+    // A custom absolute CertificatePath can still point into the install folder, so the
+    // certificate folder stays in that case.
+    if not (LoadStringFromFile(Target, Content) and (Pos(ExpandConstant('{app}'), String(Content)) > 0)) then
+      if DirExists(SourceCerts) then
+        DelTree(SourceCerts, True, True, True);
+
+    DeleteFile(Source);
+  end;
 end;
 
 procedure WriteServerConfig;

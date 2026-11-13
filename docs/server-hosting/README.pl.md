@@ -47,7 +47,9 @@ Na Windowsie program zostaje w `Program Files`, a właściwe ustawienia mieszkaj
 `%ProgramData%\StarTruckerMP\server.json`, z certyfikatem w folderze `certs` obok. Ten folder jest
 zapisywalny dla zwykłych użytkowników, więc `server.json` wyedytujesz w Notatniku bez uprawnień
 administratora, a usługa działa jako `NT AUTHORITY\LocalService`. Aktualizacja jednorazowo kopiuje
-starszy `server.json` z folderu instalacji do `%ProgramData%\StarTruckerMP`.
+starszy `server.json` i folder `certs` z folderu instalacji do `%ProgramData%\StarTruckerMP`, a potem
+usuwa je z folderu instalacji, żeby została tylko jedna konfiguracja. Własny, bezwzględny
+`CertificatePath` wskazujący do folderu instalacji zostawia ten certyfikat na miejscu.
 
 Oba zachowują istniejący `server.json` i folder `certs`, więc ponowne uruchomienie jest aktualizacją,
 a przy odinstalowaniu zostawiają je na miejscu, żeby reinstalacja przejęła te same ustawienia. Po

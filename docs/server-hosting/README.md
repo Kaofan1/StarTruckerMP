@@ -47,8 +47,10 @@ files and starts it again.
 On Windows the program stays in `Program Files` and the live settings live in
 `%ProgramData%\StarTruckerMP\server.json`, with the certificate in `certs` next to it. That folder is
 writable for normal users, so the settings can be edited in Notepad without administrator rights, and
-the service runs as `NT AUTHORITY\LocalService`. An upgrade copies an older `server.json` from the
-install folder into `%ProgramData%\StarTruckerMP` once.
+the service runs as `NT AUTHORITY\LocalService`. An upgrade copies an older `server.json` and its
+`certs` folder from the install folder into `%ProgramData%\StarTruckerMP` once and then removes them
+from the install folder, so only one configuration exists. A custom absolute `CertificatePath` that
+points into the install folder keeps that certificate in place.
 
 Both keep an existing `server.json` and `certs` folder, so running the installer again is an upgrade,
 and leave them in place when the server is uninstalled, so a reinstall continues with the same
