@@ -94,6 +94,15 @@ confirmation first, so an accidental click never deletes files from the game fol
 when the client package has not been published in a release yet, so the game
 can be prepared for plugins independently from the multiplayer mod.
 
+## BepInEx mods
+
+The **BEPINEX MODS** card lists what is in `BepInEx\plugins` and lets you add your own mods:
+**Add mod…** accepts a single `.dll` file or a `.zip` archive (for example a mod package with its
+folder) and copies it into `BepInEx\plugins`, overwriting only files with the same name.
+**Open plugins folder** opens that directory in Explorer, and **Refresh** scans it again after manual
+changes. The "our client" entry is the StarTruckerMP plugin, everything else is a mod you added;
+the launcher never deletes or edits those.
+
 ## Local server
 
 The **LOCAL SERVER** card starts and stops the multiplayer server on this PC and shows its state

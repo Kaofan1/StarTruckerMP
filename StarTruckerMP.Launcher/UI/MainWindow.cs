@@ -179,6 +179,30 @@ internal sealed class MainWindow : Window
         Strings.UninstallAction,
         ActionVariant.Ghost);
 
+    private readonly Button _addPluginButton = LauncherTheme.MakeButton(
+        Strings.AddPluginAction,
+        ActionVariant.Accent);
+
+    private readonly Button _openPluginsButton = LauncherTheme.MakeButton(
+        Strings.OpenPluginsFolder,
+        ActionVariant.Secondary);
+
+    private readonly Button _refreshPluginsButton = LauncherTheme.MakeButton(
+        Strings.RefreshPlugins,
+        ActionVariant.Ghost,
+        stretch: false,
+        fontSize: 11.5,
+        padding: new Thickness(12, 8));
+
+    private readonly TextBlock _pluginsStatusText = new()
+    {
+        TextWrapping = TextWrapping.Wrap,
+        FontSize = 12.5,
+        Foreground = LauncherTheme.MutedBrush
+    };
+
+    private readonly StackPanel _pluginList = new() { Spacing = 4 };
+
     /// <summary>Shown while the local server runs, so its status page is one click away.</summary>
     private readonly Button _serverPageButton = LauncherTheme.MakeButton(
         LocalServer.StatusPageUrl,
@@ -502,6 +526,7 @@ internal sealed class MainWindow : Window
                 BuildConnectCard(),
                 BuildModCard(),
                 BuildLoaderCard(),
+                BuildPluginsCard(),
                 BuildShortcutsCard()
             }
         };
@@ -697,6 +722,36 @@ internal sealed class MainWindow : Window
     }
 
     /// <summary>
+    /// Everything that is not our own client: the plugins other mods drop into
+    /// BepInEx\plugins, listed so the player can see what the loader will read.
+    /// </summary>
+    private Control BuildPluginsCard()
+    {
+        var list = new ScrollViewer
+        {
+            Content = _pluginList,
+            MaxHeight = 150,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled
+        };
+
+        var row = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto") };
+        _openPluginsButton.Margin = new Thickness(0, 0, 8, 0);
+        row.Children.Add(_openPluginsButton);
+        row.Children.Add(_refreshPluginsButton);
+        Grid.SetColumn(_refreshPluginsButton, 1);
+
+        return LauncherTheme.Card(
+            Strings.CardPlugins,
+            Strings.PluginsNote,
+            _pluginsStatusText,
+            list,
+            _addPluginButton,
+            row,
+            LauncherTheme.Caption(Strings.PluginsCaption));
+    }
+
+    /// <summary>
     /// Install and repair share the first row, uninstall spans the full width below them. Three
     /// equal columns made the labels too narrow, and a half-width uninstall looked off-centre.
     /// </summary>
@@ -764,6 +819,9 @@ internal sealed class MainWindow : Window
         _installLoaderButton.Click += async (_, _) => await InstallLoaderAsync();
         _repairLoaderButton.Click += async (_, _) => await RepairLoaderAsync();
         _uninstallLoaderButton.Click += async (_, _) => await UninstallLoaderAsync();
+        _addPluginButton.Click += async (_, _) => await AddPluginAsync();
+        _openPluginsButton.Click += (_, _) => OpenPluginsFolder();
+        _refreshPluginsButton.Click += (_, _) => RefreshPlugins();
         _serverPageButton.Click += (_, _) => OpenServerPage();
         _updateNowButton.Click += async (_, _) => await UpdateLauncherAsync();
         _releasePageButton.Click += (_, _) => OpenUpdatePage();
@@ -1735,6 +1793,121 @@ internal sealed class MainWindow : Window
         _playButton.IsEnabled = _install is not null && !_busy;
         _openGameFolderButton.IsEnabled = _install is not null;
         _openConfigButton.IsEnabled = _install is not null;
+
+        RefreshPlugins();
+    }
+
+    /// <summary>Rebuilds the plugin list from disk; called after every install and when the path changes.</summary>
+    private void RefreshPlugins()
+    {
+        _pluginList.Children.Clear();
+
+        if (_install is null)
+        {
+            _pluginsStatusText.Text = Strings.ModUnknown;
+            _pluginsStatusText.Foreground = LauncherTheme.MutedBrush;
+            _addPluginButton.IsEnabled = false;
+            _openPluginsButton.IsEnabled = false;
+            _refreshPluginsButton.IsEnabled = false;
+            return;
+        }
+
+        var entries = BepInExPlugins.List(_install.Path);
+        _pluginsStatusText.Text = entries.Count == 0 ? Strings.PluginsEmpty : Strings.PluginsCount(entries.Count);
+        _pluginsStatusText.Foreground = entries.Count == 0 ? LauncherTheme.AmberBrush : LauncherTheme.TealBrush;
+
+        foreach (var entry in entries)
+        {
+            var name = new TextBlock
+            {
+                Text = entry.Name,
+                FontSize = 11.5,
+                Foreground = LauncherTheme.TextBrush,
+                TextTrimming = TextTrimming.CharacterEllipsis,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+
+            var tag = LauncherTheme.Caption(
+                entry.IsOwnClient ? Strings.OwnClientTag : entry.IsDirectory ? Strings.PluginFolderTag : Strings.PluginDllTag,
+                10);
+            tag.VerticalAlignment = VerticalAlignment.Center;
+
+            var row = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto") };
+            row.Children.Add(name);
+            row.Children.Add(tag);
+            Grid.SetColumn(tag, 1);
+            _pluginList.Children.Add(row);
+        }
+
+        _addPluginButton.IsEnabled = !_busy;
+        _openPluginsButton.IsEnabled = !_busy;
+        _refreshPluginsButton.IsEnabled = !_busy;
+    }
+
+    /// <summary>Adds a plugin DLL or a plugin archive from anywhere on disk into BepInEx\plugins.</summary>
+    private async System.Threading.Tasks.Task AddPluginAsync()
+    {
+        if (_install is null || _busy)
+            return;
+
+        var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = Strings.PluginPickerTitle,
+            AllowMultiple = false,
+            FileTypeFilter = new[]
+            {
+                new FilePickerFileType(Strings.PluginPickerType)
+                {
+                    Patterns = new[] { "*.dll", "*.zip" }
+                }
+            }
+        });
+
+        var source = files.FirstOrDefault()?.TryGetLocalPath();
+        if (string.IsNullOrWhiteSpace(source))
+            return;
+
+        if (ModInstaller.IsGameRunning())
+        {
+            _log.Log(Strings.GameRunningBlock);
+            return;
+        }
+
+        var gamePath = _install.Path;
+        var fileName = System.IO.Path.GetFileName(source);
+        SetBusy(true, Strings.PluginInstalling(fileName));
+
+        try
+        {
+            var target = await System.Threading.Tasks.Task.Run(() => BepInExPlugins.Install(gamePath, source));
+            _log.Log(Strings.PluginInstalled(fileName, target));
+        }
+        catch (Exception exception)
+        {
+            _log.Log(Strings.PluginInstallFailed(exception.Message));
+        }
+        finally
+        {
+            SetBusy(false, string.Empty);
+            RefreshModState();
+        }
+    }
+
+    private void OpenPluginsFolder()
+    {
+        if (_install is null)
+            return;
+
+        try
+        {
+            var directory = BepInExPlugins.PluginsDirectory(_install.Path);
+            System.IO.Directory.CreateDirectory(directory);
+            GameLauncher.OpenFolder(directory);
+        }
+        catch (Exception exception)
+        {
+            _log.Log(Strings.CouldNotOpen(BepInExPlugins.PluginsDirectory(_install.Path), exception.Message));
+        }
     }
 
     private void RefreshServerList()
@@ -1883,6 +2056,9 @@ internal sealed class MainWindow : Window
         _browseButton.IsEnabled = !busy;
         _updateButton.IsEnabled = !busy && _pendingUpdate is not null;
         _serverToggleButton.IsEnabled = !busy;
+        _addPluginButton.IsEnabled = !busy && _install is not null;
+        _openPluginsButton.IsEnabled = !busy && _install is not null;
+        _refreshPluginsButton.IsEnabled = !busy && _install is not null;
     }
 
     private void OnLogLine(string line)

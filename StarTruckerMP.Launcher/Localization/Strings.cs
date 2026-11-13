@@ -197,6 +197,56 @@ internal static class Strings
 
     public static string CancelAction => T("Cancel", "Anuluj");
 
+    public static string CardPlugins => T("BEPINEX MODS", "MODY BEPINEX");
+
+    public static string PluginsNote => T("other mods and plugins", "inne mody i pluginy");
+
+    public static string PluginsCaption =>
+        T("Plugins are loaded when the game starts. Original mods are not overwritten.",
+            "Pluginy są wczytywane przy starcie gry. Pliki innych modów nie są nadpisywane same z siebie.");
+
+    public static string AddPluginAction => T("Add mod…", "Dodaj moda…");
+
+    public static string OpenPluginsFolder => T("Open plugins folder", "Otwórz folder pluginów");
+
+    public static string RefreshPlugins => T("Refresh", "Odśwież");
+
+    public static string PluginsEmpty =>
+        T("No plugins in BepInEx\\plugins yet.", "W BepInEx\\plugins nie ma jeszcze żadnych pluginów.");
+
+    public static string PluginsCount(int count) =>
+        count == 1
+            ? T("1 plugin in BepInEx\\plugins", "1 plugin w BepInEx\\plugins")
+            : T($"{count} plugins in BepInEx\\plugins", $"{count} pluginów w BepInEx\\plugins");
+
+    public static string OwnClientTag => T("our client", "nasz klient");
+
+    public static string PluginFolderTag => T("folder", "folder");
+
+    public static string PluginDllTag => T("dll", "dll");
+
+    public static string PluginPickerTitle =>
+        T("Select a plugin to add (.dll or .zip)", "Wybierz plugin do dodania (.dll lub .zip)");
+
+    public static string PluginPickerType => T("BepInEx plugin", "Plugin BepInEx");
+
+    public static string PluginInstalling(string name) =>
+        T($"Copying {name}…", $"Kopiuję {name}…");
+
+    public static string PluginInstalled(string name, string target) =>
+        T($"{name} was added to {target}", $"{name} został dodany do {target}");
+
+    public static string PluginInstallFailed(string reason) =>
+        T($"Could not add the plugin: {reason}", $"Nie udało się dodać pluginu: {reason}");
+
+    public static string PluginArchiveUnsafe(string entry) =>
+        T($"The archive points outside the plugins folder: {entry}",
+            $"Archiwum wskazuje poza folder pluginów: {entry}");
+
+    public static string PluginUnsupported(string name) =>
+        T($"{name} is not a plugin: pick a .dll or a .zip file.",
+            $"{name} nie jest pluginem: wybierz plik .dll albo .zip.");
+
     public static string StartLocalServer => T("Start server", "Uruchom serwer");
 
     public static string StopLocalServer => T("Stop server", "Zatrzymaj serwer");

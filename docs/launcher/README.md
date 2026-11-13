@@ -92,6 +92,15 @@ o potwierdzenie, więc przypadkowe kliknięcie nie usuwa plików z folderu gry. 
 gdy paczka klienta nie została jeszcze opublikowana w wydaniu, więc
 grę można przygotować pod pluginy niezależnie od moda multiplayer.
 
+## Mody BepInEx
+
+Karta **MODY BEPINEX** pokazuje, co leży w `BepInEx\plugins`, i pozwala dorzucić własne mody:
+**Dodaj moda…** przyjmuje pojedynczy plik `.dll` albo archiwum `.zip` (np. paczkę moda z jego
+folderem) i kopiuje je do `BepInEx\plugins`, nadpisując tylko pliki o tych samych nazwach.
+**Otwórz folder pluginów** otwiera ten katalog w Eksploratorze, a **Odśwież** przeczesuje go
+ponownie po ręcznych zmianach. Wpis „nasz klient” to plugin StarTruckerMP, reszta to mody
+dodane przez Ciebie; launcher ich nie usuwa ani nie modyfikuje.
+
 ## Lokalny serwer
 
 Karta **SERWER LOKALNY** uruchamia i zatrzymuje serwer multiplayera na tym komputerze oraz
