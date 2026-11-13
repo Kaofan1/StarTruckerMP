@@ -155,7 +155,15 @@ internal class Program
 
         app.MapControllers();
         
-        app.MapGet("/", () => "OK");
+        // The root shows a small status page instead of a bare string, so the server can be checked
+        // from a browser: version, online players and the sectors they are in.
+        app.MapGet("/", (HttpContext context, PlayerContainer players, ServerSettings settings) =>
+        {
+            context.Response.Headers.CacheControl = "no-store";
+            return Results.Content(
+                StatusPage.Render(settings, players, StatusPage.WantsPolish(context)),
+                "text/html; charset=utf-8");
+        });
 
         var startupLogger = app.Services.GetRequiredService<ILogger<Program>>();
         var settings = app.Services.GetRequiredService<ServerSettings>();
