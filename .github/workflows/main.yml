@@ -76,6 +76,7 @@ jobs:
             --no-self-contained \
             -p:PublishSingleFile=true \
             -p:RunSvelteBuild=false \
+            -p:Version=1.0.${{ github.event.inputs.version || github.run_number }} \
             -o ./artifacts/server-win
 
       - name: Clean Server before linux-x64
@@ -89,6 +90,7 @@ jobs:
             --no-self-contained \
             -p:PublishSingleFile=true \
             -p:RunSvelteBuild=false \
+            -p:Version=1.0.${{ github.event.inputs.version || github.run_number }} \
             -o ./artifacts/server-linux
 
       - name: Clean Server before docker publish

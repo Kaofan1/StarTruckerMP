@@ -85,9 +85,6 @@ build-launcher-winx64.cmd
 
 :: launcher + Windows installer -> artifacts\installer\StarTruckerMP-Setup.exe
 build-installer-winx64.cmd
-
-:: server package + release zip -> artifacts\server-win, StarTruckerMP-server-win-x64.zip
-build-server-winx64.cmd
 ```
 
 > [!NOTE]

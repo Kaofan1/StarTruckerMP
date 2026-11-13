@@ -64,6 +64,9 @@ internal static class Downloader
     }
 }
 
+/// <summary>A release asset together with the tag of the release that carries it.</summary>
+internal sealed record ReleaseAsset(string Tag, string Name, string Url);
+
 internal static class GitHubReleases
 {
     /// <summary>
@@ -71,6 +74,17 @@ internal static class GitHubReleases
     /// whose file name matches <paramref name="assetFilter"/>. Drafts are skipped.
     /// </summary>
     public static async Task<string?> FindAssetUrlAsync(
+        string owner,
+        string repository,
+        Func<string, bool> assetFilter,
+        CancellationToken cancellationToken) =>
+        (await FindLatestAssetAsync(owner, repository, assetFilter, cancellationToken).ConfigureAwait(false))?.Url;
+
+    /// <summary>
+    /// Same walk as <see cref="FindAssetUrlAsync"/>, but also reports the release tag, so a
+    /// caller can tell whether the file it already has is the newest one.
+    /// </summary>
+    public static async Task<ReleaseAsset?> FindLatestAssetAsync(
         string owner,
         string repository,
         Func<string, bool> assetFilter,
@@ -93,6 +107,8 @@ internal static class GitHubReleases
             if (release.TryGetProperty("draft", out var draft) && draft.ValueKind == System.Text.Json.JsonValueKind.True)
                 continue;
 
+            var tag = release.TryGetProperty("tag_name", out var tagElement) ? tagElement.GetString() : null;
+
             if (!release.TryGetProperty("assets", out var assets) || assets.ValueKind != System.Text.Json.JsonValueKind.Array)
                 continue;
 
@@ -104,7 +120,7 @@ internal static class GitHubReleases
 
                 var url = asset.TryGetProperty("browser_download_url", out var urlElement) ? urlElement.GetString() : null;
                 if (!string.IsNullOrWhiteSpace(url))
-                    return url;
+                    return new ReleaseAsset(string.IsNullOrWhiteSpace(tag) ? name : tag, name, url);
             }
         }
 

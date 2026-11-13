@@ -37,29 +37,22 @@ build-launcher-winx64.cmd
 
 :: launcher i instalator
 build-installer-winx64.cmd
-
-:: paczka serwera i ZIP wydania
-build-server-winx64.cmd
 ```
 
-### Paczka serwera
+### Paczka serwera lokalnego
 
-`build-server-winx64.cmd` publikuje self-contained build `win-x64` w jednym pliku do
-`artifacts\server-win` i pakuje go jako `StarTruckerMP-server-win-x64.zip` w katalogu głównym repo. To
-ten sam plik, który launcher pobiera z wydania i rozpakowuje do `%APPDATA%\StarTruckerMP\server`, więc
-karta **SERWER LOKALNY** w launcherze uruchamia dokładnie ten build.
+Asset `StarTruckerMP-server-win-x64.zip` z wydania to plik, który launcher rozpakowuje do
+`%APPDATA%\StarTruckerMP\server`, a publikuje go workflow CI. Niczego nie trzeba budować ręcznie:
+launcher porównuje tag zapisany w tym folderze (`package-tag.txt`) z najnowszym wydaniem i podmienia
+pliki, gdy pojawi się nowsza paczka. `server.json`, certyfikat i logi zostają nietknięte, a działający
+serwer jest pomijany i aktualizowany przy następnym starcie, bo Windows blokuje jego plik exe.
 
-Skrypt korzysta z gotowego `StarTruckerMP.Server\wwwroot`, więc najpierw trzeba zbudować UI overlaya.
-Gdy brakuje `wwwroot\overlay\index.html`, skrypt tylko ostrzega, a serwer wystartuje z pustą trasą
-overlaya. Na komputerze, gdzie `dotnet` nie jest na `PATH`, skrypt bierze SDK z
-`%LOCALAPPDATA%\dotnet-sdk-10`.
-
-ZIP jest tworzony przez `tar.exe` z Windows, bo `Compress-Archive` i `ZipFile` z .NET Framework zapisują
-nazwy wpisów z backslashami. Forward slashe zostawiają archiwum przenośnym i pozwalają launcherowi
-rozpakować je przez `ZipFile.ExtractToDirectory`.
+Do lokalnego sprawdzenia uruchom tę samą publikację co workflow. Korzysta ona z gotowego
+`StarTruckerMP.Server\wwwroot`, więc najpierw zbuduj UI overlaya; bez tego pliku serwer wystartuje z
+pustą trasą overlaya.
 
 ```bash
-# UI overlaya (raz przed build-server-winx64.cmd)
+# UI overlaya (raz przed lokalną publikacją serwera)
 cd StarTruckerMP.Server/overlay-ui
 npm ci
 npm run build

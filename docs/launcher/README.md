@@ -100,6 +100,11 @@ launcher pobiera `StarTruckerMP-server-win-x64.zip` z GitHub Releases i rozpakow
 `%APPDATA%\StarTruckerMP\server`. Tam też trafiają `server.json` i certyfikat; sam serwer
 działa na `https://0.0.0.0:7777` i pokazuje log w oknie konsoli.
 
+Launcher sam pilnuje też aktualności tej paczki: przy starcie porównuje tag zapisany w
+`package-tag.txt` z najnowszym wydaniem i podmienia pliki serwera, zostawiając `server.json`,
+certyfikat i logi. Gdy serwer działa, aktualizacja czeka do następnego uruchomienia, bo Windows
+trzyma jego plik exe zablokowany.
+
 BepInEx jest osobnym komponentem (`StarTruckerMP.Launcher/Mod/`) z własnym folderem plików:
 
 | Ścieżka | Zawartość |

@@ -175,6 +175,12 @@ internal static class Strings
 
     public static string LocalServerStoppedLog => T("Local server stopped.", "Zatrzymano lokalny serwer.");
 
+    public static string LocalServerUpdated(string tag) =>
+        T($"Local server updated to {tag}.", $"Zaktualizowano serwer lokalny do {tag}.");
+
+    public static string LocalServerUpdateFailed(string reason) =>
+        T($"The local server could not be updated: {reason}", $"Nie udało się zaktualizować serwera lokalnego: {reason}");
+
     public static string LocalServerStopFailed =>
         T("The server could not be stopped.", "Nie udało się zatrzymać serwera.");
 

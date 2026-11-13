@@ -305,6 +305,7 @@ internal sealed class MainWindow : Window
             FitToWorkingArea();
             DetectGame();
             _ = CheckForUpdatesAsync();
+            _ = UpdateLocalServerAsync();
             _updateTimer.Start();
             RefreshLocalServerState();
             _serverTimer.Start();
@@ -1222,6 +1223,35 @@ internal sealed class MainWindow : Window
                 _localServerStatusText.Foreground = LauncherTheme.MutedBrush;
                 SetButtonText(_serverToggleButton, Strings.StartLocalServer);
                 break;
+        }
+    }
+
+    /// <summary>
+    /// Pulls a newer local server package on start, so the card never runs last release's build.
+    /// A running server is left alone: Windows keeps its files locked until it stops.
+    /// </summary>
+    private async System.Threading.Tasks.Task UpdateLocalServerAsync()
+    {
+        if (_busy)
+            return;
+
+        try
+        {
+            var tag = await LocalServer.UpdateIfOutdatedAsync(
+                new Progress<string>(_log.Log),
+                System.Threading.CancellationToken.None);
+
+            if (string.IsNullOrEmpty(tag))
+                return;
+
+            // The timer may fire while the package is unpacking, so refresh once more.
+            _log.Log(Strings.LocalServerUpdated(tag));
+            RefreshLocalServerState();
+        }
+        catch (Exception exception)
+        {
+            // An update problem must never block the launcher; the start path retries it.
+            _log.Log(Strings.LocalServerUpdateFailed(exception.Message));
         }
     }
 

@@ -102,6 +102,11 @@ missing, the launcher downloads `StarTruckerMP-server-win-x64.zip` from GitHub R
 extracts it to `%APPDATA%\StarTruckerMP\server`. `server.json` and the certificate live there as
 well; the server itself listens on `https://0.0.0.0:7777` and prints its log in a console window.
 
+The launcher also keeps that package current: on start it compares the tag stored in
+`package-tag.txt` with the newest release and replaces the server files, leaving `server.json`, the
+certificate and the logs alone. While the server runs the update waits for its next start, because
+Windows keeps the executable locked.
+
 BepInEx is a separate component (`StarTruckerMP.Launcher/Mod/`) with its own file folder:
 
 | Path | Contents |
