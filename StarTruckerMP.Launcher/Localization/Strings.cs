@@ -212,6 +212,16 @@ internal static class Strings
 
     public static string DirectorySearchAction => T("Search", "Szukaj");
 
+    public static string DirectoryRefreshAction => T("Refresh", "Odśwież");
+
+    public static string FieldDedicatedServer => T("Dedicated server", "Serwer dedykowany");
+
+    public static string ConnectDedicatedAction => T("Connect", "Połącz");
+
+    public static string ConnectDedicatedMissing =>
+        T("Pick a dedicated server in the list first.",
+            "Najpierw wybierz serwer dedykowany na liście.");
+
     public static string DirectoryCaption =>
         T("The list comes from the server that hosts the directory. Double click a server to keep it in your server list.",
             "Lista pochodzi z serwera, który hostuje katalog. Kliknij serwer dwukrotnie, żeby zapisać go na liście serwerów.");

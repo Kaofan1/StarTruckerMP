@@ -116,7 +116,10 @@ top, the second one the worst. Double click a server to store it in your bookmar
 **PLAY**.
 
 A dedicated server installed on this computer announces to its own directory, so entering `127.0.0.1`
-and port `7777` is enough to see it in the results without extra server configuration.
+and port `7777` is enough to see it in the results without extra server configuration. **Refresh**
+runs the same search again, so the list shows the current player count. The selected server also fills
+the **Dedicated server** field in the **CONNECTION** card, where **Connect** bookmarks it, selects it
+and starts the game against its address right away.
 
 The directory host and port are saved in `launcher.json`, so they have to be typed once. The directory may use
 a self-signed certificate, because the launcher only reads public data; when https does not answer it

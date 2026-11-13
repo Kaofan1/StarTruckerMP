@@ -245,6 +245,22 @@ internal sealed class MainWindow : Window
         Strings.DirectorySearchAction,
         ActionVariant.Accent);
 
+    private readonly Button _directoryRefreshButton = LauncherTheme.MakeButton(
+        Strings.DirectoryRefreshAction,
+        ActionVariant.Secondary);
+
+    /// <summary>Results of the last search, so the connection card can dial one directly.</summary>
+    private readonly ComboBox _dedicatedCombo = LauncherTheme.StyleCombo(new ComboBox
+    {
+        HorizontalAlignment = HorizontalAlignment.Stretch,
+        MinWidth = 200
+    });
+
+    private readonly Button _connectDedicatedButton = LauncherTheme.MakeButton(
+        Strings.ConnectDedicatedAction,
+        ActionVariant.Accent,
+        stretch: false);
+
     private readonly TextBlock _directoryStatusText = new()
     {
         TextWrapping = TextWrapping.Wrap,
@@ -763,11 +779,18 @@ internal sealed class MainWindow : Window
         addressRow.Children.Add(portField);
         Grid.SetColumn(portField, 1);
 
+        var searchButtons = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 8,
+            Children = { _directorySearchButton, _directoryRefreshButton }
+        };
+
         var searchRow = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto") };
         _directorySearchBox.Margin = new Thickness(0, 0, 8, 0);
         searchRow.Children.Add(_directorySearchBox);
-        searchRow.Children.Add(_directorySearchButton);
-        Grid.SetColumn(_directorySearchButton, 1);
+        searchRow.Children.Add(searchButtons);
+        Grid.SetColumn(searchButtons, 1);
 
         _directoryHeaderHost.Content = BuildDirectoryHeader();
 
@@ -938,6 +961,7 @@ internal sealed class MainWindow : Window
         border.PointerPressed += (_, _) =>
         {
             _selectedDirectory = row;
+            SelectDedicatedInPicker(server);
             RenderDirectoryRows();
         };
 
@@ -1089,10 +1113,21 @@ internal sealed class MainWindow : Window
 
     private Control BuildConnectCard()
     {
+        // A dedicated server picked from the search can be dialled from here, without visiting
+        // the bookmarks card first.
+        var pickRow = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto") };
+        pickRow.Children.Add(LauncherTheme.Field(Strings.FieldDedicatedServer, _dedicatedCombo));
+
+        _connectDedicatedButton.VerticalAlignment = VerticalAlignment.Bottom;
+        _connectDedicatedButton.Margin = new Thickness(8, 0, 0, 0);
+        pickRow.Children.Add(_connectDedicatedButton);
+        Grid.SetColumn(_connectDedicatedButton, 1);
+
         return LauncherTheme.Card(
             Strings.CardConnection,
             null,
             _serverSummaryText,
+            pickRow,
             _playButton,
             LauncherTheme.Caption(Strings.PlayCaption));
     }
@@ -1239,6 +1274,9 @@ internal sealed class MainWindow : Window
         _addServerButton.Click += (_, _) => AddServer();
         _removeServerButton.Click += (_, _) => RemoveServer();
         _directorySearchButton.Click += async (_, _) => await SearchDirectoryAsync();
+        _directoryRefreshButton.Click += async (_, _) => await SearchDirectoryAsync();
+        _connectDedicatedButton.Click += async (_, _) => await ConnectDedicatedAsync();
+        _dedicatedCombo.SelectionChanged += (_, _) => UpdateConnectDedicatedState();
         _applyServerButton.Click += (_, _) => ApplyServerEdits();
         _serverToggleButton.Click += async (_, _) => await ToggleLocalServerAsync();
         _serverConfigButton.Click += (_, _) => OpenServerConfig();
@@ -2630,6 +2668,7 @@ internal sealed class MainWindow : Window
         _directoryRows.Clear();
         _selectedDirectory = null;
         RenderDirectoryRows();
+        RefreshDedicatedPicker(null);
 
         _directoryStatusText.Text = Strings.DirectorySearching;
         _directoryStatusText.Foreground = LauncherTheme.MutedBrush;
@@ -2659,6 +2698,7 @@ internal sealed class MainWindow : Window
 
             _directoryRows.AddRange(servers.Select(server => new DirectoryRowState { Server = server }));
             RenderDirectoryRows();
+            RefreshDedicatedPicker(servers);
             MeasureDirectoryPings(_directoryGeneration);
         }
         catch (Exception exception)
@@ -2689,6 +2729,80 @@ internal sealed class MainWindow : Window
 
         row.PingMs = ping;
         RenderDirectoryRows();
+    }
+
+    /// <summary>Fills the connection card picker with the results of the last search.</summary>
+    private void RefreshDedicatedPicker(IReadOnlyList<DirectoryServer>? servers)
+    {
+        var previousId = (_dedicatedCombo.SelectedItem as DirectoryServer)?.Id;
+        var list = servers is null ? new List<DirectoryServer>() : servers.ToList();
+
+        _dedicatedCombo.ItemsSource = null;
+        _dedicatedCombo.ItemsSource = list;
+        _dedicatedCombo.ItemTemplate = new FuncDataTemplate<DirectoryServer>((server, _) => new TextBlock
+        {
+            Text = server is null ? string.Empty : $"{server.Name} · {server.Host}:{server.Port}",
+            FontSize = 12
+        });
+
+        _dedicatedCombo.SelectedItem = list.FirstOrDefault(server => server.Id == previousId)
+            ?? list.FirstOrDefault();
+
+        UpdateConnectDedicatedState();
+    }
+
+    /// <summary>Keeps the connection picker on the row the player clicked in the search table.</summary>
+    private void SelectDedicatedInPicker(DirectoryServer server)
+    {
+        if (_dedicatedCombo.ItemsSource is not IEnumerable<DirectoryServer> servers)
+            return;
+
+        var match = servers.FirstOrDefault(candidate => candidate.Id == server.Id);
+        if (match is not null)
+            _dedicatedCombo.SelectedItem = match;
+    }
+
+    private void UpdateConnectDedicatedState()
+    {
+        _connectDedicatedButton.IsEnabled =
+            !_busy && _install is not null && _dedicatedCombo.SelectedItem is DirectoryServer;
+    }
+
+    /// <summary>
+    /// Bookmarks the picked dedicated server and starts the game against it, so joining a server
+    /// from the search takes one button instead of copying its address into the bookmarks card.
+    /// </summary>
+    private async System.Threading.Tasks.Task ConnectDedicatedAsync()
+    {
+        if (_dedicatedCombo.SelectedItem is not DirectoryServer server)
+        {
+            _log.Log(Strings.ConnectDedicatedMissing);
+            return;
+        }
+
+        if (_install is null)
+        {
+            _log.Log(Strings.GameNotDetected);
+            return;
+        }
+
+        var port = server.Port.ToString();
+        var entry = _settings.Servers.FirstOrDefault(saved =>
+            saved.Address.Equals(server.Host, StringComparison.OrdinalIgnoreCase) && saved.Port == port);
+
+        if (entry is null)
+        {
+            entry = new ServerEntry { Name = server.Name, Address = server.Host, Port = port };
+            _settings.Servers.Add(entry);
+            _log.Log(Strings.DirectoryServerAdded(server.Name, $"{server.Host}:{port}"));
+        }
+
+        _settings.SelectedServerId = entry.Id;
+        _store.Save(_settings);
+        RefreshServerList();
+        _serverCombo.SelectedItem = entry;
+
+        await PlayAsync();
     }
 
     /// <summary>Bookmarks a directory result, so it survives the next search and a restart.</summary>
@@ -2860,6 +2974,9 @@ internal sealed class MainWindow : Window
         _updateButton.IsEnabled = !busy && _pendingUpdate is not null;
         _serverToggleButton.IsEnabled = !busy;
         _directorySearchButton.IsEnabled = !busy;
+        _directoryRefreshButton.IsEnabled = !busy;
+        _dedicatedCombo.IsEnabled = !busy;
+        UpdateConnectDedicatedState();
         _directoryHostBox.IsEnabled = !busy;
         _directoryPortBox.IsEnabled = !busy;
         _directorySearchBox.IsEnabled = !busy;
