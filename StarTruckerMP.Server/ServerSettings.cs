@@ -24,4 +24,17 @@ public class ServerSettings
     // Steam: Star Trucker App ID. Used when calling ISteamUserAuth/AuthenticateUserTicket.
     // Default: 2380050 (Star Trucker on Steam).
     public uint SteamAppId { get; set; } = 2380050;
+
+    // Public directory: base address of a server that hosts the directory, for example
+    // https://hub.example:7777. The server announces itself there every minute, which is what the
+    // launcher's dedicated server search reads. Empty disables the announce loop.
+    public string DirectoryUrl { get; set; } = string.Empty;
+
+    // Address players should connect to: a public IP or a domain. Empty uses the bound address, or
+    // the first LAN IPv4 when the server listens on 0.0.0.0.
+    public string DirectoryHost { get; set; } = string.Empty;
+
+    // Name and description shown in the launcher search.
+    public string DirectoryName { get; set; } = string.Empty;
+    public string DirectoryDescription { get; set; } = string.Empty;
 }

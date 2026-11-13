@@ -114,6 +114,27 @@ The file is created on first start and rewritten on every start, so new fields a
 | `SteamAppId` | `2380050` | Star Trucker App ID used for ticket validation |
 | `CertificatePath` | `certs/localhost.pfx` | HTTPS certificate used by the API |
 | `CertificatePassword` | `changeit` | password of that certificate |
+| `DirectoryUrl` | empty | directory hub address, for example `https://hub.example:7777`; empty turns the announce off |
+| `DirectoryHost` | empty | public IP or domain players connect to; empty uses the bound address or the LAN IPv4 |
+| `DirectoryName` | empty | name in the launcher search; empty shows `StarTruckerMP server` |
+| `DirectoryDescription` | empty | one line description in the directory entry |
+
+### Publishing the server in the launcher search
+
+The launcher reads a public directory that any server can host (`/directory/servers`). A dedicated
+server joins that list by itself: set `DirectoryUrl` to the hub address, for example
+`https://hub.example:7777`, and it announces itself right after start and then once a minute. Entries
+expire after three minutes without a heartbeat, so a stopped server disappears on its own, and the
+listing keeps the current player count and capacity.
+
+Set `DirectoryHost` to the address players should use, which is your public IP or domain. When it is
+empty the server reports the address it binds to, or its first LAN IPv4 when it listens on `0.0.0.0`,
+which is only reachable inside the local network. The server log prints one line when the listing is
+accepted and only changes when the state changes, so a hub that stays down does not fill the log.
+
+A hub may run on the self-signed certificate the server creates, because only the public listing is
+exchanged. When the hub restarts it loses its in-memory list; each server notices the rejected token
+and registers again on its next beat.
 
 ### Steam Web API key
 

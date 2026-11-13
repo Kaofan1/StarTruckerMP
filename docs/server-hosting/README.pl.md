@@ -114,6 +114,27 @@ zawsze się pojawiają:
 | `SteamAppId` | `2380050` | App ID Star Trucker używane do weryfikacji biletów |
 | `CertificatePath` | `certs/localhost.pfx` | certyfikat HTTPS dla API |
 | `CertificatePassword` | `changeit` | hasło tego certyfikatu |
+| `DirectoryUrl` | puste | adres huba katalogu, np. `https://hub.example:7777`; puste wyłącza zgłaszanie |
+| `DirectoryHost` | puste | publiczne IP lub domena, na którą łączą się gracze; puste bierze adres nasłuchu lub LAN IPv4 |
+| `DirectoryName` | puste | nazwa w wyszukiwarce launchera; puste pokazuje `StarTruckerMP server` |
+| `DirectoryDescription` | puste | jednolinijkowy opis we wpisie katalogu |
+
+### Publikowanie serwera w wyszukiwarce launchera
+
+Launcher czyta publiczny katalog, który może hostować dowolny serwer (`/directory/servers`). Serwer
+dedykowany dopisuje się do tej listy sam: ustaw `DirectoryUrl` na adres huba, np.
+`https://hub.example:7777`, a zgłosi się zaraz po starcie i potem raz na minutę. Wpis wygasa po
+trzech minutach bez heartbeatu, więc zatrzymany serwer znika sam, a wpis pokazuje aktualną liczbę
+graczy i limit.
+
+W `DirectoryHost` wpisz adres, którego mają używać gracze, czyli publiczne IP albo domenę. Gdy jest
+puste, serwer podaje adres, na którym nasłuchuje, albo pierwszy LAN IPv4 przy `0.0.0.0`, a taki adres
+działa tylko w sieci lokalnej. Log serwera wypisuje jedną linię, gdy wpis jest przyjęty, i zmienia ją
+tylko przy zmianie stanu, więc hub, który leży, nie zapełnia logu.
+
+Hub może działać na self-signed certyfikacie, który serwer tworzy sam, bo wymieniana jest tylko
+publiczna lista. Po restarcie hub traci listę z pamięci; każdy serwer dostaje odrzucony token
+i rejestruje się ponownie przy następnym heartbeacie.
 
 ### Klucz Steam Web API
 

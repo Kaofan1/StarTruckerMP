@@ -121,6 +121,7 @@ internal class Program
             });
 
         builder.Services.AddSingleton<ServerDirectory>();
+        builder.Services.AddHostedService<DirectoryAnnouncer>();
 
         builder.Services.AddSingleton<ServerSettings>(sp =>
         {

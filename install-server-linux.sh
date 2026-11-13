@@ -101,7 +101,11 @@ if [[ ! -f "$INSTALL_DIR/server.json" ]]; then
   "ApiTokenLifetime": "08:00:00",
   "XboxRequiredTitleId": 1846147021,
   "SteamWebApiKey": "",
-  "SteamAppId": 2380050
+  "SteamAppId": 2380050,
+  "DirectoryUrl": "",
+  "DirectoryHost": "",
+  "DirectoryName": "",
+  "DirectoryDescription": ""
 }
 JSON
     echo "Created $INSTALL_DIR/server.json"

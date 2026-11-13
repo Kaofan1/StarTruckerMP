@@ -141,6 +141,10 @@ try {
             XboxRequiredTitleId = [Convert]::ToUInt32("6E2BD7CD", 16)
             SteamWebApiKey      = ""
             SteamAppId          = 2380050
+            DirectoryUrl        = ""
+            DirectoryHost       = ""
+            DirectoryName       = ""
+            DirectoryDescription = ""
         }
 
         $json = $settings | ConvertTo-Json -Depth 4
