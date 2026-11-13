@@ -2,7 +2,7 @@
 ;
 ; This is the server on its own, separate from the launcher Setup. It installs the server into
 ; Program Files, writes server.json on the first install, opens the firewall and registers the
-; executable as a Windows service, so the server starts with the machine.
+; executable as a manual Windows service that only runs when the operator starts it.
 ;
 ; Build with:
 ;   build-server-installer-winx64.cmd <build number>
@@ -92,6 +92,7 @@ var
   GeneratedPassword: String;
   ConfigCreated: Boolean;
   ServiceWasInstalled: Boolean;
+  ServiceWasActive: Boolean;
 
 function GetParamValue(const Name, Default: String): String;
 var
@@ -166,6 +167,29 @@ begin
   Result := ResultCode;
 end;
 
+/// <summary>True when sc reports a running or starting service, so an upgrade can restore it.</summary>
+function ServiceReportsActive: Boolean;
+var
+  ResultCode: Integer;
+  TempFile: String;
+  Content: AnsiString;
+  Upper: String;
+begin
+  TempFile := ExpandConstant('{tmp}\stmp-service-state.txt');
+  Exec(ExpandConstant('{sys}\cmd.exe'),
+       '/c sc.exe query {#ServiceName} > "' + TempFile + '" 2>&1',
+       '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+
+  Result := False;
+  if LoadStringFromFile(TempFile, Content) then
+  begin
+    Upper := Uppercase(Content);
+    Result := (Pos('RUNNING', Upper) > 0) or (Pos('START_PENDING', Upper) > 0);
+  end;
+
+  DeleteFile(TempFile);
+end;
+
 function ServerProcessRunning: Boolean;
 var
   ResultCode: Integer;
@@ -208,8 +232,10 @@ end;
 function PrepareToInstall(var NeedsRestart: Boolean): String;
 begin
   // An upgrade replaces a running executable, so the service has to go before the files are copied.
-  // The service existed before the upgrade, so it is put back even when the task is not selected.
+  // The service existed before the upgrade, so it is put back even when the task is not selected,
+  // and it is only started again when it was running before: a stopped server stays stopped.
   ServiceWasInstalled := ServiceQueryCode('query {#ServiceName}') = 0;
+  ServiceWasActive := ServiceWasInstalled and ServiceReportsActive;
   StopAndDeleteService;
   Result := '';
 end;
@@ -334,7 +360,11 @@ begin
     // The service is manual on purpose: it only runs when the operator starts it, so a stopped
     // server stays stopped after a reboot.
     Exec(ExpandConstant('{sys}\sc.exe'), 'config {#ServiceName} start= demand', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
-    Exec(ExpandConstant('{sys}\sc.exe'), 'start {#ServiceName}', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+
+    // A fresh install starts the server once so the operator sees it working; an upgrade keeps
+    // whatever state the service had, so updating a stopped server does not start it.
+    if (not ServiceWasInstalled) or ServiceWasActive then
+      Exec(ExpandConstant('{sys}\sc.exe'), 'start {#ServiceName}', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
   end;
 end;
 

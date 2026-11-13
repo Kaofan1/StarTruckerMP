@@ -38,7 +38,7 @@ the first install, opens TCP and UDP in Windows Firewall and registers the `Star
 service. Run it as administrator; `StarTruckerMP-Server-Setup.exe /VERYSILENT /PORT=7778` does the
 same silently, and `/MAXPLAYERS=16` changes the limit; a silent run registers the service and the
 firewall rule too, unless `/TASKS=""` turns them off. An upgrade stops the service, replaces the
-files and starts it again.
+files and restores the state it had: a running server starts again, a stopped one stays stopped.
 - **Linux:** `StarTruckerMP-Server-linux-x64.run` is a self-extracting installer:
   `sudo ./StarTruckerMP-Server-linux-x64.run --port 7777`. It takes `--dir`, `--max-players`,
   `--user`, `--no-start` and `--uninstall`, creates the service user, the systemd unit and

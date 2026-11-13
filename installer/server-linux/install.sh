@@ -86,6 +86,13 @@ if [ -d "$INSTALL_DIR/certs" ]; then
     rm -rf "$TMP_DIR/certs"
 fi
 
+# An upgrade keeps the state the service had: a running server is restarted onto the new
+# binary, a stopped one stays stopped.
+WAS_ACTIVE="no"
+if systemctl is-active --quiet "$SERVICE" 2>/dev/null; then WAS_ACTIVE="yes"; fi
+WAS_INSTALLED="no"
+if systemctl cat "$SERVICE" >/dev/null 2>&1; then WAS_INSTALLED="yes"; fi
+
 cp -a "$TMP_DIR/." "$INSTALL_DIR/"
 rm -f "$INSTALL_DIR/payload.tar.gz" "$INSTALL_DIR/install.sh"
 chmod +x "$INSTALL_DIR/StarTruckerMP.Server"
@@ -150,8 +157,16 @@ systemctl daemon-reload
 # The unit is not enabled on purpose: an installed server stays stopped until the operator
 # starts it, and `systemctl enable` makes it start with the machine when that is wanted.
 if [ "$START_SERVICE" = "yes" ]; then
-    step "Starting $SERVICE"
-    systemctl start "$SERVICE"
+    if [ "$WAS_ACTIVE" = "yes" ]; then
+        step "Restarting $SERVICE on the new files"
+        systemctl restart "$SERVICE"
+    elif [ "$WAS_INSTALLED" = "no" ]; then
+        step "Starting $SERVICE"
+        systemctl start "$SERVICE"
+    else
+        step "Leaving $SERVICE stopped, because it was stopped before the upgrade"
+    fi
+
     sleep 2
     systemctl --no-pager --lines=0 status "$SERVICE" || true
 fi

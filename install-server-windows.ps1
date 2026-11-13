@@ -162,6 +162,8 @@ try {
 
     Write-Step "Registering service $ServiceName"
     $service = Get-Service -Name $ServiceName -ErrorAction SilentlyContinue
+    $serviceWasInstalled = $null -ne $service
+    $serviceWasRunning = $serviceWasInstalled -and $service.Status -eq "Running"
     if ($service) {
         Write-Host "Service exists, stopping and replacing it"
         if ($service.Status -ne "Stopped") {
@@ -188,21 +190,29 @@ try {
         }
     }
 
-    Write-Step "Starting the service"
-    sc.exe start $ServiceName | Out-Null
-
     $running = $false
-    for ($i = 0; $i -lt 45; $i++) {
-        Start-Sleep -Seconds 1
-        if ((Get-Service $ServiceName).Status -eq "Running") {
-            $running = $true
-            break
+    if ((-not $serviceWasInstalled) -or $serviceWasRunning) {
+        Write-Step "Starting the service"
+        sc.exe start $ServiceName | Out-Null
+
+        for ($i = 0; $i -lt 45; $i++) {
+            Start-Sleep -Seconds 1
+            if ((Get-Service $ServiceName).Status -eq "Running") {
+                $running = $true
+                break
+            }
         }
+    }
+    else {
+        Write-Step "Leaving the service stopped, because it was stopped before the upgrade"
     }
 
     Write-Host ""
     if ($running) {
         Write-Host "StarTruckerMP server $($release.tag_name) is running." -ForegroundColor Green
+    }
+    elseif ($serviceWasInstalled -and -not $serviceWasRunning) {
+        Write-Host "StarTruckerMP server $($release.tag_name) is installed and stopped, as it was before the upgrade." -ForegroundColor Yellow
     }
     else {
         Write-Warning "The service did not report Running within 45 seconds. Check the Windows event log and $settingsPath."
