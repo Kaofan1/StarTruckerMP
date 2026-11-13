@@ -697,8 +697,8 @@ internal sealed class MainWindow : Window
     }
 
     /// <summary>
-    /// Install and repair share the first row, uninstall sits below repair. Three equal columns
-    /// made the labels too narrow, so the card wraps instead of cutting the text off.
+    /// Install and repair share the first row, uninstall spans the full width below them. Three
+    /// equal columns made the labels too narrow, and a half-width uninstall looked off-centre.
     /// </summary>
     private static Control ActionButtons(Button install, Button repair, Button uninstall)
     {
@@ -711,7 +711,7 @@ internal sealed class MainWindow : Window
 
         install.Margin = new Thickness(0);
         repair.Margin = new Thickness(8, 0, 0, 0);
-        uninstall.Margin = new Thickness(8, 0, 0, 0);
+        uninstall.Margin = new Thickness(0);
 
         grid.Children.Add(install);
         grid.Children.Add(repair);
@@ -719,7 +719,8 @@ internal sealed class MainWindow : Window
 
         Grid.SetColumn(install, 0);
         Grid.SetColumn(repair, 1);
-        Grid.SetColumn(uninstall, 1);
+        Grid.SetColumn(uninstall, 0);
+        Grid.SetColumnSpan(uninstall, 2);
         Grid.SetRow(uninstall, 1);
 
         return grid;
