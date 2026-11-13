@@ -27,7 +27,8 @@ public class ServerSettings
 
     // Public directory: base address of a server that hosts the directory, for example
     // https://hub.example:7777. The server announces itself there every minute, which is what the
-    // launcher's dedicated server search reads. Empty disables the announce loop.
+    // launcher's dedicated server search reads. Empty means the server's own directory, so a fresh
+    // install lists itself without configuration; set off or none to disable the announce loop.
     public string DirectoryUrl { get; set; } = string.Empty;
 
     // Address players should connect to: a public IP or a domain. Empty uses the bound address, or

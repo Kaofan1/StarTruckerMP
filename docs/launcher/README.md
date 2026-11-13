@@ -114,6 +114,9 @@ nagłówka sortuje według tej kolumny (drugie kliknięcie odwraca kolejność).
 pokazuje najlepsze łącza, po drugim najgorsze. Kliknij serwer dwukrotnie, żeby zapisać go w zakładkach
 i móc kliknąć **GRAJ**.
 
+Serwer dedykowany zainstalowany na tym komputerze zgłasza się do własnego katalogu, więc wpisanie
+`127.0.0.1` i portu `7777` wystarcza, żeby zobaczyć go w wynikach bez dodatkowej konfiguracji serwera.
+
 Host i port katalogu są zapamiętywane w `launcher.json`, więc wystarczy wpisać je raz. Katalog może
 działać na certyfikacie self-signed, bo launcher czyta wyłącznie publiczne dane; gdy https nie
 odpowie, próbuje jeszcze http. Sam katalog hostuje dowolny serwer StarTruckerMP, opis endpointów

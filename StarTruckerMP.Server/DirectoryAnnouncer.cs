@@ -52,15 +52,22 @@ internal sealed class DirectoryAnnouncer : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        var baseUrl = NormalizeBaseUrl(_settings.DirectoryUrl);
-        if (baseUrl is null)
+        if (IsAnnounceDisabled(_settings.DirectoryUrl))
         {
             _logger.LogInformation(
-                "Directory announce is off: set DirectoryUrl in server.json to appear in the launcher search");
+                "Directory announce is off (DirectoryUrl is {Value})", _settings.DirectoryUrl);
             return;
         }
 
-        _logger.LogInformation("Announcing this server to {Directory} every minute", baseUrl);
+        // An installed server publishes itself without any configuration: it announces to the
+        // directory it hosts, so the launcher pointed at that address lists it right away.
+        var baseUrl = NormalizeBaseUrl(_settings.DirectoryUrl) ?? BuiltInHubUrl();
+
+        _logger.LogInformation(
+            string.IsNullOrWhiteSpace(_settings.DirectoryUrl)
+                ? "Announcing this server to its own directory at {Directory} every minute"
+                : "Announcing this server to {Directory} every minute",
+            baseUrl);
 
         while (!stoppingToken.IsCancellationRequested)
         {
@@ -81,7 +88,7 @@ internal sealed class DirectoryAnnouncer : BackgroundService
     private async Task AnnounceAsync(string baseUrl, CancellationToken cancellationToken, bool canRetry = true)
     {
         var name = string.IsNullOrWhiteSpace(_settings.DirectoryName)
-            ? "StarTruckerMP server"
+            ? $"{Environment.MachineName} StarTruckerMP"
             : _settings.DirectoryName.Trim();
 
         var host = ResolveHost();
@@ -174,6 +181,24 @@ internal sealed class DirectoryAnnouncer : BackgroundService
             return "127.0.0.1";
         }
     }
+
+    /// <summary>The built-in hub is this instance, so a fresh install lists itself.</summary>
+    private string BuiltInHubUrl()
+    {
+        var bound = _settings.IpAddress?.Trim();
+        var host = !string.IsNullOrEmpty(bound) && bound is not "0.0.0.0" and not "::" and not "[::]"
+            ? bound
+            : "127.0.0.1";
+
+        if (host.Contains(':') && !host.StartsWith("[", StringComparison.Ordinal))
+            host = $"[{host}]";
+
+        return $"https://{host}:{_settings.Port}";
+    }
+
+    /// <summary>An operator can turn the announce off with <c>DirectoryUrl</c> set to off or none.</summary>
+    private static bool IsAnnounceDisabled(string? url) =>
+        url?.Trim().ToLowerInvariant() is "off" or "none" or "disabled";
 
     /// <summary>Turns user input into a base URL; a missing scheme means https, like the launcher does.</summary>
     private static string? NormalizeBaseUrl(string? url)

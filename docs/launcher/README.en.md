@@ -115,6 +115,9 @@ column title sorts by it (click again to reverse). The first ping click puts the
 top, the second one the worst. Double click a server to store it in your bookmarks, ready for
 **PLAY**.
 
+A dedicated server installed on this computer announces to its own directory, so entering `127.0.0.1`
+and port `7777` is enough to see it in the results without extra server configuration.
+
 The directory host and port are saved in `launcher.json`, so they have to be typed once. The directory may use
 a self-signed certificate, because the launcher only reads public data; when https does not answer it
 retries over http. Any StarTruckerMP server can host the directory: the endpoints are described in

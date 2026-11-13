@@ -143,18 +143,24 @@ The file is created on first start and rewritten on every start, so new fields a
 | `SteamAppId` | `2380050` | Star Trucker App ID used for ticket validation |
 | `CertificatePath` | `certs/localhost.pfx` | HTTPS certificate used by the API |
 | `CertificatePassword` | `changeit` | password of that certificate |
-| `DirectoryUrl` | empty | directory hub address, for example `https://hub.example:7777`; empty turns the announce off |
+| `DirectoryUrl` | empty | directory hub address, for example `https://hub.example:7777`; empty means the server's own directory, `off` turns the announce off |
 | `DirectoryHost` | empty | public IP or domain players connect to; empty uses the bound address or the LAN IPv4 |
-| `DirectoryName` | empty | name in the launcher search; empty shows `StarTruckerMP server` |
+| `DirectoryName` | empty | name in the launcher search; empty shows the computer name with a `StarTruckerMP` suffix |
 | `DirectoryDescription` | empty | one line description in the directory entry |
 
 ### Publishing the server in the launcher search
 
 The launcher reads a public directory that any server can host (`/directory/servers`). A dedicated
-server joins that list by itself: set `DirectoryUrl` to the hub address, for example
-`https://hub.example:7777`, and it announces itself right after start and then once a minute. Entries
-expire after three minutes without a heartbeat, so a stopped server disappears on its own, and the
-listing keeps the current player count and capacity.
+server joins that list by itself and needs no configuration for it: when `DirectoryUrl` is empty it
+announces to the directory it hosts, at `https://127.0.0.1:<Port>` (or at its bound address when
+`IpAddress` is not `0.0.0.0`). An installed service therefore shows up right away in a launcher
+pointed at that address. It announces right after start and then once a minute, and entries expire
+after three minutes without a heartbeat, so a stopped server disappears on its own. The listing keeps
+the current player count and capacity.
+
+To gather servers from several machines in one list, set `DirectoryUrl` to a shared hub address, for
+example `https://hub.example:7777`. The value `off` (or `none`) turns the announce off completely, for
+a server that should stay invisible.
 
 Set `DirectoryHost` to the address players should use, which is your public IP or domain. When it is
 empty the server reports the address it binds to, or its first LAN IPv4 when it listens on `0.0.0.0`,
