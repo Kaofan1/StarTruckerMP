@@ -62,6 +62,21 @@ dotnet publish StarTruckerMP.Server/StarTruckerMP.Server.csproj -c Release -r wi
   --no-self-contained -p:PublishSingleFile=true -p:RunSvelteBuild=false -o ./artifacts/server-win
 ```
 
+## Wpis Multiplayer w menu głównym
+
+`StarTruckerMP.Client/Patches/MainMenuButtonPatch.cs` klonuje pierwszy dostępny `MenuButton` z
+`MainMenuScreen`, podpisuje go **Multiplayer** i otwiera listę serwerów bez wychodzenia z menu. Menu
+jest najbardziej zmienną częścią gry, więc patch nigdy nie rzuca wyjątku: `Start` i
+`RefreshControlVisibility` są patchowane w dwóch osobnych klasach, każda rejestracja ma własny
+`try`/`catch`, a przebudowa menu tylko odtwarza przycisk. Gdy przycisku nie da się dodać, ten sam
+panel otwiera `F9`, a `[Interface] MenuButton = false` wyłącza wpis.
+
+Panel to zwykły HTML w procesie overlaya, ale serwowany z pętli zwrotnej `TcpListener` uruchamianej
+przez plugin (`http://127.0.0.1:<port>/`), a nie z wbudowanego albo `data:` URL, bo host CEF pokazuje
+dla nich własną stronę błędu. `[Connection] DirectoryUrl` wybiera katalog, który czyta panel. Wybór
+serwera zapisuje `ServerAddress` i `ServerPort` oraz konfigurację pluginu; samo połączenie startuje
+po wczytaniu zapisu.
+
 ## Konwencje
 
 - Nazwa produktu to wszędzie **StarTruckerMP**: foldery, namespace'y, assembly, pliki, assety wydań

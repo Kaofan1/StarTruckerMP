@@ -255,6 +255,14 @@ public class GameEventsComponent : MonoBehaviour
             Patches.FontFallback.TryInstall();
         }
 
+        // F9 is the fallback for the main menu button: it opens the multiplayer server list
+        // even when a game update changes the menu and the button cannot be added.
+        if (Input.GetKeyDown(KeyCode.F9))
+        {
+            App.Log.LogInfo("[Multiplayer] F9 => open server list");
+            MultiplayerPanel.Open();
+        }
+
         // F2 opens the panel only; Escape is the key that closes it again.
         if (Input.GetKeyDown(KeyCode.F2) && !OverlayManager.IsInteractiveMode)
         {

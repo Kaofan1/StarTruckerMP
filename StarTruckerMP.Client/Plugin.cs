@@ -51,11 +51,33 @@ public class Plugin : BasePlugin
         SetupComponents();
         SetupUI();
 
+        OverlayManager.MessageReceived += MultiplayerPanel.HandleMessage;
+
         Network.SetupConnection();
         
         Harmony.CreateAndPatchAll(typeof(ClientHooks));
         Harmony.CreateAndPatchAll(typeof(AIVehicleTruck_Patch));
         Harmony.CreateAndPatchAll(typeof(AIVehicleDef_Patch));
+
+        // The main menu is the most volatile part of the game, so a missing type or method must
+        // only cost the button, never the plugin: F9 opens the same panel without it.
+        try
+        {
+            Harmony.CreateAndPatchAll(typeof(MainMenuButtonPatch));
+        }
+        catch (Exception exception)
+        {
+            Log.LogWarning("[Menu] Multiplayer button patch skipped: " + exception.Message);
+        }
+
+        try
+        {
+            Harmony.CreateAndPatchAll(typeof(MainMenuButtonRefreshPatch));
+        }
+        catch (Exception exception)
+        {
+            Log.LogWarning("[Menu] Multiplayer button refresh patch skipped: " + exception.Message);
+        }
         
         Log.LogInfo($"Plugin {PluginInfo.PLUGIN_GUID} loaded.");
         
