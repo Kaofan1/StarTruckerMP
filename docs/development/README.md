@@ -65,12 +65,14 @@ dotnet publish StarTruckerMP.Server/StarTruckerMP.Server.csproj -c Release -r wi
 
 ## Multiplayer entry in the main menu
 
-`StarTruckerMP.Client/Patches/MainMenuButtonPatch.cs` clones the first available `MenuButton` of
-`MainMenuScreen`, labels it **Multiplayer** and opens the server list without leaving the menu. The
-menu is the part of the game most likely to change, so the patch never throws: `Start` and
+`StarTruckerMP.Client/Patches/MainMenuButtonPatch.cs` builds its own **Multiplayer** row below the
+last entry of `MainMenuScreen`, copies the game's label font and opens the server list without leaving
+the menu. It deliberately does not clone a `MenuButton`: the prefab's serialised click target would
+also start a new game, and the screen's selection marker would jump to another entry. The menu is the
+part of the game most likely to change, so the patch never throws: `Start` and
 `RefreshControlVisibility` are patched in two separate classes, each registration is wrapped in its
-own `try`/`catch`, and a menu rebuild only recreates the button. When the button cannot be added,
-`F9` still opens the same panel, and `[Interface] MenuButton = false` turns the entry off.
+own `try`/`catch`, and a menu rebuild only recreates the row. When the row cannot be added, `F9`
+still opens the same panel, and `[Interface] MenuButton = false` turns the entry off.
 
 The panel is plain HTML inside the overlay process, but it is served from a loopback `TcpListener`
 started by the plugin (`http://127.0.0.1:<port>/`) instead of an embedded or `data:` URL, because the
