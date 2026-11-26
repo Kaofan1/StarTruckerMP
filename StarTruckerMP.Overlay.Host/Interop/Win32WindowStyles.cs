@@ -24,6 +24,8 @@ internal sealed class Win32WindowStyles
     private const long WsExLayered = 0x80000L;
     private const long WsExToolWindow = 0x00000080L;
     private const long WsExNoActivate = 0x08000000L;
+    private const long WsExTopmost = 0x00000008L;
+    private static readonly IntPtr HwndTopmost = new(-1);
     private const int DwmwaNcRenderingPolicy = 2;
     private const int DwmwaWindowCornerPreference = 33;
     private const int DwmwaBorderColor = 34;
@@ -46,7 +48,7 @@ internal sealed class Win32WindowStyles
         SetWindowLongPtr(hwnd, GwlStyle, new IntPtr(style));
 
         var exStyle = GetWindowLongPtr(hwnd, GwlExStyle).ToInt64();
-        exStyle |= WsExLayered | WsExToolWindow | WsExNoActivate;
+        exStyle |= WsExLayered | WsExToolWindow | WsExNoActivate | WsExTopmost;
         SetWindowLongPtr(hwnd, GwlExStyle, new IntPtr(exStyle));
         SetWindowPos(hwnd, IntPtr.Zero, 0, 0, 0, 0, SwpNoMove | SwpNoSize | SwpNoZOrder | SwpNoActivate | SwpFrameChanged);
         TrySuppressWindowFrame(hwnd);
@@ -119,6 +121,17 @@ internal sealed class Win32WindowStyles
     {
         ShowWindow(hwnd, SwShownoactivate);
         _logger.Info($"[Win32] ShowWithoutActivation hwnd=0x{hwnd:X}");
+    }
+
+    /// <summary>
+    /// The game stays fullscreen and can put itself back on top when it repaints, so the overlay
+    /// asks for the top of the z-order every time it is shown instead of relying on the style
+    /// it received at startup.
+    /// </summary>
+    public void EnsureTopmost(nint hwnd)
+    {
+        SetWindowPos(hwnd, HwndTopmost, 0, 0, 0, 0, SwpNoMove | SwpNoSize | SwpNoActivate);
+        _logger.Info($"[Win32] Topmost re-asserted hwnd=0x{hwnd:X}");
     }
 
     private void TrySuppressWindowFrame(nint hwnd)

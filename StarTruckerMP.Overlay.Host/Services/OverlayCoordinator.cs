@@ -179,6 +179,7 @@ internal sealed class OverlayCoordinator : IDisposable
         if (enabled)
         {
             ShowOverlay();
+            _windowStyles.EnsureTopmost(hwnd);
             _windowStyles.SetClickThrough(hwnd, enabled: false);
             _browser.SendFocusEvent(true);
             _window.Activate();
@@ -224,7 +225,9 @@ internal sealed class OverlayCoordinator : IDisposable
         if (!_window.IsVisible)
         {
             _window.Show();
-            _windowStyles.ShowWithoutActivation(EnsureWindowHandle());
+            var handle = EnsureWindowHandle();
+            _windowStyles.ShowWithoutActivation(handle);
+            _windowStyles.EnsureTopmost(handle);
         }
     }
 

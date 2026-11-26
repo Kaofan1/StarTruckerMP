@@ -5,6 +5,7 @@ using StarTruckerMP.Overlay.Browser;
 using StarTruckerMP.Overlay.Core.Abstractions;
 using StarTruckerMP.Overlay.Core.Services;
 using StarTruckerMP.Overlay.Host.UI;
+using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Text;
 
@@ -15,7 +16,14 @@ internal sealed class BrowserInputRouter : IDisposable
     private readonly OverlayWindow _window;
     private readonly CefOverlayBrowser _browser;
     private readonly OverlayModeService _modeService;
+    private readonly IOverlayLogger _logger;
+    private readonly HashSet<MouseButtonType> _pressed = new();
     private bool _disposed;
+
+    // The overlay appears during the click that opened the panel. Forwarding the rest of that
+    // gesture makes Chromium treat the release as a click on whatever sits under the pointer,
+    // which closed the panel right after opening. Only a fresh press is routed.
+    private static readonly TimeSpan InputArmDelay = TimeSpan.FromMilliseconds(250);
 
     public BrowserInputRouter(
         OverlayWindow window,
@@ -26,6 +34,7 @@ internal sealed class BrowserInputRouter : IDisposable
         _window = window;
         _browser = browser;
         _modeService = modeService;
+        _logger = logger;
         _window.PointerMoved += OnPointerMoved;
         _window.PointerPressed += OnPointerPressed;
         _window.PointerReleased += OnPointerReleased;
@@ -48,9 +57,13 @@ internal sealed class BrowserInputRouter : IDisposable
         _window.KeyUp -= OnKeyUp;
     }
 
+    private bool IsInputArmed =>
+        _modeService.UiModeEnabled &&
+        DateTime.UtcNow - _modeService.EnabledAtUtc > InputArmDelay;
+
     private void OnPointerMoved(object? sender, PointerEventArgs e)
     {
-        if (!CanRoutePointer())
+        if (!CanRoutePointer() || !IsInputArmed)
             return;
 
         var host = _browser.BrowserHost;
@@ -79,9 +92,14 @@ internal sealed class BrowserInputRouter : IDisposable
         if (host == null)
             return;
 
-        var point = ToBrowserPoint(e.GetPosition(_window));
+        if (!IsInputArmed)
+            return;
+
+        var client = e.GetPosition(_window);
+        var point = ToBrowserPoint(client);
         var properties = e.GetCurrentPoint(_window).Properties;
         var button = ToMouseButton(properties);
+        _pressed.Add(button);
         host.SendMouseClickEvent(new MouseEvent(point.X, point.Y, GetMouseModifiers(e.KeyModifiers)), button, mouseUp: false, clickCount: 1);
         e.Handled = true;
     }
@@ -95,9 +113,19 @@ internal sealed class BrowserInputRouter : IDisposable
         if (host == null)
             return;
 
-        var point = ToBrowserPoint(e.GetPosition(_window));
+        var client = e.GetPosition(_window);
+        var point = ToBrowserPoint(client);
         var properties = e.GetCurrentPoint(_window).Properties;
         var button = ToMouseButton(properties);
+
+        // A release with no routed press belongs to a gesture that started in the game (the
+        // click that opened the panel); sending it would click whatever is under the pointer.
+        if (!_pressed.Remove(button))
+        {
+            _logger.Info("[Input] ignored a release that started outside the overlay");
+            return;
+        }
+
         host.SendMouseClickEvent(new MouseEvent(point.X, point.Y, GetMouseModifiers(e.KeyModifiers)), button, mouseUp: true, clickCount: 1);
         e.Handled = true;
     }
@@ -109,6 +137,9 @@ internal sealed class BrowserInputRouter : IDisposable
 
         var host = _browser.BrowserHost;
         if (host == null)
+            return;
+
+        if (!IsInputArmed)
             return;
 
         var point = ToBrowserPoint(e.GetPosition(_window));

@@ -7,6 +7,7 @@ public sealed class OverlayModeService
     private readonly object _syncRoot = new();
     private readonly IOverlayLogger _logger;
     private bool _uiModeEnabled;
+    private DateTime _enabledAtUtc = DateTime.MinValue;
 
     public OverlayModeService(IOverlayLogger logger)
     {
@@ -22,6 +23,21 @@ public sealed class OverlayModeService
             lock (_syncRoot)
             {
                 return _uiModeEnabled;
+            }
+        }
+    }
+
+    /// <summary>
+    /// When the interactive mode was enabled. The click that opened the panel must not reach
+    /// the freshly shown page, so the input router ignores the tail of that gesture.
+    /// </summary>
+    public DateTime EnabledAtUtc
+    {
+        get
+        {
+            lock (_syncRoot)
+            {
+                return _enabledAtUtc;
             }
         }
     }
@@ -55,6 +71,9 @@ public sealed class OverlayModeService
         }
 
         _uiModeEnabled = enabled;
+        if (enabled)
+            _enabledAtUtc = DateTime.UtcNow;
+
         _logger.Info($"[Mode] {source}: uiMode => {(enabled ? "ON" : "OFF")}");
         UiModeChanged?.Invoke(this, enabled);
         return true;
