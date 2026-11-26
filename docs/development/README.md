@@ -82,7 +82,10 @@ The panel is plain HTML inside the overlay process, but it is served from a loop
 started by the plugin (`http://127.0.0.1:<port>/`) instead of an embedded or `data:` URL, because the
 CEF host shows its own error page for those. `[Connection] DirectoryUrl` selects the directory the
 panel reads. Picking a server writes `ServerAddress` and `ServerPort` and saves the plugin config;
-the connection itself starts after a save is loaded.
+the connection itself starts after a save is loaded. The panel has two tabs: the directory list filters
+live by server name, and the by-IP tab takes a host or IP with an optional port (the configured
+`ServerPort` is used when the field is empty), so an unlisted server can be picked without its name.
+A typed `host:port` is split, and a full URL is reduced to its host.
 
 ## Conventions
 

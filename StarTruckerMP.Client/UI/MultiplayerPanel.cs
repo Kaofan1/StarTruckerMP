@@ -135,6 +135,7 @@ internal static class MultiplayerPanel
                 name = nameValue.GetString();
         }
 
+        host = NormalizeHost(host, ref port);
         if (string.IsNullOrWhiteSpace(host) || port is < 1 or > 65535)
         {
             OverlayManager.PostMessage("serverSelected", new { error = "Invalid server address." });
@@ -145,9 +146,51 @@ internal static class MultiplayerPanel
         App.ServerPort.Value = port.ToString();
         SaveConfig();
 
-        App.Log.LogInfo($"[Multiplayer] Selected server {host}:{port} ({name}). Load a save to connect.");
-        OverlayManager.PostMessage("serverSelected", new { host, port, name });
+        App.Log.LogInfo($"[Multiplayer] Selected server {host}:{port} ({name ?? host}). Load a save to connect.");
+        OverlayManager.PostMessage("serverSelected", new { host, port, name = name ?? host });
     }
+
+    /// <summary>
+    /// A typed address may arrive as <c>https://host/</c>, <c>host:port</c> or a bare IP. The port
+    /// is optional, so an address without one falls back to the configured server port.
+    /// </summary>
+    private static string? NormalizeHost(string? typed, ref int port)
+    {
+        if (string.IsNullOrWhiteSpace(typed))
+            return null;
+
+        var value = typed.Trim();
+
+        if (value.Contains("://", StringComparison.Ordinal) &&
+            Uri.TryCreate(value, UriKind.Absolute, out var uri))
+            value = uri.Host;
+
+        // Bracketed IPv6 keeps its colons; everything else may carry a trailing :port.
+        if (value.StartsWith('[') && value.EndsWith(']'))
+        {
+            value = value[1..^1];
+        }
+        else if (value.Contains(':', StringComparison.Ordinal))
+        {
+            var separator = value.LastIndexOf(':');
+            if (separator > 0 && int.TryParse(value[(separator + 1)..], out var inlinePort))
+            {
+                value = value[..separator];
+                if (port <= 0)
+                    port = inlinePort;
+            }
+        }
+
+        if (port <= 0)
+            port = DefaultPort();
+
+        return value.Trim();
+    }
+
+    private static int DefaultPort() =>
+        int.TryParse(App.ServerPort.Value, out var configured) && configured is > 0 and <= 65535
+            ? configured
+            : 7777;
 
     private static async Task<(string? Error, object Servers)> FetchAsync(string url)
     {
@@ -262,7 +305,8 @@ internal static class MultiplayerPanel
     }
 
     private static string BuildHtml() => PanelHtml
-        .Replace("__DIRECTORY_URL__", JsonSerializer.Serialize(App.DirectoryUrl.Value), StringComparison.Ordinal);
+        .Replace("__DIRECTORY_URL__", JsonSerializer.Serialize(App.DirectoryUrl.Value), StringComparison.Ordinal)
+        .Replace("__DEFAULT_PORT__", JsonSerializer.Serialize(DefaultPort()), StringComparison.Ordinal);
 
     /// <summary>
     /// The overlay browser renders plain http pages reliably, while a data or custom URL showed
@@ -371,19 +415,29 @@ internal static class MultiplayerPanel
   h1 { margin: 0; font-size: 15px; letter-spacing: .16em; text-transform: uppercase; color: #f2a33c; flex: 1; }
   .close { background: transparent; color: #93a1af; border: 0; font-size: 20px; cursor: pointer; line-height: 1; }
   .close:hover { color: #f3e7d0; }
-  .toolbar { display: flex; gap: 8px; padding: 14px 18px 8px; }
+  nav.tabs { display: flex; gap: 6px; padding: 12px 18px 0; }
+  .tab {
+    background: transparent; color: #93a1af; border: 1px solid #24303f; border-radius: 4px;
+    padding: 6px 14px; font-size: 12px; cursor: pointer;
+  }
+  .tab:hover { color: #f3e7d0; }
+  .tab.active { background: #f2a33c; border-color: #f2a33c; color: #20140a; font-weight: 700; }
+  .toolbar { display: flex; gap: 8px; padding: 12px 18px 8px; }
   input {
     flex: 1; min-width: 0; background: #0b121b; color: #f3e7d0; border: 1px solid #24303f;
     border-radius: 4px; padding: 8px 10px; font-size: 13px;
   }
+  input:focus { outline: none; border-color: #f2a33c; }
+  input.port { flex: 0 0 108px; text-align: center; }
   button.action {
     background: #f2a33c; color: #20140a; border: 0; border-radius: 4px;
-    padding: 8px 16px; font-weight: 700; cursor: pointer; font-size: 13px;
+    padding: 8px 16px; font-weight: 700; cursor: pointer; font-size: 13px; white-space: nowrap;
   }
   button.action:disabled { opacity: .5; cursor: default; }
   .status { padding: 0 18px 8px; font-size: 12px; color: #93a1af; min-height: 18px; }
   .status.error { color: #e2573f; }
   .status.ok { color: #5bc8b0; }
+  .hint { padding: 0 18px 10px; font-size: 11.5px; color: #93a1af; }
   .list { overflow: auto; padding: 0 10px 10px; }
   .row {
     display: grid; grid-template-columns: 1fr auto auto; gap: 12px; align-items: center;
@@ -398,23 +452,48 @@ internal static class MultiplayerPanel
   }
   .join:hover { border-color: #f2a33c; color: #f2a33c; }
   .empty { padding: 18px; text-align: center; color: #93a1af; font-size: 12.5px; }
+  .directory { display: flex; gap: 8px; align-items: center; padding: 10px 18px 12px; border-top: 1px solid #24303f; }
+  .directory label { font-size: 11.5px; color: #93a1af; white-space: nowrap; }
+  .directory input { font-size: 12px; padding: 6px 8px; }
   footer { padding: 10px 18px 14px; font-size: 11.5px; color: #93a1af; border-top: 1px solid #24303f; }
-  b.host { color: #f3e7d0; font-weight: 600; }
+  [hidden] { display: none !important; }
 </style>
 </head>
 <body>
 <div class="panel">
   <header>
     <h1>StarTruckerMP</h1>
-    <span class="meta" id="lang"></span>
     <button class="close" id="close" title="Close">&#10005;</button>
   </header>
-  <div class="toolbar">
-    <input id="url" spellcheck="false" autocomplete="off">
-    <button class="action" id="refresh"></button>
-  </div>
-  <div class="status" id="status"></div>
-  <div class="list" id="list"></div>
+
+  <nav class="tabs" role="tablist">
+    <button class="tab active" id="tabDirectory" role="tab" aria-selected="true"></button>
+    <button class="tab" id="tabDirect" role="tab" aria-selected="false"></button>
+  </nav>
+
+  <section id="directoryView">
+    <div class="toolbar">
+      <input id="filter" spellcheck="false" autocomplete="off">
+      <button class="action" id="refresh"></button>
+    </div>
+    <div class="status" id="status"></div>
+    <div class="list" id="list"></div>
+    <div class="directory">
+      <label for="url" id="directoryLabel"></label>
+      <input id="url" spellcheck="false" autocomplete="off">
+    </div>
+  </section>
+
+  <section id="directView" hidden>
+    <div class="toolbar">
+      <input id="ip" spellcheck="false" autocomplete="off">
+      <input id="port" class="port" inputmode="numeric" autocomplete="off">
+      <button class="action" id="connect"></button>
+    </div>
+    <div class="status" id="directStatus"></div>
+    <div class="hint" id="directHint"></div>
+  </section>
+
   <footer id="footer"></footer>
 </div>
 <script>
@@ -423,14 +502,26 @@ internal static class MultiplayerPanel
   const t = polish ? {
     refresh: 'Odśwież', status: 'Szukam w katalogu...', empty: 'Brak serwerów w katalogu.',
     join: 'Połącz', players: 'graczy', footer: 'Po wybraniu serwera wczytaj zapis, żeby dołączyć.',
-    saved: 'Ustawiono serwer', current: 'Adres katalogu', error: 'Katalog niedostępny',
-    needsUrl: 'Najpierw wpisz host i port katalogu.'
+    saved: 'Ustawiono serwer', error: 'Błąd', needsUrl: 'Najpierw wpisz host i port katalogu.',
+    directory: 'Katalog', direct: 'Po adresie IP', directoryLabel: 'Adres katalogu',
+    filterHint: 'Szukaj po nazwie serwera', ipHint: 'IP lub host, np. 192.168.1.20',
+    connect: 'Połącz', invalid: 'Podaj adres IP lub nazwę hosta.', badPort: 'Port musi być liczbą 1-65535.',
+    noMatch: 'Żaden serwer nie pasuje do wpisanej nazwy.',
+    directHint: 'Port jest opcjonalny, domyślnie __DEFAULT_PORT__.',
+    directReady: 'Gotowe do połączenia. Wczytaj zapis, żeby dołączyć.'
   } : {
     refresh: 'Refresh', status: 'Searching the directory...', empty: 'No servers in the directory.',
     join: 'Connect', players: 'players', footer: 'After picking a server, load a save to connect.',
-    saved: 'Server set to', current: 'Directory address', error: 'Directory unavailable',
-    needsUrl: 'Enter the directory host and port first.'
+    saved: 'Server set to', error: 'Error', needsUrl: 'Enter the directory host and port first.',
+    directory: 'Directory', direct: 'By IP address', directoryLabel: 'Directory address',
+    filterHint: 'Search by server name', ipHint: 'IP or host, e.g. 192.168.1.20',
+    connect: 'Connect', invalid: 'Enter an IP address or host name.', badPort: 'The port must be 1-65535.',
+    noMatch: 'No server matches that name.',
+    directHint: 'The port is optional, __DEFAULT_PORT__ is used when empty.',
+    directReady: 'Ready to connect. Load a save to join.'
   };
+
+  const DEFAULT_PORT = __DEFAULT_PORT__;
 
   const bridge = window.__starTruckMP = window.__starTruckMP || {};
   bridge.handlers = bridge.handlers || [];
@@ -441,17 +532,31 @@ internal static class MultiplayerPanel
   };
 
   const urlInput = document.getElementById('url');
+  const filterInput = document.getElementById('filter');
   const refreshButton = document.getElementById('refresh');
   const status = document.getElementById('status');
   const list = document.getElementById('list');
   const footer = document.getElementById('footer');
   const closeButton = document.getElementById('close');
+  const tabDirectory = document.getElementById('tabDirectory');
+  const tabDirect = document.getElementById('tabDirect');
+  const directoryView = document.getElementById('directoryView');
+  const directView = document.getElementById('directView');
+  const ipInput = document.getElementById('ip');
+  const portInput = document.getElementById('port');
+  const connectButton = document.getElementById('connect');
+  const directStatus = document.getElementById('directStatus');
 
   let lastServers = [];
 
   const setStatus = (text, tone) => {
     status.textContent = text || '';
     status.className = 'status' + (tone ? ' ' + tone : '');
+  };
+
+  const setDirectStatus = (text, tone) => {
+    directStatus.textContent = text || '';
+    directStatus.className = 'status' + (tone ? ' ' + tone : '');
   };
 
   const sendToGame = (type, payload) => {
@@ -478,8 +583,17 @@ internal static class MultiplayerPanel
     sendToGame('joinServer', { host: server.host, port: server.port, name: server.name });
   };
 
+  const matches = (server, query) => {
+    if (!query) return true;
+    const address = `${server.host}:${server.port}`.toLowerCase();
+    return server.name.toLowerCase().includes(query) || address.includes(query);
+  };
+
   const render = (servers) => {
     list.replaceChildren();
+    const query = filterInput.value.trim().toLowerCase();
+    const visible = servers.filter(server => matches(server, query));
+
     if (!servers || servers.length === 0) {
       const empty = document.createElement('div');
       empty.className = 'empty';
@@ -488,7 +602,15 @@ internal static class MultiplayerPanel
       return;
     }
 
-    for (const server of servers) {
+    if (visible.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'empty';
+      empty.textContent = t.noMatch;
+      list.appendChild(empty);
+      return;
+    }
+
+    for (const server of visible) {
       const row = document.createElement('div');
       row.className = 'row';
 
@@ -512,6 +634,42 @@ internal static class MultiplayerPanel
     }
   };
 
+  const showTab = (direct) => {
+    tabDirectory.classList.toggle('active', !direct);
+    tabDirect.classList.toggle('active', direct);
+    tabDirectory.setAttribute('aria-selected', String(!direct));
+    tabDirect.setAttribute('aria-selected', String(direct));
+    directoryView.hidden = direct;
+    directView.hidden = !direct;
+    if (direct) ipInput.focus();
+  };
+
+  const connectDirect = () => {
+    let host = ipInput.value.trim().replace(/^https?:\/\//i, '').replace(/\/.*$/, '');
+    let portText = portInput.value.trim();
+
+    if (!host) { setDirectStatus(t.invalid, 'error'); return; }
+
+    // "host:7777" typed in one field is accepted too.
+    const singleColon = (host.match(/:/g) || []).length === 1;
+    if (singleColon) {
+      const separator = host.lastIndexOf(':');
+      const tail = host.slice(separator + 1);
+      if (/^\d+$/.test(tail)) {
+        host = host.slice(0, separator);
+        if (!portText) portText = tail;
+      }
+    }
+
+    if (!/^[A-Za-z0-9._-]+$/.test(host)) { setDirectStatus(t.invalid, 'error'); return; }
+
+    const port = portText ? Number(portText) : DEFAULT_PORT;
+    if (!Number.isInteger(port) || port < 1 || port > 65535) { setDirectStatus(t.badPort, 'error'); return; }
+
+    setDirectStatus(`${t.saved} ${host}:${port}`, 'ok');
+    sendToGame('joinServer', { host, port, name: host });
+  };
+
   bridge.handlers.push((message) => {
     if (!message || message.type === undefined) return;
     const payload = message.payload || {};
@@ -532,9 +690,11 @@ internal static class MultiplayerPanel
     if (message.type === 'serverSelected') {
       if (payload.error) {
         setStatus(t.error + ': ' + payload.error, 'error');
+        setDirectStatus(t.error + ': ' + payload.error, 'error');
         return;
       }
       setStatus(`${t.saved} ${payload.host}:${payload.port}`, 'ok');
+      setDirectStatus(`${t.saved} ${payload.host}:${payload.port}`, 'ok');
       footer.textContent = t.footer;
     }
   });
@@ -547,9 +707,27 @@ internal static class MultiplayerPanel
   urlInput.value = __DIRECTORY_URL__;
   refreshButton.textContent = t.refresh;
   footer.textContent = t.footer;
-  document.getElementById('lang').textContent = t.current;
+  filterInput.placeholder = t.filterHint;
+  filterInput.setAttribute('aria-label', t.filterHint);
+  ipInput.placeholder = t.ipHint;
+  ipInput.setAttribute('aria-label', t.ipHint);
+  portInput.placeholder = String(DEFAULT_PORT);
+  portInput.setAttribute('aria-label', t.directHint);
+  connectButton.textContent = t.connect;
+  tabDirectory.textContent = t.directory;
+  tabDirect.textContent = t.direct;
+  document.getElementById('directoryLabel').textContent = t.directoryLabel;
+  document.getElementById('directHint').textContent = t.directHint;
+
+  filterInput.addEventListener('input', () => render(lastServers));
+  filterInput.addEventListener('keydown', (event) => { if (event.key === 'Enter') refresh(); });
   refreshButton.addEventListener('click', refresh);
   urlInput.addEventListener('keydown', (event) => { if (event.key === 'Enter') refresh(); });
+  connectButton.addEventListener('click', connectDirect);
+  ipInput.addEventListener('keydown', (event) => { if (event.key === 'Enter') connectDirect(); });
+  portInput.addEventListener('keydown', (event) => { if (event.key === 'Enter') connectDirect(); });
+  tabDirectory.addEventListener('click', () => showTab(false));
+  tabDirect.addEventListener('click', () => showTab(true));
   closeButton.addEventListener('click', () => sendToGame('closeMultiplayer'));
   window.addEventListener('keydown', (event) => {
     if (event.key === 'Escape') sendToGame('closeMultiplayer');
