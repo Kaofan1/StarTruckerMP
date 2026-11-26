@@ -65,14 +65,18 @@ dotnet publish StarTruckerMP.Server/StarTruckerMP.Server.csproj -c Release -r wi
 
 ## Multiplayer entry in the main menu
 
-`StarTruckerMP.Client/Patches/MainMenuButtonPatch.cs` builds its own **Multiplayer** row below the
-last entry of `MainMenuScreen`, copies the game's label font and opens the server list without leaving
-the menu. It deliberately does not clone a `MenuButton`: the prefab's serialised click target would
-also start a new game, and the screen's selection marker would jump to another entry. The menu is the
-part of the game most likely to change, so the patch never throws: `Start` and
-`RefreshControlVisibility` are patched in two separate classes, each registration is wrapped in its
-own `try`/`catch`, and a menu rebuild only recreates the row. When the row cannot be added, `F9`
-still opens the same panel, and `[Interface] MenuButton = false` turns the entry off.
+`StarTruckerMP.Client/Patches/MainMenuButtonPatch.cs` clones the game's own first `MenuButton`, renames
+its label to **Multiplayer** and places the copy directly above **Continue** (the entry the game shows
+as **Wczytaj**). The clone keeps the game's hover and press animations, so the entry looks and behaves
+like every other row. The prefab's serialised click target would also start a new game, so the patch
+replaces the cloned `m_OnClick` and `Button.onClick` events with a fresh event that only opens the
+server list. `Panel_Content` positions its rows with a `LayoutGroup`, so the button takes the first
+menu slot instead of a hand picked height; that keeps the order right even when the game enables
+Continue a moment after the menu appears. The menu is the part of the game most likely to change, so
+the patch never throws: `Start` and `RefreshControlVisibility` are patched in two separate classes,
+each registration is wrapped in its own `try`/`catch`, and a menu rebuild only recreates the button.
+When it cannot be added, `F9` still opens the same panel, and `[Interface] MenuButton = false` turns the
+entry off.
 
 The panel is plain HTML inside the overlay process, but it is served from a loopback `TcpListener`
 started by the plugin (`http://127.0.0.1:<port>/`) instead of an embedded or `data:` URL, because the

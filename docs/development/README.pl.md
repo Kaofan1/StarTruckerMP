@@ -64,14 +64,17 @@ dotnet publish StarTruckerMP.Server/StarTruckerMP.Server.csproj -c Release -r wi
 
 ## Wpis Multiplayer w menu głównym
 
-`StarTruckerMP.Client/Patches/MainMenuButtonPatch.cs` tworzy własny wiersz **Multiplayer** pod
-ostatnią pozycją `MainMenuScreen`, kopiuje czcionkę etykiety z gry i otwiera listę serwerów bez
-wychodzenia z menu. Świadomie nie klonuje `MenuButton`: zapisany w prefabie cel kliknięcia
-uruchamiałby też nową grę, a znacznik wyboru menu przeskakiwałby na inną pozycję. Menu jest
-najbardziej zmienną częścią gry, więc patch nigdy nie rzuca wyjątku: `Start` i
-`RefreshControlVisibility` są patchowane w dwóch osobnych klasach, każda rejestracja ma własny
-`try`/`catch`, a przebudowa menu tylko odtwarza wiersz. Gdy wiersza nie da się dodać, ten sam panel
-otwiera `F9`, a `[Interface] MenuButton = false` wyłącza wpis.
+`StarTruckerMP.Client/Patches/MainMenuButtonPatch.cs` klonuje pierwszy `MenuButton` z gry, zmienia
+jego etykietę na **Multiplayer** i wstawia kopię bezpośrednio nad **Kontynuuj** (pozycję widoczną jako
+**Wczytaj**). Klon zachowuje animacje najechania i wciśnięcia, więc wygląda i zachowuje się jak każdy
+inny wiersz. Zapisany w prefabie cel kliknięcia uruchamiałby też nową grę, dlatego patch zastępuje
+zdarzenia `m_OnClick` i `Button.onClick` klonu nowym zdarzeniem, które tylko otwiera listę serwerów.
+`Panel_Content` układa wiersze przez `LayoutGroup`, więc przycisk zajmuje pierwsze miejsce w menu, a
+nie ręcznie wyliczoną wysokość; dzięki temu kolejność jest poprawna także wtedy, gdy gra włączy
+Kontynuuj chwilę po pojawieniu się menu. Menu jest najbardziej zmienną częścią gry, więc patch nigdy
+nie rzuca wyjątku: `Start` i `RefreshControlVisibility` są patchowane w dwóch osobnych klasach, każda
+rejestracja ma własny `try`/`catch`, a przebudowa menu tylko odtwarza przycisk. Gdy nie da się go
+dodać, ten sam panel otwiera `F9`, a `[Interface] MenuButton = false` wyłącza wpis.
 
 Panel to zwykły HTML w procesie overlaya, ale serwowany z pętli zwrotnej `TcpListener` uruchamianej
 przez plugin (`http://127.0.0.1:<port>/`), a nie z wbudowanego albo `data:` URL, bo host CEF pokazuje
