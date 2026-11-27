@@ -38,6 +38,9 @@ public class Network
     private static SessionCipher? _sessionCipher;
 
     public static int NetId => _netId;
+
+    /// <summary>True between the protocol welcome and the peer disconnect.</summary>
+    public static bool IsConnected => _handshakeCompleted;
     
     /// <summary>
     /// This should only run once, on plugin startup.

@@ -52,6 +52,7 @@ public class Plugin : BasePlugin
         SetupUI();
 
         OverlayManager.MessageReceived += MultiplayerPanel.HandleMessage;
+        OverlayManager.MessageReceived += HudPanel.HandleMessage;
 
         Network.SetupConnection();
         

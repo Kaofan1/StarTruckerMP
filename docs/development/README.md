@@ -87,6 +87,16 @@ live by server name, and the by-IP tab takes a host or IP with an optional port 
 `ServerPort` is used when the field is empty), so an unlisted server can be picked without its name.
 A typed `host:port` is split, and a full URL is reduced to its host.
 
+The address field at the bottom is optional: left empty, the panel reads `[Connection] DirectoryUrl`, so
+the full list appears as soon as the panel opens. Each row shows its position in the filtered list,
+the player count from the last heartbeat and a ping that the plugin measures with a TCP connect to the
+server port.
+
+`F2` toggles a small panel in the same overlay: the server address, the connection state, the online
+player count and this player's network id. It is served by the plugin the same way as the server list
+and stays click-through, so the game keeps the mouse and the keyboard. The count comes from the public
+`/status/summary` endpoint of the server.
+
 ## Conventions
 
 - The product name is **StarTruckerMP** everywhere: folders, namespaces, assemblies, files, release

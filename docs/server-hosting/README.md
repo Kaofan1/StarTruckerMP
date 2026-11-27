@@ -216,6 +216,9 @@ SERVERS** browser shows. The launcher fills the PING column itself by timing a s
 `host:port`. The directory lives in memory, so after a hub restart servers re-register with
 their next heartbeat and receive a new id.
 
+`GET /status/summary` returns `{"players":3,"capacity":8}`: counts only, no names, so it needs no
+session token. The in-game panel reads it to show how full the server is.
+
 ## Connecting players
 
 1. Install the launcher from Releases and open the **Server bookmarks** card.

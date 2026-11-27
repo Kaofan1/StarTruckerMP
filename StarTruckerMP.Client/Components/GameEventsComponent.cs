@@ -126,19 +126,24 @@ public class GameEventsComponent : MonoBehaviour
     private static void ReportOverlayState()
     {
         ReportOverlayMode();
-        ReportOverlaySession(Network.NetId != -1);
+        ReportOverlaySession(Network.IsConnected);
     }
 
     private static void ReportOverlayMode() =>
         OverlayManager.PostMessage("overlayModeChanged", new { interactive = OverlayManager.IsInteractiveMode });
 
-    private static void ReportOverlaySession(bool connected) =>
+    private static void ReportOverlaySession(bool connected)
+    {
         OverlayManager.PostMessage("session", new
         {
             connected,
             server = $"{App.ServerAddress.Value}:{App.ServerPort.Value}",
             netId = connected ? Network.NetId : -1
         });
+
+        // The F2 panel shows the same state, and it has to follow a connect or a drop.
+        HudPanel.PushState();
+    }
 
     private void Connected()
     {
@@ -263,13 +268,16 @@ public class GameEventsComponent : MonoBehaviour
             MultiplayerPanel.Open();
         }
 
-        // F2 opens the panel only; Escape is the key that closes it again.
-        if (Input.GetKeyDown(KeyCode.F2) && !OverlayManager.IsInteractiveMode)
+        // F2 toggles the small panel with the connection, the online players and this player's id.
+        // It stays click-through, so the game keeps the mouse and the keyboard.
+        if (Input.GetKeyDown(KeyCode.F2))
         {
-            OverlayManager.SetInteractiveMode(true);
-            App.Log.LogInfo("[Overlay] F2 => open panel");
-            ReportOverlayMode();
+            App.Log.LogInfo("[Hud] F2 => toggle panel");
+            HudPanel.Toggle();
         }
+
+        if (HudPanel.IsVisible)
+            HudPanel.Tick();
 
         if (OverlayManager.IsInteractiveMode && Input.GetKeyDown(KeyCode.Escape))
         {

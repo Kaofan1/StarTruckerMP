@@ -82,6 +82,16 @@ dla nich własną stronę błędu. `[Connection] DirectoryUrl` wybiera katalog, 
 serwera zapisuje `ServerAddress` i `ServerPort` oraz konfigurację pluginu; samo połączenie startuje
 po wczytaniu zapisu.
 
+Pole adresu na dole jest opcjonalne: gdy jest puste, panel czyta `[Connection] DirectoryUrl`, więc pełna
+lista pojawia się zaraz po otwarciu panelu. Każdy wiersz pokazuje swoją pozycję na przefiltrowanej
+liście, liczbę graczy z ostatniego heartbeatu i ping, który plugin mierzy przez połączenie TCP z portem
+serwera.
+
+`F2` włącza mały panel w tym samym overlayu: adres serwera, stan połączenia, liczbę graczy online
+i identyfikator sieciowy tego gracza. Jest serwowany przez plugin tak samo jak lista serwerów i pozostaje
+click-through, więc gra zachowuje mysz i klawiaturę. Liczba graczy pochodzi z publicznego endpointu
+`/status/summary` serwera.
+
 ## Konwencje
 
 - Nazwa produktu to wszędzie **StarTruckerMP**: foldery, namespace'y, assembly, pliki, assety wydań

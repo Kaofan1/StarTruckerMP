@@ -232,6 +232,24 @@ internal class Program
                 "text/html; charset=utf-8");
         });
 
+        // A counts-only summary for the in-game panel: it shows how full the server is without
+        // exposing names, so it needs no session token.
+        app.MapGet("/status/summary", (HttpContext context, PlayerContainer players, ServerSettings settings) =>
+        {
+            context.Response.Headers.CacheControl = "no-store";
+
+            var online = 0;
+            foreach (var player in players.SnapshotPlayers())
+            {
+                if (player.HandshakeCompleted)
+                    online++;
+            }
+
+            return Results.Json(
+                new { players = online, capacity = (int)settings.MaxPlayers },
+                ServerDirectory.JsonOptions);
+        });
+
         // The token form keeps the token in an HttpOnly cookie, so it stays out of the address bar
         // and out of the page source. The header stays supported for scripts and curl.
         app.MapPost("/status/token", (HttpContext context, AuthService auth) =>

@@ -1,6 +1,9 @@
 #nullable enable
 using System;
+using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Net.Sockets;
@@ -21,16 +24,15 @@ internal static class MultiplayerPanel
     private static readonly HttpClient Client = CreateClient();
     private static readonly JsonDocumentOptions ParseOptions = new() { AllowTrailingCommas = true };
 
-    private static TcpListener? _listener;
-    private static int _port;
-    private static volatile string _html = "";
+    private static readonly LocalPageServer Page = new("StarTruckerMP.MultiplayerPanel");
 
     /// <summary>Opens the panel in the overlay, above the running game.</summary>
     public static void Open()
     {
         try
         {
-            var url = EnsureLocalPage();
+            var url = Page.Publish(BuildHtml());
+            HudPanel.MarkHidden();
             OverlayManager.Show();
             OverlayManager.Navigate(url);
             OverlayManager.SetInteractiveMode(true);
@@ -48,6 +50,7 @@ internal static class MultiplayerPanel
         try
         {
             OverlayManager.SetInteractiveMode(false);
+            HudPanel.MarkHidden();
             OverlayManager.Hide();
         }
         catch (Exception exception)
@@ -84,28 +87,16 @@ internal static class MultiplayerPanel
 
     private static void Refresh(string? payload)
     {
-        var url = App.DirectoryUrl.Value;
-        if (!string.IsNullOrWhiteSpace(payload))
-        {
-            try
-            {
-                using var document = JsonDocument.Parse(payload, ParseOptions);
-                if (document.RootElement.TryGetProperty("url", out var value) &&
-                    value.ValueKind == JsonValueKind.String)
-                {
-                    var typed = value.GetString()?.Trim();
-                    if (!string.IsNullOrEmpty(typed))
-                        url = typed;
-                }
-            }
-            catch (JsonException)
-            {
-                // Keep the configured address.
-            }
-        }
+        // The address field is an optional override: left empty it reads the configured
+        // directory, so the list appears without typing anything.
+        var typed = ReadTypedUrl(payload);
+        var url = string.IsNullOrWhiteSpace(typed) ? ConfiguredDirectoryUrl() : typed;
 
-        App.DirectoryUrl.Value = url;
-        SaveConfig();
+        if (!string.IsNullOrWhiteSpace(typed))
+        {
+            App.DirectoryUrl.Value = typed;
+            SaveConfig();
+        }
 
         // Fetching runs off the game thread; the result goes back through the overlay pipe.
         Plugin.StartAttachedThread(() =>
@@ -113,6 +104,36 @@ internal static class MultiplayerPanel
             var (error, servers) = FetchAsync(url).GetAwaiter().GetResult();
             OverlayManager.PostMessage("multiplayerServers", new { url, error, servers });
         });
+    }
+
+    private static string? ReadTypedUrl(string? payload)
+    {
+        if (string.IsNullOrWhiteSpace(payload))
+            return null;
+
+        try
+        {
+            using var document = JsonDocument.Parse(payload, ParseOptions);
+            if (document.RootElement.TryGetProperty("url", out var value) &&
+                value.ValueKind == JsonValueKind.String)
+                return value.GetString()?.Trim();
+        }
+        catch (JsonException)
+        {
+            // Fall back to the configured address.
+        }
+
+        return null;
+    }
+
+    /// <summary>The directory the panel reads when its own address field is left empty.</summary>
+    private static string ConfiguredDirectoryUrl()
+    {
+        var configured = App.DirectoryUrl.Value?.Trim();
+        if (!string.IsNullOrWhiteSpace(configured))
+            return configured;
+
+        return $"https://{App.ServerAddress.Value}:{App.ServerPort.Value}";
     }
 
     private static void Join(string? payload)
@@ -212,7 +233,8 @@ internal static class MultiplayerPanel
                 }
 
                 var json = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
-                return (null, ParseServers(json));
+                var rows = ParseServers(json);
+                return (null, Describe(rows, ProbeAll(rows)));
             }
             catch (Exception exception) when (exception is HttpRequestException or TaskCanceledException)
             {
@@ -223,14 +245,24 @@ internal static class MultiplayerPanel
         return (lastError ?? "The directory did not answer.", Array.Empty<object>());
     }
 
-    private static object[] ParseServers(string json)
+    /// <summary>One directory entry as the panel needs it.</summary>
+    private sealed record ServerRow(
+        string Name,
+        string Host,
+        int Port,
+        int Players,
+        int Capacity,
+        string? Description,
+        string? Version);
+
+    private static List<ServerRow> ParseServers(string json)
     {
-        var servers = new System.Collections.Generic.List<object>();
+        var servers = new List<ServerRow>();
 
         using var document = JsonDocument.Parse(json, ParseOptions);
         if (!document.RootElement.TryGetProperty("servers", out var list) ||
             list.ValueKind != JsonValueKind.Array)
-            return servers.ToArray();
+            return servers;
 
         foreach (var item in list.EnumerateArray())
         {
@@ -239,18 +271,100 @@ internal static class MultiplayerPanel
             if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(host))
                 continue;
 
-            servers.Add(new
-            {
+            servers.Add(new ServerRow(
                 name,
                 host,
-                port = ReadInt(item, "port"),
-                players = ReadInt(item, "players"),
-                capacity = ReadInt(item, "capacity"),
-                description = ReadString(item, "description")
-            });
+                ReadInt(item, "port"),
+                ReadInt(item, "players"),
+                ReadInt(item, "capacity"),
+                ReadString(item, "description"),
+                ReadString(item, "version")));
         }
 
-        return servers.ToArray();
+        return servers;
+    }
+
+    /// <summary>Pairs every row with its measured ping, -1 when the probe failed.</summary>
+    private static object[] Describe(IReadOnlyList<ServerRow> rows, IReadOnlyList<int> pings)
+    {
+        var servers = new object[rows.Count];
+        for (var index = 0; index < rows.Count; index++)
+        {
+            var row = rows[index];
+            servers[index] = new
+            {
+                row.Name,
+                row.Host,
+                row.Port,
+                row.Players,
+                row.Capacity,
+                row.Description,
+                row.Version,
+                ping = pings[index]
+            };
+        }
+
+        return servers;
+    }
+
+    private const int PingTimeoutMs = 1500;
+    private const int PingBatchSize = 16;
+
+    /// <summary>
+    /// The directory only knows that a server announced itself, so the panel measures the round
+    /// trip of a TCP connect to the server port itself instead of trusting a stale number. The
+    /// probes run on their own threads, because this method already runs off the game thread.
+    /// </summary>
+    private static int[] ProbeAll(IReadOnlyList<ServerRow> rows)
+    {
+        var pings = new int[rows.Count];
+        Array.Fill(pings, -1);
+
+        for (var start = 0; start < rows.Count; start += PingBatchSize)
+        {
+            var end = Math.Min(start + PingBatchSize, rows.Count);
+            var threads = new List<Thread>(end - start);
+
+            for (var index = start; index < end; index++)
+            {
+                var slot = index;
+                var row = rows[slot];
+                var thread = new Thread(() => pings[slot] = Probe(row.Host, row.Port))
+                {
+                    IsBackground = true,
+                    Name = "StarTruckerMP.Ping"
+                };
+
+                threads.Add(thread);
+                thread.Start();
+            }
+
+            foreach (var thread in threads)
+                thread.Join(PingTimeoutMs + 250);
+        }
+
+        return pings;
+    }
+
+    private static int Probe(string host, int port)
+    {
+        if (port is < 1 or > 65535)
+            return -1;
+
+        var stopwatch = Stopwatch.StartNew();
+        try
+        {
+            using var client = new TcpClient();
+            var connect = client.ConnectAsync(host.Trim('[', ']'), port);
+            if (!connect.Wait(PingTimeoutMs))
+                return -1;
+
+            return (int)stopwatch.ElapsedMilliseconds;
+        }
+        catch (Exception exception) when (exception is SocketException or AggregateException or ArgumentException or ObjectDisposedException)
+        {
+            return -1;
+        }
     }
 
     private static string? ReadString(JsonElement item, string property) =>
@@ -309,86 +423,6 @@ internal static class MultiplayerPanel
         .Replace("__DEFAULT_PORT__", JsonSerializer.Serialize(DefaultPort()), StringComparison.Ordinal);
 
     /// <summary>
-    /// The overlay browser renders plain http pages reliably, while a data or custom URL showed
-    /// its own error page. A loopback listener avoids the certificate of the game server and keeps
-    /// the panel available in the main menu, before any server exists.
-    /// </summary>
-    private static string EnsureLocalPage()
-    {
-        _html = BuildHtml();
-
-        if (_listener is null)
-        {
-            var listener = new TcpListener(IPAddress.Loopback, 0);
-            listener.Start();
-            _listener = listener;
-            _port = ((IPEndPoint)listener.LocalEndpoint).Port;
-
-            var thread = new Thread(() => AcceptLoop(listener))
-            {
-                IsBackground = true,
-                Name = "StarTruckerMP.MultiplayerPanel"
-            };
-            thread.Start();
-            App.Log.LogInfo($"[Multiplayer] Panel page served at http://127.0.0.1:{_port}/");
-        }
-
-        return $"http://127.0.0.1:{_port}/?v={DateTime.UtcNow.Ticks}";
-    }
-
-    private static void AcceptLoop(TcpListener listener)
-    {
-        while (true)
-        {
-            try
-            {
-                var client = listener.AcceptTcpClient();
-                ThreadPool.QueueUserWorkItem(_ => Serve(client));
-            }
-            catch (Exception)
-            {
-                // The listener is closed when the game exits; nothing else to do here.
-                return;
-            }
-        }
-    }
-
-    private static void Serve(TcpClient client)
-    {
-        try
-        {
-            using (client)
-            using (var stream = client.GetStream())
-            {
-                using var reader = new StreamReader(stream, Encoding.ASCII, false, 1024, leaveOpen: true);
-                var requestLine = reader.ReadLine() ?? string.Empty;
-                while (!string.IsNullOrEmpty(reader.ReadLine()))
-                {
-                    // Skip the request headers.
-                }
-
-                var isIcon = requestLine.Contains("/favicon", StringComparison.OrdinalIgnoreCase);
-                var body = Encoding.UTF8.GetBytes(isIcon ? "" : _html);
-                var status = isIcon ? "404 Not Found" : "200 OK";
-                var header = $"HTTP/1.1 {status}\r\n" +
-                             "Content-Type: text/html; charset=utf-8\r\n" +
-                             "Cache-Control: no-store\r\n" +
-                             $"Content-Length: {body.Length}\r\n" +
-                             "Connection: close\r\n\r\n";
-
-                var headerBytes = Encoding.ASCII.GetBytes(header);
-                stream.Write(headerBytes, 0, headerBytes.Length);
-                stream.Write(body, 0, body.Length);
-                stream.Flush();
-            }
-        }
-        catch (Exception)
-        {
-            // A closed panel must never affect the game.
-        }
-    }
-
-    /// <summary>
     /// Plain HTML on purpose: the Svelte overlay page needs a running game server, and this
     /// panel has to work in the main menu, before any server is chosen.
     /// </summary>
@@ -440,12 +474,25 @@ internal static class MultiplayerPanel
   .hint { padding: 0 18px 10px; font-size: 11.5px; color: #93a1af; }
   .list { overflow: auto; padding: 0 10px 10px; }
   .row {
-    display: grid; grid-template-columns: 1fr auto auto; gap: 12px; align-items: center;
-    padding: 9px 10px; border-bottom: 1px solid #1b2634;
+    display: grid; grid-template-columns: 2rem minmax(0, 1fr) 7.5rem 4.8rem auto; gap: 12px;
+    align-items: center; padding: 9px 10px; border-bottom: 1px solid #1b2634;
   }
   .row:hover { background: #16202c; }
+  .row.head {
+    color: #6d7887; font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase;
+    padding: 2px 10px 6px; border-bottom: 1px solid #24303f;
+  }
+  .row.head:hover { background: transparent; }
+  .rank { color: #6d7887; font-size: 12px; font-variant-numeric: tabular-nums; }
+  .details { min-width: 0; }
   .name { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .meta { font-size: 11.5px; color: #93a1af; white-space: nowrap; }
+  .address { font-size: 11px; color: #6d7887; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .players, .ping {
+    font-size: 11.5px; color: #93a1af; text-align: right; white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+  .ping.good { color: #5bc8b0; }
+  .ping.bad { color: #e2573f; }
   .join {
     background: #1f2c3b; color: #f3e7d0; border: 1px solid #2f4054; border-radius: 4px;
     padding: 6px 12px; font-size: 12px; cursor: pointer;
@@ -502,7 +549,8 @@ internal static class MultiplayerPanel
   const t = polish ? {
     refresh: 'Odśwież', status: 'Szukam w katalogu...', empty: 'Brak serwerów w katalogu.',
     join: 'Połącz', players: 'graczy', footer: 'Po wybraniu serwera wczytaj zapis, żeby dołączyć.',
-    saved: 'Ustawiono serwer', error: 'Błąd', needsUrl: 'Najpierw wpisz host i port katalogu.',
+    saved: 'Ustawiono serwer', error: 'Błąd', serverColumn: 'Serwer', ping: 'Ping',
+    found: 'Serwery: {count}', unknownPing: '?', directoryHint: 'Puste pole czyta adres z konfiguracji.',
     directory: 'Katalog', direct: 'Po adresie IP', directoryLabel: 'Adres katalogu',
     filterHint: 'Szukaj po nazwie serwera', ipHint: 'IP lub host, np. 192.168.1.20',
     connect: 'Połącz', invalid: 'Podaj adres IP lub nazwę hosta.', badPort: 'Port musi być liczbą 1-65535.',
@@ -512,7 +560,8 @@ internal static class MultiplayerPanel
   } : {
     refresh: 'Refresh', status: 'Searching the directory...', empty: 'No servers in the directory.',
     join: 'Connect', players: 'players', footer: 'After picking a server, load a save to connect.',
-    saved: 'Server set to', error: 'Error', needsUrl: 'Enter the directory host and port first.',
+    saved: 'Server set to', error: 'Error', serverColumn: 'Server', ping: 'Ping',
+    found: 'Servers: {count}', unknownPing: '?', directoryHint: 'An empty field reads the configured address.',
     directory: 'Directory', direct: 'By IP address', directoryLabel: 'Directory address',
     filterHint: 'Search by server name', ipHint: 'IP or host, e.g. 192.168.1.20',
     connect: 'Connect', invalid: 'Enter an IP address or host name.', badPort: 'The port must be 1-65535.',
@@ -572,11 +621,10 @@ internal static class MultiplayerPanel
   };
 
   const refresh = () => {
-    const url = urlInput.value.trim();
-    if (!url) { setStatus(t.needsUrl, 'error'); return; }
+    // An empty address field is allowed: the plugin then reads the configured directory.
     setStatus(t.status);
     refreshButton.disabled = true;
-    sendToGame('multiplayerRefresh', { url });
+    sendToGame('multiplayerRefresh', { url: urlInput.value.trim() });
   };
 
   const join = (server) => {
@@ -587,6 +635,18 @@ internal static class MultiplayerPanel
     if (!query) return true;
     const address = `${server.host}:${server.port}`.toLowerCase();
     return server.name.toLowerCase().includes(query) || address.includes(query);
+  };
+
+  const headerRow = () => {
+    const head = document.createElement('div');
+    head.className = 'row head';
+    for (const label of ['#', t.serverColumn, t.players, t.ping]) {
+      const cell = document.createElement('div');
+      cell.textContent = label;
+      head.appendChild(cell);
+    }
+    head.appendChild(document.createElement('div'));
+    return head;
   };
 
   const render = (servers) => {
@@ -610,28 +670,52 @@ internal static class MultiplayerPanel
       return;
     }
 
-    for (const server of visible) {
+    list.appendChild(headerRow());
+
+    visible.forEach((server, index) => {
       const row = document.createElement('div');
       row.className = 'row';
+
+      // The position follows the visible rows, so filtering renumbers the list.
+      const rank = document.createElement('div');
+      rank.className = 'rank';
+      rank.textContent = String(index + 1);
+
+      const details = document.createElement('div');
+      details.className = 'details';
 
       const name = document.createElement('div');
       name.className = 'name';
       name.textContent = server.name;
       if (server.description) name.title = server.description;
 
-      const meta = document.createElement('div');
-      meta.className = 'meta';
-      const players = server.capacity > 0 ? ` · ${server.players}/${server.capacity} ${t.players}` : '';
-      meta.textContent = `${server.host}:${server.port}${players}`;
+      const address = document.createElement('div');
+      address.className = 'address';
+      address.textContent = `${server.host}:${server.port}`;
+
+      details.append(name, address);
+
+      const players = document.createElement('div');
+      players.className = 'players';
+      const count = Number.isFinite(server.players) ? server.players : 0;
+      players.textContent = server.capacity > 0
+        ? `${count}/${server.capacity} ${t.players}`
+        : `${count} ${t.players}`;
+
+      const ping = document.createElement('div');
+      const pingMs = Number.isFinite(server.ping) ? server.ping : -1;
+      ping.className = 'ping' + (pingMs >= 0 ? (pingMs < 150 ? ' good' : ' bad') : '');
+      ping.textContent = pingMs >= 0 ? `${pingMs} ms` : t.unknownPing;
+      ping.title = pingMs >= 0 ? `${server.host}:${server.port}` : t.ping;
 
       const button = document.createElement('button');
       button.className = 'join';
       button.textContent = t.join;
       button.addEventListener('click', () => join(server));
 
-      row.append(name, meta, button);
+      row.append(rank, details, players, ping, button);
       list.appendChild(row);
-    }
+    });
   };
 
   const showTab = (direct) => {
@@ -677,12 +761,11 @@ internal static class MultiplayerPanel
     if (message.type === 'multiplayerServers') {
       refreshButton.disabled = false;
       lastServers = payload.servers || [];
-      if (payload.url) urlInput.value = payload.url;
       if (payload.error) {
         setStatus(t.error + ': ' + payload.error, 'error');
         render([]);
       } else {
-        setStatus(`${lastServers.length}`, 'ok');
+        setStatus(t.found.replace('{count}', String(lastServers.length)), 'ok');
         render(lastServers);
       }
     }
@@ -704,7 +787,9 @@ internal static class MultiplayerPanel
   bridge.pendingGameMessages = [];
   for (const message of pending) bridge.dispatchGameMessage(message);
 
-  urlInput.value = __DIRECTORY_URL__;
+  urlInput.placeholder = __DIRECTORY_URL__;
+  urlInput.title = t.directoryHint;
+  urlInput.setAttribute('aria-label', t.directoryLabel);
   refreshButton.textContent = t.refresh;
   footer.textContent = t.footer;
   filterInput.placeholder = t.filterHint;

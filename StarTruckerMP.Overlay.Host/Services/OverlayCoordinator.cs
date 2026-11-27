@@ -235,6 +235,13 @@ internal sealed class OverlayCoordinator : IDisposable
     {
         _overlayVisible = true;
         ApplyWindowState(_tracker.CurrentState);
+
+        // The in-game HUD is click-through, so it never passes through ApplyUiMode. Re-assert the
+        // topmost flag here too, otherwise a full screen game can cover the panel it just opened.
+        var hwnd = _window.GetWindowHandle();
+        if (hwnd != 0)
+            _windowStyles.EnsureTopmost(hwnd);
+
         _logger.Info("[Overlay] SHOW");
     }
 

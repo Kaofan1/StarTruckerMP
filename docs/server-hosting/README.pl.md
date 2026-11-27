@@ -213,6 +213,9 @@ przyjmowane raz na sekundę, a zły token kończy się kodem 403, więc nie da s
 w launcherze. Kolumnę PING launcher wypełnia sam, mierząc czas odpowiedzi na `host:port`. Katalog trzyma wpisy w pamięci, więc po restarcie huba serwery zarejestrują się ponownie
 następnym heartbeatem i dostaną nowe id.
 
+`GET /status/summary` zwraca `{"players":3,"capacity":8}`: same liczby, bez nicków, więc nie wymaga
+tokenu sesji. Panel w grze czyta go, żeby pokazać zapełnienie serwera.
+
 ## Podłączanie graczy
 
 1. Zainstaluj launcher z Releases i otwórz kartę **Zakładki serwerów**.
