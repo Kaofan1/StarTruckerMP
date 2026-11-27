@@ -32,6 +32,7 @@ internal static class MultiplayerPanel
         try
         {
             var url = Page.Publish(BuildHtml());
+            HudPanel.SuspendForPanel();
             OverlayManager.Panel.Show();
             OverlayManager.Panel.Navigate(url);
             OverlayManager.Panel.SetInteractiveMode(true);
@@ -41,6 +42,7 @@ internal static class MultiplayerPanel
         {
             // A missing overlay process must never break the game menu.
             App.Log.LogWarning("[Multiplayer] Could not open the panel: " + exception.Message);
+            HudPanel.ResumeAfterPanel();
         }
     }
 
@@ -50,6 +52,7 @@ internal static class MultiplayerPanel
         {
             OverlayManager.Panel.SetInteractiveMode(false);
             OverlayManager.Panel.Hide();
+            HudPanel.ResumeAfterPanel();
         }
         catch (Exception exception)
         {

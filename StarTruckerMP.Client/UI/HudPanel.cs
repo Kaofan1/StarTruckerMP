@@ -19,6 +19,7 @@ internal static class HudPanel
     private static readonly HttpClient Client = CreateClient();
 
     private static volatile bool _visible;
+    private static volatile bool _suspendedForPanel;
     private static volatile int _players = -1;
     private static volatile int _capacity;
     private static long _nextPlayerPoll;
@@ -44,6 +45,7 @@ internal static class HudPanel
             OverlayManager.Show();
             OverlayManager.Navigate(url);
             _visible = true;
+            _suspendedForPanel = false;
             App.Log.LogInfo("[Hud] Shown.");
             PushState();
             PollPlayers(force: true);
@@ -61,8 +63,45 @@ internal static class HudPanel
             return;
 
         _visible = false;
+        _suspendedForPanel = false;
         OverlayManager.Hide();
         App.Log.LogInfo("[Hud] Hidden.");
+    }
+
+    /// <summary>
+    /// The Multiplayer panel is its own window now, so the HUD steps aside while it is open
+    /// instead of drawing underneath it.
+    /// </summary>
+    public static void SuspendForPanel()
+    {
+        if (!_visible || _suspendedForPanel)
+            return;
+
+        _suspendedForPanel = true;
+        OverlayManager.Hide();
+        App.Log.LogInfo("[Hud] Hidden while the Multiplayer panel is open.");
+    }
+
+    /// <summary>Brings the HUD back after the panel closes, if it was visible before.</summary>
+    public static void ResumeAfterPanel()
+    {
+        if (!_suspendedForPanel)
+            return;
+
+        _suspendedForPanel = false;
+        if (!_visible)
+            return;
+
+        try
+        {
+            OverlayManager.Show();
+            OverlayManager.Navigate(Page.Publish(HudHtml));
+            App.Log.LogInfo("[Hud] Restored after the Multiplayer panel closed.");
+        }
+        catch (Exception exception)
+        {
+            App.Log.LogWarning("[Hud] Could not restore the panel: " + exception.Message);
+        }
     }
 
     /// <summary>Messages sent by the HUD page through the overlay pipe.</summary>

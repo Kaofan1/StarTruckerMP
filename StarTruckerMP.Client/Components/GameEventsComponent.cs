@@ -37,11 +37,6 @@ public class GameEventsComponent : MonoBehaviour
                     // overlay process usually starts long before the browser finishes loading.
                     ReportOverlayState();
                     break;
-                case "overlayModeChanged":
-                    // The overlay window closes the panel with Escape, so its own mode change has to
-                    // reach the page too, otherwise the panel would stay on screen.
-                    ReportOverlayMode();
-                    break;
             }
         };
 
@@ -133,7 +128,7 @@ public class GameEventsComponent : MonoBehaviour
     }
 
     private static void ReportOverlayMode() =>
-        OverlayManager.PostMessage("overlayModeChanged", new { interactive = OverlayManager.IsInteractiveMode });
+        OverlayManager.PostMessage("overlayModeChanged", new { interactive = OverlayManager.IsHudInteractiveMode });
 
     private static void ReportOverlaySession(bool connected)
     {

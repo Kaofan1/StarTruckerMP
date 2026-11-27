@@ -33,6 +33,9 @@ internal sealed class OverlayHandle
     private Process? _process;
     private bool _launchStarted;
 
+    /// <summary>Whether this instance's window currently captures input.</summary>
+    public bool Interactive { get; private set; }
+
     public OverlayHandle(string pipeName, string tag)
     {
         _pipeName = pipeName;
@@ -71,19 +74,22 @@ internal sealed class OverlayHandle
     /// <summary>Enable or disable click-through on this overlay's window.</summary>
     public void SetClickThrough(bool enabled)
     {
+        Interactive = !enabled;
         OverlayManager.SetInteractiveModeState(!enabled);
         SendCommand($"CLICKTHROUGH:{(enabled ? "1" : "0")}");
     }
 
     public void SetInteractiveMode(bool enabled)
     {
+        Interactive = enabled;
         OverlayManager.SetInteractiveModeState(enabled);
         SendCommand($"INTERACTIVE:{(enabled ? "1" : "0")}");
     }
 
     public void ToggleInteractiveMode()
     {
-        OverlayManager.SetInteractiveModeState(!OverlayManager.IsInteractiveMode);
+        Interactive = !Interactive;
+        OverlayManager.SetInteractiveModeState(Interactive);
         SendCommand("TOGGLEINTERACTIVE");
     }
 
@@ -276,6 +282,12 @@ internal static class OverlayManager
     public static void SetClickThrough(bool enabled) => HudHandle.SetClickThrough(enabled);
 
     public static bool IsInteractiveMode => _interactiveMode;
+
+    /// <summary>
+    /// Whether the HUD instance captures input. The Multiplayer panel is its own overlay, so its
+    /// mode never reaches the HUD page and the Svelte HUD cannot appear while the panel is open.
+    /// </summary>
+    public static bool IsHudInteractiveMode => HudHandle.Interactive;
 
     public static void SetInteractiveMode(bool enabled) => HudHandle.SetInteractiveMode(enabled);
 
@@ -576,7 +588,10 @@ internal static class OverlayManager
                 p.TryGetProperty("interactive", out var interactiveElement) &&
                 (interactiveElement.ValueKind == JsonValueKind.True || interactiveElement.ValueKind == JsonValueKind.False))
             {
+                // The panel has its own window: its mode change only matters to the game's input
+                // handling and must not be forwarded to the HUD page, which would draw its HUD.
                 _interactiveMode = interactiveElement.GetBoolean();
+                return;
             }
 
             MessageReceived?.Invoke(type, payload);
