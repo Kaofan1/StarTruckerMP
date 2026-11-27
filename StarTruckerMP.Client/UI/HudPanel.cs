@@ -24,7 +24,6 @@ internal static class HudPanel
     private static long _nextPlayerPoll;
 
     private const int PlayerPollIntervalMs = 5000;
-    private static readonly TimeSpan FetchTimeout = TimeSpan.FromSeconds(3);
 
     public static bool IsVisible => _visible;
 
@@ -175,7 +174,9 @@ internal static class HudPanel
             ServerCertificateCustomValidationCallback = (_, _, _, _) => true
         };
 
-        return new HttpClient(handler) { Timeout = FetchTimeout };
+        // A static TimeSpan field declared after Client would still be zero here, and
+        // HttpClient rejects a zero timeout, so the value is written inline.
+        return new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(3) };
     }
 
     private const string HudHtml = """

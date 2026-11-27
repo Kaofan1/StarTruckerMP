@@ -50,6 +50,9 @@ public class GameEventsComponent : MonoBehaviour
     }
 
     private bool _loaded;
+
+    /// <summary>Set once when the HUD cannot be reached, so Update stops calling into it.</summary>
+    private bool _hudUnavailable;
     
     private GameObject _player;
     private GameObject _playerCam;
@@ -251,7 +254,7 @@ public class GameEventsComponent : MonoBehaviour
         if (PlayerState.SpaceSuitMats == null &&  PlayerState.SpaceSuit != null)
             PlayerState.SpaceSuitMats = PlayerState.SpaceSuit.GetComponent<MeshRenderer>()?.materials.ToArray();
         
-        // Real overlay hotkeys: F2 toggles UI mode and Esc closes it.
+        // Real overlay hotkeys: F2 toggles the status panel and F9 opens the server browser.
         // Font assets are loaded by the game after the plugin starts, so the fallback is added
         // once they appear instead of only at start up.
         if (!Patches.FontFallback.Installed && Time.unscaledTime >= _nextFontFallbackCheck)
@@ -269,15 +272,27 @@ public class GameEventsComponent : MonoBehaviour
         }
 
         // F2 toggles the small panel with the connection, the online players and this player's id.
-        // It stays click-through, so the game keeps the mouse and the keyboard.
-        if (Input.GetKeyDown(KeyCode.F2))
+        // It stays click-through, so the game keeps the mouse and the keyboard. A failure is
+        // reported once instead of every frame, because this runs in Update.
+        if (!_hudUnavailable)
         {
-            App.Log.LogInfo("[Hud] F2 => toggle panel");
-            HudPanel.Toggle();
-        }
+            try
+            {
+                if (Input.GetKeyDown(KeyCode.F2))
+                {
+                    App.Log.LogInfo("[Hud] F2 => toggle panel");
+                    HudPanel.Toggle();
+                }
 
-        if (HudPanel.IsVisible)
-            HudPanel.Tick();
+                if (HudPanel.IsVisible)
+                    HudPanel.Tick();
+            }
+            catch (Exception exception)
+            {
+                _hudUnavailable = true;
+                App.Log.LogError("[Hud] The panel is unavailable for this session: " + exception);
+            }
+        }
 
         if (OverlayManager.IsInteractiveMode && Input.GetKeyDown(KeyCode.Escape))
         {
