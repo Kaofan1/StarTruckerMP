@@ -217,6 +217,7 @@ internal sealed class OverlayCoordinator : IDisposable
         Dispatcher.UIThread.Post(() =>
         {
             _logger.Warn("[Overlay] The game exited; closing the overlay.");
+            _window.AllowClose();
             _window.Close();
         });
     }

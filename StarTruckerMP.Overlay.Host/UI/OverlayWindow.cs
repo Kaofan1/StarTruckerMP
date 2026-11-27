@@ -14,6 +14,7 @@ internal sealed class OverlayWindow : Window
     private double _lastWidth;
     private double _lastHeight;
     private bool _hasBounds;
+    private bool _closeAllowed;
 
     public OverlayWindow()
     {
@@ -45,7 +46,19 @@ internal sealed class OverlayWindow : Window
                 _image
             }
         };
+
+        // The overlay belongs to the game for as long as the game runs. A close request from the
+        // desktop (Alt+F4 aimed at the game while this window happens to be in front) used to end
+        // this process, after which F2 had nothing left to talk to.
+        Closing += (_, e) =>
+        {
+            if (!_closeAllowed)
+                e.Cancel = true;
+        };
     }
+
+    /// <summary>Lets the window close for real, which only the end of the game asks for.</summary>
+    public void AllowClose() => _closeAllowed = true;
 
     public Bitmap? FrameBitmap
     {

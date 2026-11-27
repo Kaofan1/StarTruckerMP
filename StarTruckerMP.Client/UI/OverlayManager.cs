@@ -26,6 +26,12 @@ internal sealed class OverlayHandle
     /// <summary>How many undelivered commands may wait before the oldest ones are dropped.</summary>
     private const int MaxQueuedCommands = 32;
 
+    /// <summary>How long an overlay that is only just starting up may take to open its pipe.</summary>
+    private const int PipeLaunchDeadlineMs = 60_000;
+
+    /// <summary>A launch that failed is not repeated faster than this.</summary>
+    private const int RelaunchCooldownMs = 10_000;
+
     /// <summary>
     /// The session token has to survive the whole overlay cold start: on this machine the pipe
     /// server appeared around twenty seconds after the process started.
@@ -36,9 +42,11 @@ internal sealed class OverlayHandle
     private readonly string _tag;
     private readonly object _pageLock = new();
     private readonly object _queueLock = new();
+    private readonly object _launchLock = new();
     private readonly List<PendingCommand> _queue = [];
     private Process? _process;
-    private bool _launchStarted;
+    private bool _launching;
+    private long _nextLaunchTick;
     private bool _senderRunning;
     private bool _reportedDead;
 
@@ -53,18 +61,43 @@ internal sealed class OverlayHandle
 
     public string PipeName => _pipeName;
 
-    /// <summary>Starts this overlay process once; a second call is ignored.</summary>
-    public void Launch()
-    {
-        if (_launchStarted)
-            return;
+    /// <summary>Starts this overlay process; a call while it is already running does nothing.</summary>
+    public void Launch() => EnsureRunning();
 
-        _launchStarted = true;
+    /// <summary>
+    /// Starts the overlay process when it is not running and reports whether a new one was
+    /// started. The game owns both overlays for its whole life, so an instance that exited is
+    /// brought back instead of leaving F2 and the server browser with a pipe nobody listens to.
+    /// </summary>
+    internal bool EnsureRunning()
+    {
+        lock (_launchLock)
+        {
+            if (_launching || !HasExited())
+                return false;
+
+            if (Environment.TickCount64 < _nextLaunchTick)
+                return false;
+
+            _launching = true;
+            _nextLaunchTick = Environment.TickCount64 + RelaunchCooldownMs;
+            _reportedDead = false;
+        }
+
+        App.Log.LogWarning($"[Overlay] Starting the {_tag} overlay process.");
 
         Plugin.StartAttachedThread(() =>
         {
-            _process = OverlayManager.StartOverlayProcess(_pipeName, _tag);
+            var process = OverlayManager.StartOverlayProcess(_pipeName, _tag);
+
+            lock (_launchLock)
+            {
+                _process = process;
+                _launching = false;
+            }
         });
+
+        return true;
     }
 
     public void Shutdown()
@@ -83,9 +116,9 @@ internal sealed class OverlayHandle
     /// <summary>One pipe write that is still waiting for the overlay to accept a connection.</summary>
     private sealed class PendingCommand(string[] commands, long deadline)
     {
-        public string[] Commands { get; } = commands;
+        public string[] Commands { get; set; } = commands;
 
-        public long Deadline { get; } = deadline;
+        public long Deadline { get; set; } = deadline;
 
         public int Attempts { get; set; }
     }
@@ -145,6 +178,17 @@ internal sealed class OverlayHandle
     {
         lock (_pageLock)
             _pageUrl = null;
+    }
+
+    /// <summary>Takes the page a restarted process has to load again, or null when none was set.</summary>
+    private string? TakePageForRestart()
+    {
+        lock (_pageLock)
+        {
+            var url = _pageUrl;
+            _pageUrl = null;
+            return url;
+        }
     }
 
     public void Show() => SendCommand("SHOW");
@@ -243,6 +287,17 @@ internal sealed class OverlayHandle
                 if (Plugin.IsShuttingDown)
                     return;
 
+                // The overlay process may have exited while the game kept running. Starting it
+                // again here is what makes F2 work after that instead of talking to a dead pipe.
+                if (EnsureRunning())
+                {
+                    var page = TakePageForRestart();
+                    if (page != null && Array.IndexOf(command.Commands, "HIDE") < 0)
+                        command.Commands = [$"NAVIGATE:{page}", .. command.Commands];
+
+                    command.Deadline = Environment.TickCount64 + PipeLaunchDeadlineMs;
+                }
+
                 command.Attempts++;
 
                 string? failure;
@@ -275,17 +330,21 @@ internal sealed class OverlayHandle
                     return;
                 }
 
-                // Nobody is listening any more, so retrying would only repeat this failure on
-                // every following key press.
+                // An overlay that is only just starting up has no pipe yet, so the command waits
+                // for it until its deadline instead of being reported as a failure.
                 if (HasExited())
                 {
-                    if (!_reportedDead)
+                    if (Environment.TickCount64 < command.Deadline)
                     {
-                        _reportedDead = true;
-                        App.Log.LogWarning($"[Overlay] The {_tag} overlay process is gone; its commands are dropped. Restart the game to get it back.");
+                        Thread.Sleep(250);
+                        continue;
                     }
 
-                    return;
+                    lock (_queueLock)
+                        _queue.Remove(command);
+
+                    ReportDeadOnce();
+                    continue;
                 }
 
                 if (Environment.TickCount64 >= command.Deadline)
@@ -312,17 +371,36 @@ internal sealed class OverlayHandle
         }
     }
 
+    /// <summary>True when no overlay process is running: one that is still booting counts as alive.</summary>
     private bool HasExited()
     {
-        try
+        lock (_launchLock)
         {
-            return _process is { HasExited: true };
+            if (_launching)
+                return false;
+
+            if (_process is null)
+                return true;
+
+            try
+            {
+                return _process.HasExited;
+            }
+            catch
+            {
+                // A process object that cannot answer is one that is not there any more.
+                return true;
+            }
         }
-        catch
-        {
-            // A process object that cannot answer is one that is not there any more.
-            return true;
-        }
+    }
+
+    private void ReportDeadOnce()
+    {
+        if (_reportedDead)
+            return;
+
+        _reportedDead = true;
+        App.Log.LogWarning($"[Overlay] The {_tag} overlay is not running; its commands are dropped until the next request.");
     }
 
     private void AllowForeground()
