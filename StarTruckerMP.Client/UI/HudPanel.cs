@@ -41,7 +41,6 @@ internal static class HudPanel
         try
         {
             var url = Page.Publish(HudHtml);
-            OverlayManager.SetInteractiveMode(false);
             OverlayManager.Show();
             OverlayManager.Navigate(url);
             _visible = true;

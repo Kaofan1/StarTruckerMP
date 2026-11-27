@@ -4,9 +4,6 @@ public abstract record OverlayCommand(string Raw);
 
 public sealed record SetInteractiveCommand(string Raw, bool Enabled) : OverlayCommand(Raw);
 
-public sealed record SetClickThroughCommand(string Raw, bool Enabled) : OverlayCommand(Raw);
-
-public sealed record ToggleInteractiveCommand(string Raw) : OverlayCommand(Raw);
 
 public sealed record NavigateCommand(string Raw, string Url) : OverlayCommand(Raw);
 

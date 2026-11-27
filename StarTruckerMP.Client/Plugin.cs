@@ -82,13 +82,6 @@ public class Plugin : BasePlugin
         
         Log.LogInfo($"Plugin {PluginInfo.PLUGIN_GUID} loaded.");
         
-        #if DEBUG
-        OverlayManager.MessageReceived += (type, payload) =>
-        {
-            if (type == "overlayLoaded")
-                App.Log.LogInfo("[Overlay] Overlay has loaded and is ready to receive messages.");
-        };
-        #endif
     }
 
     private void SetupUI()

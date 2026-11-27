@@ -33,9 +33,6 @@ internal sealed class OverlayHandle
     private Process? _process;
     private bool _launchStarted;
 
-    /// <summary>Whether this instance's window currently captures input.</summary>
-    public bool Interactive { get; private set; }
-
     public OverlayHandle(string pipeName, string tag)
     {
         _pipeName = pipeName;
@@ -71,27 +68,8 @@ internal sealed class OverlayHandle
         }
     }
 
-    /// <summary>Enable or disable click-through on this overlay's window.</summary>
-    public void SetClickThrough(bool enabled)
-    {
-        Interactive = !enabled;
-        OverlayManager.SetInteractiveModeState(!enabled);
-        SendCommand($"CLICKTHROUGH:{(enabled ? "1" : "0")}");
-    }
-
-    public void SetInteractiveMode(bool enabled)
-    {
-        Interactive = enabled;
-        OverlayManager.SetInteractiveModeState(enabled);
-        SendCommand($"INTERACTIVE:{(enabled ? "1" : "0")}");
-    }
-
-    public void ToggleInteractiveMode()
-    {
-        Interactive = !Interactive;
-        OverlayManager.SetInteractiveModeState(Interactive);
-        SendCommand("TOGGLEINTERACTIVE");
-    }
+    /// <summary>Switches this overlay between click-through and input capture.</summary>
+    public void SetInteractiveMode(bool enabled) => SendCommand($"INTERACTIVE:{(enabled ? "1" : "0")}");
 
     public void RunDiagnostics() => SendCommand("RUNTESTS");
 
@@ -229,7 +207,6 @@ internal static class OverlayManager
     private static readonly OverlayHandle HudHandle = new(HudPipeName, "hud");
 
     private static CancellationTokenSource? _gamePipeCts;
-    private static volatile bool _interactiveMode;
 
     /// <summary>The Multiplayer panel overlay, isolated from the HUD overlay.</summary>
     public static OverlayHandle Panel { get; } = new(PanelPipeName, "panel");
@@ -279,20 +256,6 @@ internal static class OverlayManager
 
     // The static API controls the HUD instance; the panel is reached through Panel.
 
-    public static void SetClickThrough(bool enabled) => HudHandle.SetClickThrough(enabled);
-
-    public static bool IsInteractiveMode => _interactiveMode;
-
-    /// <summary>
-    /// Whether the HUD instance captures input. The Multiplayer panel is its own overlay, so its
-    /// mode never reaches the HUD page and the Svelte HUD cannot appear while the panel is open.
-    /// </summary>
-    public static bool IsHudInteractiveMode => HudHandle.Interactive;
-
-    public static void SetInteractiveMode(bool enabled) => HudHandle.SetInteractiveMode(enabled);
-
-    public static void ToggleInteractiveMode() => HudHandle.ToggleInteractiveMode();
-
     public static void RunDiagnostics() => HudHandle.RunDiagnostics();
 
     /// <summary>Navigates the HUD browser to a URL.</summary>
@@ -316,8 +279,6 @@ internal static class OverlayManager
         HudHandle.PostMessage(type, jsonPayload);
 
     public static void PostMessage<T>(string type, T? data) => HudHandle.PostMessage(type, data);
-
-    internal static void SetInteractiveModeState(bool enabled) => _interactiveMode = enabled;
 
     #endregion
 
@@ -583,17 +544,6 @@ internal static class OverlayManager
 
             var type = root.GetProperty("type").GetString() ?? string.Empty;
             var payload = root.TryGetProperty("payload", out var p) ? p.GetRawText() : null;
-            if (type.Equals("overlayModeChanged", StringComparison.OrdinalIgnoreCase) &&
-                p.ValueKind == JsonValueKind.Object &&
-                p.TryGetProperty("interactive", out var interactiveElement) &&
-                (interactiveElement.ValueKind == JsonValueKind.True || interactiveElement.ValueKind == JsonValueKind.False))
-            {
-                // The panel has its own window: its mode change only matters to the game's input
-                // handling and must not be forwarded to the HUD page, which would draw its HUD.
-                _interactiveMode = interactiveElement.GetBoolean();
-                return;
-            }
-
             MessageReceived?.Invoke(type, payload);
         }
         catch (Exception ex)

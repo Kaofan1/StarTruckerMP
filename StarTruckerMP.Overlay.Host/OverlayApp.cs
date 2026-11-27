@@ -56,7 +56,6 @@ internal sealed class OverlayApp : Application
                 modeService,
                 tracker,
                 windowStyles,
-                pipeToGame,
                 new OverlayPipeServer(_logger, _launchOptions.PipeName, command => _coordinator!.HandleCommandAsync(command)),
                 _logger);
 

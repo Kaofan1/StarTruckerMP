@@ -32,16 +32,11 @@ public class GameEventsComponent : MonoBehaviour
                     App.Log.LogInfo($"[Object Inspector] request extra data for object {data}");
                     GetMoreData(data);
                     break;
-                case "overlayLoaded":
-                    // The page asks for the current state as soon as it mounts, because the
-                    // overlay process usually starts long before the browser finishes loading.
-                    ReportOverlayState();
-                    break;
             }
         };
 
         Network.OnConnected += netId => Connected();
-        Network.OnDisconnected += () => ReportOverlaySession(connected: false);
+        Network.OnDisconnected += () => HudPanel.PushState();
     }
 
     private bool _loaded;
@@ -121,31 +116,10 @@ public class GameEventsComponent : MonoBehaviour
 
     private float _nextFontFallbackCheck;
 
-    private static void ReportOverlayState()
-    {
-        ReportOverlayMode();
-        ReportOverlaySession(Network.IsConnected);
-    }
-
-    private static void ReportOverlayMode() =>
-        OverlayManager.PostMessage("overlayModeChanged", new { interactive = OverlayManager.IsHudInteractiveMode });
-
-    private static void ReportOverlaySession(bool connected)
-    {
-        OverlayManager.PostMessage("session", new
-        {
-            connected,
-            server = $"{App.ServerAddress.Value}:{App.ServerPort.Value}",
-            netId = connected ? Network.NetId : -1
-        });
-
-        // The F2 panel shows the same state, and it has to follow a connect or a drop.
-        HudPanel.PushState();
-    }
-
     private void Connected()
     {
-        ReportOverlaySession(connected: true);
+        // The F2 panel follows a connect or a drop.
+        HudPanel.PushState();
 
         // The handshake can finish before the truck exists (or with a connector that has no
         // cargo attached yet), so every step is optional here.
@@ -287,13 +261,6 @@ public class GameEventsComponent : MonoBehaviour
                 _hudUnavailable = true;
                 App.Log.LogError("[Hud] The panel is unavailable for this session: " + exception);
             }
-        }
-
-        if (OverlayManager.IsInteractiveMode && Input.GetKeyDown(KeyCode.Escape))
-        {
-            App.Log.LogInfo("[Overlay] Esc => interactive mode OFF (click-through ON)");
-            OverlayManager.SetInteractiveMode(false);
-            ReportOverlayMode();
         }
 
         if (Input.GetKeyDown(KeyCode.F3))

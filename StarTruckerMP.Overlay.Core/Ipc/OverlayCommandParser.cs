@@ -10,9 +10,6 @@ public static class OverlayCommandParser
         if (string.IsNullOrWhiteSpace(command))
             return new UnknownOverlayCommand(string.Empty);
 
-        if (command.Equals("TOGGLEINTERACTIVE", StringComparison.OrdinalIgnoreCase))
-            return new ToggleInteractiveCommand(command);
-
         if (command.Equals("SHOW", StringComparison.OrdinalIgnoreCase))
             return new ShowOverlayCommand(command);
 
@@ -24,9 +21,6 @@ public static class OverlayCommandParser
 
         if (TryReadBool(command, "INTERACTIVE:", out var interactive))
             return new SetInteractiveCommand(command, interactive);
-
-        if (TryReadBool(command, "CLICKTHROUGH:", out var clickThrough))
-            return new SetClickThroughCommand(command, clickThrough);
 
         if (TryReadPayload(command, "NAVIGATE:", out var url))
             return new NavigateCommand(command, url);
