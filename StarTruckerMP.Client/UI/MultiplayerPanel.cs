@@ -32,10 +32,9 @@ internal static class MultiplayerPanel
         try
         {
             var url = Page.Publish(BuildHtml());
-            HudPanel.MarkHidden();
-            OverlayManager.Show();
-            OverlayManager.Navigate(url);
-            OverlayManager.SetInteractiveMode(true);
+            OverlayManager.Panel.Show();
+            OverlayManager.Panel.Navigate(url);
+            OverlayManager.Panel.SetInteractiveMode(true);
             App.Log.LogInfo("[Multiplayer] Panel opened.");
         }
         catch (Exception exception)
@@ -49,9 +48,8 @@ internal static class MultiplayerPanel
     {
         try
         {
-            OverlayManager.SetInteractiveMode(false);
-            HudPanel.MarkHidden();
-            OverlayManager.Hide();
+            OverlayManager.Panel.SetInteractiveMode(false);
+            OverlayManager.Panel.Hide();
         }
         catch (Exception exception)
         {
@@ -102,7 +100,7 @@ internal static class MultiplayerPanel
         Plugin.StartAttachedThread(() =>
         {
             var (error, servers) = FetchAsync(url).GetAwaiter().GetResult();
-            OverlayManager.PostMessage("multiplayerServers", new { url, error, servers });
+            OverlayManager.Panel.PostMessage("multiplayerServers", new { url, error, servers });
         });
     }
 
@@ -159,7 +157,7 @@ internal static class MultiplayerPanel
         host = NormalizeHost(host, ref port);
         if (string.IsNullOrWhiteSpace(host) || port is < 1 or > 65535)
         {
-            OverlayManager.PostMessage("serverSelected", new { error = "Invalid server address." });
+            OverlayManager.Panel.PostMessage("serverSelected", new { error = "Invalid server address." });
             return;
         }
 
@@ -168,7 +166,7 @@ internal static class MultiplayerPanel
         SaveConfig();
 
         App.Log.LogInfo($"[Multiplayer] Selected server {host}:{port} ({name ?? host}). Load a save to connect.");
-        OverlayManager.PostMessage("serverSelected", new { host, port, name = name ?? host });
+        OverlayManager.Panel.PostMessage("serverSelected", new { host, port, name = name ?? host });
     }
 
     /// <summary>

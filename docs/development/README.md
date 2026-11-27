@@ -92,10 +92,12 @@ the full list appears as soon as the panel opens. Each row shows its position in
 the player count from the last heartbeat and a ping that the plugin measures with a TCP connect to the
 server port.
 
-`F2` toggles a small panel in the same overlay: the server address, the connection state, the online
-player count and this player's network id. It is served by the plugin the same way as the server list
-and stays click-through, so the game keeps the mouse and the keyboard. The count comes from the public
-`/status/summary` endpoint of the server.
+The server list and the HUD are two separate overlay processes, each with its own IPC pipe and window:
+the `Multiplayer` button opens the server list in one, and `F2` toggles the small panel in the other with
+the server address, the connection state, the online player count and this player's network id. Both
+pages are served by the plugin and keep their click-through or interactive behaviour independently, so
+opening one never replaces the page of the other. The count comes from the public `/status/summary`
+endpoint of the server.
 
 ## Conventions
 

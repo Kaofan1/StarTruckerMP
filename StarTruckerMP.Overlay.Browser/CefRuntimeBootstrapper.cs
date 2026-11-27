@@ -11,7 +11,12 @@ public static class CefRuntimeBootstrapper
     private static bool _initialized;
     public static bool IgnoreCertificateErrorsByDefault { get; set; }
 
-    public static void InitializeOnce(IOverlayLogger logger)
+    /// <summary>
+    /// Initializes CEF once per process. Two overlay processes run next to each other, and Chromium
+    /// locks its cache directory, so each instance needs a cache of its own; <paramref name="instanceName"/>,
+    /// normally the instance pipe name, names that folder.
+    /// </summary>
+    public static void InitializeOnce(IOverlayLogger logger, string instanceName)
     {
         lock (SyncRoot)
         {
@@ -28,7 +33,7 @@ public static class CefRuntimeBootstrapper
                 WindowlessRenderingEnabled = true,
                 LogSeverity = LogSeverity.Info,
                 BackgroundColor = Cef.ColorSetARGB(0, 0, 0, 0),
-                RootCachePath = Path.Combine(baseDirectory, "cef-cache")
+                RootCachePath = Path.Combine(baseDirectory, "cef-cache", SafeFolderName(instanceName))
             };
 
             settings.CefCommandLineArgs["disable-gpu-vsync"] = "1";
@@ -61,7 +66,7 @@ public static class CefRuntimeBootstrapper
                 break;
             }
 
-            logger.Info($"[CEF] Initializing runtime from {baseDirectory}");
+            logger.Info($"[CEF] Initializing runtime from {baseDirectory} (cache={settings.RootCachePath})");
             logger.Info($"[CEF] BrowserSubprocessPath={settings.BrowserSubprocessPath ?? "<default>"}");
             logger.Info($"[CEF] IgnoreCertificateErrors={ignoreCertificateErrors}");
 
@@ -72,6 +77,16 @@ public static class CefRuntimeBootstrapper
             _initialized = true;
             logger.Info($"[CEF] Initialized. CefSharp={typeof(Cef).Assembly.GetName().Version}, Host={Assembly.GetEntryAssembly()?.GetName().Version}");
         }
+    }
+
+    private static string SafeFolderName(string value)
+    {
+        var invalid = Path.GetInvalidFileNameChars();
+        var builder = new System.Text.StringBuilder(value.Length);
+        foreach (var character in value)
+            builder.Append(invalid.Contains(character) ? '_' : character);
+
+        return builder.Length == 0 ? "default" : builder.ToString();
     }
 
     public static void Shutdown(IOverlayLogger logger)

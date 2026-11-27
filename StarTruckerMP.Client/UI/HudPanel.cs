@@ -65,9 +65,6 @@ internal static class HudPanel
         App.Log.LogInfo("[Hud] Hidden.");
     }
 
-    /// <summary>Another page took over the overlay window.</summary>
-    public static void MarkHidden() => _visible = false;
-
     /// <summary>Messages sent by the HUD page through the overlay pipe.</summary>
     public static void HandleMessage(string type, string? payload)
     {

@@ -7,14 +7,15 @@ namespace StarTruckerMP.Overlay.Host.Services;
 
 internal sealed class OverlayPipeServer : IDisposable
 {
-    private const string OverlayPipeName = "StarTruckerMP.Overlay";
+    private readonly string _overlayPipeName;
     private readonly IOverlayLogger _logger;
     private readonly CancellationTokenSource _cts = new();
     private readonly Func<OverlayCommand, Task> _commandHandler;
     private Task? _serverTask;
 
-    public OverlayPipeServer(IOverlayLogger logger, Func<OverlayCommand, Task> commandHandler)
+    public OverlayPipeServer(IOverlayLogger logger, string pipeName, Func<OverlayCommand, Task> commandHandler)
     {
+        _overlayPipeName = pipeName;
         _logger = logger;
         _commandHandler = commandHandler;
     }
@@ -24,7 +25,7 @@ internal sealed class OverlayPipeServer : IDisposable
         if (_serverTask != null)
             return;
 
-        _logger.Info($"[Pipe<-Game] Starting server '{OverlayPipeName}'");
+        _logger.Info($"[Pipe<-Game] Starting server '{_overlayPipeName}'");
         _serverTask = Task.Run(RunAsync);
     }
 
@@ -37,7 +38,7 @@ internal sealed class OverlayPipeServer : IDisposable
             try
             {
                 using var pipe = new NamedPipeServerStream(
-                    OverlayPipeName,
+                    _overlayPipeName,
                     PipeDirection.In,
                     NamedPipeServerStream.MaxAllowedServerInstances,
                     PipeTransmissionMode.Byte,

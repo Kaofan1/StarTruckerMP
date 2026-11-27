@@ -87,10 +87,11 @@ lista pojawia się zaraz po otwarciu panelu. Każdy wiersz pokazuje swoją pozyc
 liście, liczbę graczy z ostatniego heartbeatu i ping, który plugin mierzy przez połączenie TCP z portem
 serwera.
 
-`F2` włącza mały panel w tym samym overlayu: adres serwera, stan połączenia, liczbę graczy online
-i identyfikator sieciowy tego gracza. Jest serwowany przez plugin tak samo jak lista serwerów i pozostaje
-click-through, więc gra zachowuje mysz i klawiaturę. Liczba graczy pochodzi z publicznego endpointu
-`/status/summary` serwera.
+Lista serwerów i HUD to dwa osobne procesy overlaya, każdy z własną rurą IPC i własnym oknem: przycisk
+`Multiplayer` otwiera listę serwerów w jednym, a `F2` włącza w drugim mały panel z adresem serwera, stanem
+połączenia, liczbą graczy online i identyfikatorem sieciowym tego gracza. Obie strony są serwowane przez
+plugin i niezależnie od siebie pozostają click-through albo interaktywne, więc otwarcie jednej nigdy nie
+podmienia strony drugiej. Liczba graczy pochodzi z publicznego endpointu `/status/summary` serwera.
 
 ## Konwencje
 

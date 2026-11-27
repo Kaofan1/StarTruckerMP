@@ -36,10 +36,10 @@ internal sealed class OverlayApp : Application
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
             _logger = new ConsoleOverlayLogger();
-            _logger.Info($"[App] Launching overlay. GameHwnd=0x{_launchOptions.GameWindowHandle:X}, GamePid={_launchOptions.GameProcessId}");
+            _logger.Info($"[App] Launching overlay '{_launchOptions.PipeName}'. GameHwnd=0x{_launchOptions.GameWindowHandle:X}, GamePid={_launchOptions.GameProcessId}");
 
             CefRuntimeBootstrapper.IgnoreCertificateErrorsByDefault = _launchOptions.IgnoreCertificateErrors;
-            CefRuntimeBootstrapper.InitializeOnce(_logger);
+            CefRuntimeBootstrapper.InitializeOnce(_logger, _launchOptions.PipeName);
 
             var window = new OverlayWindow();
             var modeService = new OverlayModeService(_logger);
@@ -57,7 +57,7 @@ internal sealed class OverlayApp : Application
                 tracker,
                 windowStyles,
                 pipeToGame,
-                new OverlayPipeServer(_logger, command => _coordinator!.HandleCommandAsync(command)),
+                new OverlayPipeServer(_logger, _launchOptions.PipeName, command => _coordinator!.HandleCommandAsync(command)),
                 _logger);
 
             _hotkeyService = new HotkeyService(window, modeService, _logger);

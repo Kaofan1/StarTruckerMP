@@ -35,7 +35,26 @@ internal static class Program
         if (!int.TryParse(args[1], out var processId))
             throw new ArgumentException($"Invalid PID: '{args[1]}'");
 
-        return new LaunchOptions(new IntPtr(hwndValue), processId, ParseIgnoreCertificateErrors(args));
+        return new LaunchOptions(new IntPtr(hwndValue), processId, ParseIgnoreCertificateErrors(args), ParsePipeName(args));
+    }
+
+    /// <summary>
+    /// Reads the instance pipe the game controls this process with. Each overlay instance has its
+    /// own pipe, so the HUD and the Multiplayer panel can never send commands to each other.
+    /// </summary>
+    private static string ParsePipeName(string[] args)
+    {
+        foreach (var arg in args.Skip(2))
+        {
+            if (!arg.StartsWith("--pipe=", StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            var value = arg[("--pipe=".Length)..].Trim();
+            if (value.Length > 0)
+                return value;
+        }
+
+        return LaunchOptions.DefaultPipeName;
     }
 
     private static bool ParseIgnoreCertificateErrors(string[] args)

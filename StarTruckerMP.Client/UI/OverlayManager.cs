@@ -1,4 +1,4 @@
-﻿#nullable enable
+#nullable enable
 using System;
 using System.Diagnostics;
 using System.IO;
@@ -10,6 +10,187 @@ using System.Text.Json;
 using System.Threading;
 
 namespace StarTruckerMP.Client.UI;
+
+/// <summary>
+/// One overlay process and the pipe that controls it. The game runs two of them: the HUD instance
+/// (the Svelte page and the F2 panel) and the Multiplayer instance (the server browser). They are
+/// separate processes with separate pipes and windows, so opening one can never replace the page
+/// of the other.
+/// </summary>
+internal sealed class OverlayHandle
+{
+    private const int PipeConnectTimeoutMs = 2000;
+    private const int PipeSendDeadlineMs = 20_000;
+
+    /// <summary>
+    /// The session token has to survive the whole overlay cold start: on this machine the pipe
+    /// server appeared around twenty seconds after the process started.
+    /// </summary>
+    private const int PipeTokenDeadlineMs = 120_000;
+
+    private readonly string _pipeName;
+    private readonly string _tag;
+    private Process? _process;
+    private bool _launchStarted;
+
+    public OverlayHandle(string pipeName, string tag)
+    {
+        _pipeName = pipeName;
+        _tag = tag;
+    }
+
+    public string PipeName => _pipeName;
+
+    /// <summary>Starts this overlay process once; a second call is ignored.</summary>
+    public void Launch()
+    {
+        if (_launchStarted)
+            return;
+
+        _launchStarted = true;
+
+        Plugin.StartAttachedThread(() =>
+        {
+            _process = OverlayManager.StartOverlayProcess(_pipeName, _tag);
+        });
+    }
+
+    public void Shutdown()
+    {
+        try
+        {
+            if (_process is { HasExited: false })
+                _process.Kill();
+        }
+        catch
+        {
+            // The process is already gone.
+        }
+    }
+
+    /// <summary>Enable or disable click-through on this overlay's window.</summary>
+    public void SetClickThrough(bool enabled)
+    {
+        OverlayManager.SetInteractiveModeState(!enabled);
+        SendCommand($"CLICKTHROUGH:{(enabled ? "1" : "0")}");
+    }
+
+    public void SetInteractiveMode(bool enabled)
+    {
+        OverlayManager.SetInteractiveModeState(enabled);
+        SendCommand($"INTERACTIVE:{(enabled ? "1" : "0")}");
+    }
+
+    public void ToggleInteractiveMode()
+    {
+        OverlayManager.SetInteractiveModeState(!OverlayManager.IsInteractiveMode);
+        SendCommand("TOGGLEINTERACTIVE");
+    }
+
+    public void RunDiagnostics() => SendCommand("RUNTESTS");
+
+    public void Navigate(string url) => SendCommand($"NAVIGATE:{url}");
+
+    /// <summary>Loads raw HTML into the overlay.</summary>
+    public void NavigateToHtml(string html) =>
+        SendCommand($"NAVHTML:{Convert.ToBase64String(Encoding.UTF8.GetBytes(html))}");
+
+    public void Show() => SendCommand("SHOW");
+
+    public void Hide() => SendCommand("HIDE");
+
+    /// <summary>
+    /// Sends the session token and immediately navigates to the given URL, both in a single pipe
+    /// write so the token is guaranteed to be stored before the navigation request fires.
+    /// </summary>
+    public void SetSessionTokenAndNavigate(string token, string url)
+    {
+        SendCommands(PipeTokenDeadlineMs, $"TOKEN:{token}", $"NAVIGATE:{url}");
+        App.Log.LogInfo($"[Overlay] Session token queued, navigating to {url}.");
+    }
+
+    /// <summary>
+    /// Posts a typed message to the page via <c>window.postMessage</c>. The page can listen with
+    /// <c>onGameMessage</c> from <c>$lib/gameEvents</c>.
+    /// </summary>
+    public void PostMessage(string type, string? jsonPayload = null)
+    {
+        // Escape only the characters that would break the JSON string literal.
+        var typeEscaped = type.Replace("\\", "\\\\").Replace("\"", "\\\"");
+
+        var json = jsonPayload != null
+            ? $"{{\"source\":\"StarTruckerMP\",\"type\":\"{typeEscaped}\",\"payload\":{jsonPayload}}}"
+            : $"{{\"source\":\"StarTruckerMP\",\"type\":\"{typeEscaped}\"}}";
+
+        SendCommand($"POSTMESSAGE:{Convert.ToBase64String(Encoding.UTF8.GetBytes(json))}");
+    }
+
+    public void PostMessage<T>(string type, T? data)
+    {
+        var payload = new
+        {
+            type = type.Replace("\\", "\\\\").Replace("\"", "\\\""),
+            source = "StarTruckerMP",
+            payload = data
+        };
+        var json = JsonSerializer.Serialize(payload, OverlayManager.MessageJsonOptions);
+
+        SendCommand($"POSTMESSAGE:{Convert.ToBase64String(Encoding.UTF8.GetBytes(json))}");
+    }
+
+    private void SendCommand(string command) => SendCommands(PipeSendDeadlineMs, command);
+
+    private void SendCommands(params string[] commands) => SendCommands(PipeSendDeadlineMs, commands);
+
+    private void SendCommands(int deadlineMs, params string[] commands)
+    {
+        var pipeName = _pipeName;
+
+        Plugin.StartAttachedThread(() =>
+        {
+            var deadline = Environment.TickCount64 + deadlineMs;
+            var attempts = 0;
+
+            while (true)
+            {
+                if (Plugin.IsShuttingDown)
+                    return;
+
+                attempts++;
+                try
+                {
+                    using var pipe = new NamedPipeClientStream(".", pipeName, PipeDirection.Out);
+                    pipe.Connect(timeout: PipeConnectTimeoutMs);
+                    using var writer = new StreamWriter(pipe, Encoding.UTF8, bufferSize: 1024, leaveOpen: false);
+                    writer.AutoFlush = true;
+                    foreach (var cmd in commands)
+                        writer.WriteLine(cmd);
+
+                    if (attempts > 1)
+                        App.Log.LogInfo($"[Overlay] IPC delivered to {pipeName} after {attempts} attempts.");
+
+                    return;
+                }
+                catch (Exception ex) when (ex is TimeoutException or IOException or UnauthorizedAccessException)
+                {
+                    if (Environment.TickCount64 >= deadline)
+                    {
+                        App.Log.LogWarning($"[Overlay] IPC send to {pipeName} failed after {attempts} attempts: {ex.Message}");
+                        return;
+                    }
+
+                    Thread.Sleep(250);
+                }
+                catch (Exception ex)
+                {
+                    if (!Plugin.IsShuttingDown)
+                        App.Log.LogWarning($"[Overlay] IPC send to {pipeName} failed: {ex.Message}");
+                    return;
+                }
+            }
+        });
+    }
+}
 
 internal static class OverlayManager
 {
@@ -31,17 +212,34 @@ internal static class OverlayManager
 
     #endregion
 
-    private const string PipeName     = "StarTruckerMP.Overlay";
+    /// <summary>The instance that draws the in-game page and the F2 panel.</summary>
+    private const string HudPipeName = "StarTruckerMP.Overlay";
+
+    /// <summary>The instance that draws the Multiplayer server browser.</summary>
+    private const string PanelPipeName = "StarTruckerMP.Overlay.Panel";
+
     private const string GamePipeName = "StarTruckerMP.Client";
 
-    private static Process? _overlayProcess;
+    private static readonly OverlayHandle HudHandle = new(HudPipeName, "hud");
+
     private static CancellationTokenSource? _gamePipeCts;
     private static volatile bool _interactiveMode;
+
+    /// <summary>The Multiplayer panel overlay, isolated from the HUD overlay.</summary>
+    public static OverlayHandle Panel { get; } = new(PanelPipeName, "panel");
+
+    internal static readonly JsonSerializerOptions MessageJsonOptions = new()
+    {
+        PropertyNameCaseInsensitive = true,
+        WriteIndented = false,
+        DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull,
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+    };
 
     #region Events
 
     /// <summary>
-    /// Raised on a background thread whenever the Svelte overlay calls
+    /// Raised on a background thread whenever an overlay page calls
     /// <c>sendToGame(type, payload)</c> from JavaScript.
     /// </summary>
     /// <remarks>
@@ -54,88 +252,133 @@ internal static class OverlayManager
 
     #region Public API
 
-    /// <summary>Locate, launch and connect to the overlay process.</summary>
+    /// <summary>Locate, launch and connect both overlay processes.</summary>
     public static void Launch()
     {
-        // Start the game pipe server before the overlay process so it is
-        // ready to accept connections as soon as the overlay boots.
+        // Start the game pipe server before the overlay processes so it is ready to accept
+        // connections as soon as they boot. Both processes connect to it.
         StartGamePipeServer();
 
-        Plugin.StartAttachedThread(() =>
-        {
-            var exe = ResolveOverlayExe();
-            if (exe == null)
-            {
-                App.Log.LogWarning("[Overlay] StarTruckerMP.Overlay.exe not found. Searched:");
-                App.Log.LogWarning($"[Overlay]   {Path.Combine(Path.GetDirectoryName(typeof(OverlayManager).Assembly.Location) ?? "", "StarTruckerMP.Overlay.exe")}");
-                App.Log.LogWarning($"[Overlay]   {Path.Combine(Path.GetDirectoryName(typeof(OverlayManager).Assembly.Location) ?? "", "overlay", "StarTruckerMP.Overlay.exe")}");
-                return;
-            }
-
-            App.Log.LogInfo($"[Overlay] Found exe at: {exe}");
-
-            var hwnd = WaitForGameWindow(timeoutMs: 30_000);
-            var pid  = Process.GetCurrentProcess().Id;
-            var ignoreSslValidation = App.IgnoreSslValidation.Value;
-            App.Log.LogInfo($"[Overlay] Game HWND={hwnd}, PID={pid}, IgnoreSslValidation={ignoreSslValidation}");
-
-            // Pass HWND and PID so the overlay can track the game window and
-            // automatically exit when the game process terminates.
-            var psi = new ProcessStartInfo(exe, $"{hwnd.ToInt64()} {pid} --ignore-certificate-errors={(ignoreSslValidation ? "1" : "0")}")
-            {
-                UseShellExecute = false,
-                RedirectStandardError  = true,
-                RedirectStandardOutput = true,
-                WorkingDirectory = Path.GetDirectoryName(exe)!
-            };
-
-            try
-            {
-                _overlayProcess = Process.Start(psi);
-                if (_overlayProcess == null)
-                {
-                    App.Log.LogError("[Overlay] Process.Start returned null - the OS refused to start the process.");
-                    return;
-                }
-
-                App.Log.LogInfo($"[Overlay] Process started (pid={_overlayProcess.Id}).");
-
-                // Pipe stdout/stderr from the overlay to the BepInEx log.
-                _overlayProcess.OutputDataReceived += (_, e) =>
-                {
-                    if (!string.IsNullOrEmpty(e.Data))
-                        App.Log.LogInfo($"[Overlay:out] {e.Data}");
-                };
-                _overlayProcess.ErrorDataReceived += (_, e) =>
-                {
-                    if (!string.IsNullOrEmpty(e.Data) && !IsChromiumInternalNoise(e.Data))
-                        App.Log.LogWarning($"[Overlay:err] {e.Data}");
-                };
-                _overlayProcess.BeginOutputReadLine();
-                _overlayProcess.BeginErrorReadLine();
-
-                // Detect early crash.
-                _overlayProcess.Exited += (_, _) =>
-                    App.Log.LogWarning($"[Overlay] Process exited with code {_overlayProcess.ExitCode}.");
-                _overlayProcess.EnableRaisingEvents = true;
-            }
-            catch (Exception ex)
-            {
-                App.Log.LogError($"[Overlay] Failed to start process: {ex.Message}");
-            }
-        });
+        HudHandle.Launch();
+        Panel.Launch();
     }
 
-    /// <summary>Kill the overlay process (called on plugin unload if needed).</summary>
+    /// <summary>Kill both overlay processes (called on plugin unload if needed).</summary>
     public static void Shutdown()
     {
         _gamePipeCts?.Cancel();
+        HudHandle.Shutdown();
+        Panel.Shutdown();
+    }
+
+    // The static API controls the HUD instance; the panel is reached through Panel.
+
+    public static void SetClickThrough(bool enabled) => HudHandle.SetClickThrough(enabled);
+
+    public static bool IsInteractiveMode => _interactiveMode;
+
+    public static void SetInteractiveMode(bool enabled) => HudHandle.SetInteractiveMode(enabled);
+
+    public static void ToggleInteractiveMode() => HudHandle.ToggleInteractiveMode();
+
+    public static void RunDiagnostics() => HudHandle.RunDiagnostics();
+
+    /// <summary>Navigates the HUD browser to a URL.</summary>
+    public static void Navigate(string url) => HudHandle.Navigate(url);
+
+    /// <summary>Loads raw HTML into the HUD browser.</summary>
+    public static void NavigateToHtml(string html) => HudHandle.NavigateToHtml(html);
+
+    /// <summary>Shows the HUD overlay.</summary>
+    public static void Show() => HudHandle.Show();
+
+    /// <summary>Hides the HUD overlay while keeping the window alive.</summary>
+    public static void Hide() => HudHandle.Hide();
+
+    /// <summary>Sends the session token to the HUD overlay and navigates to the given URL.</summary>
+    public static void SetSessionTokenAndNavigate(string token, string url) =>
+        HudHandle.SetSessionTokenAndNavigate(token, url);
+
+    /// <summary>Posts a typed message to the HUD page.</summary>
+    public static void PostMessage(string type, string? jsonPayload = null) =>
+        HudHandle.PostMessage(type, jsonPayload);
+
+    public static void PostMessage<T>(string type, T? data) => HudHandle.PostMessage(type, data);
+
+    internal static void SetInteractiveModeState(bool enabled) => _interactiveMode = enabled;
+
+    #endregion
+
+    #region Process start
+
+    /// <summary>Starts one overlay process for the given pipe. Runs on a background thread.</summary>
+    internal static Process? StartOverlayProcess(string pipeName, string tag)
+    {
+        var exe = ResolveOverlayExe();
+        if (exe == null)
+        {
+            App.Log.LogWarning($"[Overlay] StarTruckerMP.Overlay.exe not found ({tag}). Searched:");
+            App.Log.LogWarning($"[Overlay]   {Path.Combine(Path.GetDirectoryName(typeof(OverlayManager).Assembly.Location) ?? "", "StarTruckerMP.Overlay.exe")}");
+            App.Log.LogWarning($"[Overlay]   {Path.Combine(Path.GetDirectoryName(typeof(OverlayManager).Assembly.Location) ?? "", "overlay", "StarTruckerMP.Overlay.exe")}");
+            return null;
+        }
+
+        App.Log.LogInfo($"[Overlay] Found exe for {tag} at: {exe}");
+
+        var hwnd = WaitForGameWindow(timeoutMs: 30_000);
+        var pid = Process.GetCurrentProcess().Id;
+        var ignoreSslValidation = App.IgnoreSslValidation.Value;
+        App.Log.LogInfo($"[Overlay] {tag}: Game HWND={hwnd}, PID={pid}, Pipe={pipeName}, IgnoreSslValidation={ignoreSslValidation}");
+
+        // The player id makes the overlay track the game window and exit with the game. The pipe
+        // name keeps the two instances apart.
+        var psi = new ProcessStartInfo(
+            exe,
+            $"{hwnd.ToInt64()} {pid} --ignore-certificate-errors={(ignoreSslValidation ? "1" : "0")} --pipe={pipeName}")
+        {
+            UseShellExecute = false,
+            RedirectStandardError = true,
+            RedirectStandardOutput = true,
+            WorkingDirectory = Path.GetDirectoryName(exe)!
+        };
+
         try
         {
-            if (_overlayProcess is { HasExited: false })
-                _overlayProcess.Kill();
+            var process = Process.Start(psi);
+            if (process == null)
+            {
+                App.Log.LogError($"[Overlay] Process.Start returned null for {tag} - the OS refused to start the process.");
+                return null;
+            }
+
+            App.Log.LogInfo($"[Overlay] {tag} process started (pid={process.Id}).");
+
+            // Pipe stdout/stderr from the overlay to the BepInEx log.
+            process.OutputDataReceived += (_, e) =>
+            {
+                if (!string.IsNullOrEmpty(e.Data))
+                    App.Log.LogInfo($"[Overlay:{tag}:out] {e.Data}");
+            };
+            process.ErrorDataReceived += (_, e) =>
+            {
+                if (!string.IsNullOrEmpty(e.Data) && !IsChromiumInternalNoise(e.Data))
+                    App.Log.LogWarning($"[Overlay:{tag}:err] {e.Data}");
+            };
+            process.BeginOutputReadLine();
+            process.BeginErrorReadLine();
+
+            // Detect early crash.
+            process.Exited += (_, _) =>
+                App.Log.LogWarning($"[Overlay] {tag} process exited with code {process.ExitCode}.");
+            process.EnableRaisingEvents = true;
+
+            return process;
         }
-        catch { /* ignored */ }
+        catch (Exception ex)
+        {
+            App.Log.LogError($"[Overlay] Failed to start the {tag} process: {ex.Message}");
+            return null;
+        }
     }
 
     /// <summary>
@@ -149,167 +392,6 @@ internal static class OverlayManager
 
     #endregion
 
-    #region IPC helpers
-
-    /// <summary>Enable or disable click-through on the overlay window.</summary>
-    public static void SetClickThrough(bool enabled)
-    {
-        _interactiveMode = !enabled;
-        SendCommand($"CLICKTHROUGH:{(enabled ? "1" : "0")}");
-    }
-
-    public static bool IsInteractiveMode => _interactiveMode;
-
-    public static void SetInteractiveMode(bool enabled)
-    {
-        _interactiveMode = enabled;
-        SendCommand($"INTERACTIVE:{(enabled ? "1" : "0")}");
-    }
-
-    public static void ToggleInteractiveMode()
-    {
-        _interactiveMode = !_interactiveMode;
-        SendCommand("TOGGLEINTERACTIVE");
-    }
-
-    public static void RunDiagnostics() => SendCommand("RUNTESTS");
-
-    /// <summary>Navigates the CEF browser to a URL.</summary>
-    public static void Navigate(string url) =>
-        SendCommand($"NAVIGATE:{url}");
-
-    /// <summary>Loads raw HTML into CEF.</summary>
-    public static void NavigateToHtml(string html) =>
-        SendCommand($"NAVHTML:{Convert.ToBase64String(Encoding.UTF8.GetBytes(html))}");
-
-    /// <summary>Shows the CEF overlay.</summary>
-    public static void Show() => SendCommand("SHOW");
-
-    /// <summary>Hides the overlay while keeping the window alive.</summary>
-    public static void Hide() => SendCommand("HIDE");
-
-    /// <summary>
-    /// Sends the session token to the overlay and immediately navigates to the given
-    /// URL - both in a single pipe write so the token is guaranteed to be stored
-    /// before the navigation request fires.
-    /// </summary>
-    public static void SetSessionTokenAndNavigate(string token, string url)
-    {
-        // The overlay process is launched at the same moment as the auth request and needs up to
-        // half a minute before its pipe server listens (CEF and Avalonia start up first), so this
-        // send waits much longer than a normal command.
-        SendCommands(PipeTokenDeadlineMs, $"TOKEN:{token}", $"NAVIGATE:{url}");
-        App.Log.LogInfo($"[Overlay] Session token queued, navigating to {url}.");
-    }
-
-    /// <summary>
-    /// Posts a typed message to the SvelteKit page via <c>window.postMessage</c>.
-    /// The page can listen with <c>onGameMessage</c> from <c>$lib/gameEvents</c>.
-    /// </summary>
-    /// <param name="type">Arbitrary event type string (e.g. "playerSpeed").</param>
-    /// <param name="jsonPayload">
-    /// Optional JSON-serialized payload object (e.g. <c>"{\"value\":50}"</c>).
-    /// Pass <c>null</c> to omit the payload field entirely.
-    /// </param>
-    public static void PostMessage(string type, string? jsonPayload = null)
-    {
-        // Escape only the characters that would break the JSON string literal.
-        var typeEscaped = type.Replace("\\", "\\\\").Replace("\"", "\\\"");
-
-        var json = jsonPayload != null
-            ? $"{{\"source\":\"StarTruckerMP\",\"type\":\"{typeEscaped}\",\"payload\":{jsonPayload}}}"
-            : $"{{\"source\":\"StarTruckerMP\",\"type\":\"{typeEscaped}\"}}";
-
-        SendCommand($"POSTMESSAGE:{Convert.ToBase64String(Encoding.UTF8.GetBytes(json))}");
-    }
-
-    private static JsonSerializerOptions _jsonOpt = new()
-    {
-        PropertyNameCaseInsensitive = true,
-        WriteIndented = false,
-        DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull,
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-    };
-    
-    public static void PostMessage<T>(string type, T? data)
-    {
-        var payload = new
-        {
-            type = type.Replace("\\", "\\\\").Replace("\"", "\\\""),
-            source = "StarTruckerMP",
-            payload = data
-        };
-        var json = JsonSerializer.Serialize(payload, _jsonOpt);
-
-        SendCommand($"POSTMESSAGE:{Convert.ToBase64String(Encoding.UTF8.GetBytes(json))}");
-    }
-
-    private static void SendCommand(string command) => SendCommands(command);
-
-    /// <summary>How long a single pipe connect may block before it counts as a missed attempt.</summary>
-    private const int PipeConnectTimeoutMs = 2000;
-
-    /// <summary>How long a normal command keeps retrying while the overlay pipe is not listening.</summary>
-    private const int PipeSendDeadlineMs = 20_000;
-
-    /// <summary>
-    /// The session token has to survive the whole overlay cold start: on this machine the pipe
-    /// server appeared around twenty seconds after the process started.
-    /// </summary>
-    private const int PipeTokenDeadlineMs = 120_000;
-
-    private static void SendCommands(params string[] commands) =>
-        SendCommands(PipeSendDeadlineMs, commands);
-
-    private static void SendCommands(int deadlineMs, params string[] commands)
-    {
-        Plugin.StartAttachedThread(() =>
-        {
-            var deadline = Environment.TickCount64 + deadlineMs;
-            var attempts = 0;
-
-            while (true)
-            {
-                if (Plugin.IsShuttingDown)
-                    return;
-
-                attempts++;
-                try
-                {
-                    using var pipe = new NamedPipeClientStream(".", PipeName, PipeDirection.Out);
-                    pipe.Connect(timeout: PipeConnectTimeoutMs);
-                    using var writer = new StreamWriter(pipe, Encoding.UTF8, bufferSize: 1024, leaveOpen: false);
-                    writer.AutoFlush = true;
-                    foreach (var cmd in commands)
-                        writer.WriteLine(cmd);
-
-                    if (attempts > 1)
-                        App.Log.LogInfo($"[Overlay] IPC delivered after {attempts} attempts.");
-
-                    return;
-                }
-                catch (Exception ex) when (ex is TimeoutException or IOException or UnauthorizedAccessException)
-                {
-                    if (Environment.TickCount64 >= deadline)
-                    {
-                        App.Log.LogWarning($"[Overlay] IPC send failed after {attempts} attempts: {ex.Message}");
-                        return;
-                    }
-
-                    Thread.Sleep(250);
-                }
-                catch (Exception ex)
-                {
-                    if (!Plugin.IsShuttingDown)
-                        App.Log.LogWarning($"[Overlay] IPC send failed: {ex.Message}");
-                    return;
-                }
-            }
-        });
-    }
-
-    #endregion
-
     #region Game window detection
 
     /// <summary>
@@ -318,29 +400,26 @@ internal static class OverlayManager
     /// </summary>
     private static IntPtr FindGameWindow()
     {
-        var currentPid  = (uint)Process.GetCurrentProcess().Id;
+        var currentPid = (uint)Process.GetCurrentProcess().Id;
         var consoleHwnd = GetConsoleWindow();
-        var found       = IntPtr.Zero;
+        var found = IntPtr.Zero;
 
         EnumWindows((hwnd, _) =>
         {
-            if (hwnd == consoleHwnd)    return true; // skip BepInEx console
+            if (hwnd == consoleHwnd) return true; // skip BepInEx console
             if (!IsWindowVisible(hwnd)) return true; // skip hidden windows
 
             GetWindowThreadProcessId(hwnd, out var pid);
-            if (pid != currentPid)      return true; // skip other processes
+            if (pid != currentPid) return true; // skip other processes
 
             found = hwnd;
-            return false; // stop – first match is the game window
+            return false; // stop - first match is the game window
         }, IntPtr.Zero);
 
         return found;
     }
 
-    /// <summary>
-    /// Polls <see cref="FindGameWindow"/> until it returns a valid handle or the
-    /// timeout expires.
-    /// </summary>
+    /// <summary>Polls <see cref="FindGameWindow"/> until it returns a valid handle or the timeout expires.</summary>
     private static IntPtr WaitForGameWindow(int timeoutMs)
     {
         var deadline = Environment.TickCount + timeoutMs;
@@ -410,7 +489,7 @@ internal static class OverlayManager
 
     #endregion
 
-    #region Game pipe server (Overlay → Plugin)
+    #region Game pipe server (Overlay -> Plugin)
 
     private static void StartGamePipeServer()
     {
@@ -423,20 +502,20 @@ internal static class OverlayManager
             {
                 try
                 {
-                    using var pipe = new NamedPipeServerStream(
+                    var pipe = new NamedPipeServerStream(
                         GamePipeName,
                         PipeDirection.In,
                         NamedPipeServerStream.MaxAllowedServerInstances,
                         PipeTransmissionMode.Byte,
                         PipeOptions.Asynchronous);
 
-                    // Wait for the overlay to connect; respect cancellation.
+                    // Wait for the next overlay to connect; respect cancellation.
                     pipe.WaitForConnectionAsync(ct).Wait(ct);
 
-                    using var reader = new StreamReader(pipe, Encoding.UTF8);
-                    string? line;
-                    while (!ct.IsCancellationRequested && (line = reader.ReadLine()) != null)
-                        DispatchGameMessage(line.Trim());
+                    // Each overlay process keeps its connection open for its whole life, so the
+                    // server hands it to a reader and immediately listens for the next one.
+                    var connection = pipe;
+                    Plugin.StartAttachedThread(() => ReadGamePipe(connection, ct));
                 }
                 catch (OperationCanceledException) { break; }
                 catch (AggregateException ae) when (ae.InnerException is OperationCanceledException) { break; }
@@ -456,8 +535,29 @@ internal static class OverlayManager
         });
     }
 
+    private static void ReadGamePipe(NamedPipeServerStream pipe, CancellationToken ct)
+    {
+        try
+        {
+            using (pipe)
+            using (var reader = new StreamReader(pipe, Encoding.UTF8))
+            {
+                string? line;
+                while (!ct.IsCancellationRequested && (line = reader.ReadLine()) != null)
+                    DispatchGameMessage(line.Trim());
+            }
+        }
+        catch (Exception ex)
+        {
+            if (Plugin.IsShuttingDown || ct.IsCancellationRequested)
+                return;
+
+            App.Log.LogWarning($"[Overlay] Game pipe reader error: {ex.Message}");
+        }
+    }
+
     /// <summary>
-    /// Parses a JSON line received from the overlay and raises
+    /// Parses a JSON line received from an overlay and raises
     /// <see cref="MessageReceived"/> with the extracted type and payload.
     /// Expected format: <c>{"type":"eventName","payload":{...}}</c>
     /// </summary>
@@ -478,7 +578,7 @@ internal static class OverlayManager
             {
                 _interactiveMode = interactiveElement.GetBoolean();
             }
-            
+
             MessageReceived?.Invoke(type, payload);
         }
         catch (Exception ex)
