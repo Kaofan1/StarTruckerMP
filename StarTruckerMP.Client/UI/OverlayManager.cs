@@ -1,5 +1,6 @@
 #nullable enable
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.IO.Pipes;
@@ -22,6 +23,9 @@ internal sealed class OverlayHandle
     private const int PipeConnectTimeoutMs = 2000;
     private const int PipeSendDeadlineMs = 20_000;
 
+    /// <summary>How many undelivered commands may wait before the oldest ones are dropped.</summary>
+    private const int MaxQueuedCommands = 32;
+
     /// <summary>
     /// The session token has to survive the whole overlay cold start: on this machine the pipe
     /// server appeared around twenty seconds after the process started.
@@ -31,8 +35,12 @@ internal sealed class OverlayHandle
     private readonly string _pipeName;
     private readonly string _tag;
     private readonly object _pageLock = new();
+    private readonly object _queueLock = new();
+    private readonly List<PendingCommand> _queue = [];
     private Process? _process;
     private bool _launchStarted;
+    private bool _senderRunning;
+    private bool _reportedDead;
 
     /// <summary>The page this instance was last told to show, so a repeated show does not reload it.</summary>
     private string? _pageUrl;
@@ -72,6 +80,16 @@ internal sealed class OverlayHandle
         }
     }
 
+    /// <summary>One pipe write that is still waiting for the overlay to accept a connection.</summary>
+    private sealed class PendingCommand(string[] commands, long deadline)
+    {
+        public string[] Commands { get; } = commands;
+
+        public long Deadline { get; } = deadline;
+
+        public int Attempts { get; set; }
+    }
+
     /// <summary>Switches this overlay between click-through and input capture.</summary>
     public void SetInteractiveMode(bool enabled) => SendCommand($"INTERACTIVE:{(enabled ? "1" : "0")}");
 
@@ -108,7 +126,13 @@ internal sealed class OverlayHandle
         }
 
         if (navigate && interactive)
+        {
+            // The game holds the foreground right when the panel is opened in its menu, so it can
+            // lend it to the overlay. The overlay then takes the keyboard by itself instead of
+            // attaching to the game's input queue, which used to hang the game and its console.
+            AllowForeground();
             SendCommands($"NAVIGATE:{url}", "INTERACTIVE:1");
+        }
         else if (navigate)
             SendCommand($"NAVIGATE:{url}");
         else if (interactive)
@@ -173,52 +197,149 @@ internal sealed class OverlayHandle
 
     private void SendCommands(int deadlineMs, params string[] commands)
     {
-        var pipeName = _pipeName;
+        var startSender = false;
 
-        Plugin.StartAttachedThread(() =>
+        lock (_queueLock)
         {
-            var deadline = Environment.TickCount64 + deadlineMs;
-            var attempts = 0;
+            // A key pressed over and over must not leave a backlog behind when the overlay is slow
+            // or gone, so the oldest commands give way instead of the queue growing without end.
+            if (_queue.Count >= MaxQueuedCommands)
+                _queue.RemoveAt(0);
 
+            _queue.Add(new PendingCommand(commands, Environment.TickCount64 + deadlineMs));
+
+            if (!_senderRunning)
+            {
+                _senderRunning = true;
+                startSender = true;
+            }
+        }
+
+        if (startSender && !Plugin.IsShuttingDown)
+            Plugin.StartAttachedThread(SendQueuedCommands);
+    }
+
+    /// <summary>
+    /// The only thread this overlay writes the pipe with. Every command used to start a thread of
+    /// its own that then waited up to twenty seconds in a pipe connect, and a pile of threads
+    /// attached to the game's runtime is what froze it together with its console.
+    /// </summary>
+    private void SendQueuedCommands()
+    {
+        try
+        {
             while (true)
             {
+                PendingCommand command;
+
+                lock (_queueLock)
+                {
+                    if (_queue.Count == 0)
+                        return;
+
+                    command = _queue[0];
+                }
+
                 if (Plugin.IsShuttingDown)
                     return;
 
-                attempts++;
+                command.Attempts++;
+
+                string? failure;
                 try
                 {
-                    using var pipe = new NamedPipeClientStream(".", pipeName, PipeDirection.Out);
+                    using var pipe = new NamedPipeClientStream(".", _pipeName, PipeDirection.Out);
                     pipe.Connect(timeout: PipeConnectTimeoutMs);
                     using var writer = new StreamWriter(pipe, Encoding.UTF8, bufferSize: 1024, leaveOpen: false);
                     writer.AutoFlush = true;
-                    foreach (var cmd in commands)
-                        writer.WriteLine(cmd);
+                    foreach (var line in command.Commands)
+                        writer.WriteLine(line);
 
-                    if (attempts > 1)
-                        App.Log.LogInfo($"[Overlay] IPC delivered to {pipeName} after {attempts} attempts.");
+                    lock (_queueLock)
+                        _queue.Remove(command);
 
-                    return;
+                    if (command.Attempts > 1)
+                        App.Log.LogInfo($"[Overlay] IPC delivered to {_pipeName} after {command.Attempts} attempts.");
+
+                    continue;
                 }
                 catch (Exception ex) when (ex is TimeoutException or IOException or UnauthorizedAccessException)
                 {
-                    if (Environment.TickCount64 >= deadline)
-                    {
-                        App.Log.LogWarning($"[Overlay] IPC send to {pipeName} failed after {attempts} attempts: {ex.Message}");
-                        return;
-                    }
-
-                    Thread.Sleep(250);
+                    failure = ex.Message;
                 }
                 catch (Exception ex)
                 {
+                    failure = ex.Message;
                     if (!Plugin.IsShuttingDown)
-                        App.Log.LogWarning($"[Overlay] IPC send to {pipeName} failed: {ex.Message}");
+                        App.Log.LogWarning($"[Overlay] IPC send to {_pipeName} failed: {ex.Message}");
                     return;
                 }
+
+                // Nobody is listening any more, so retrying would only repeat this failure on
+                // every following key press.
+                if (HasExited())
+                {
+                    if (!_reportedDead)
+                    {
+                        _reportedDead = true;
+                        App.Log.LogWarning($"[Overlay] The {_tag} overlay process is gone; its commands are dropped. Restart the game to get it back.");
+                    }
+
+                    return;
+                }
+
+                if (Environment.TickCount64 >= command.Deadline)
+                {
+                    lock (_queueLock)
+                        _queue.Remove(command);
+
+                    App.Log.LogWarning($"[Overlay] IPC send to {_pipeName} failed after {command.Attempts} attempts: {failure}");
+                    continue;
+                }
+
+                Thread.Sleep(250);
             }
-        });
+        }
+        finally
+        {
+            // A sender that ends, whether it delivered everything or not, hands the queue back so
+            // the next command can start a fresh one.
+            lock (_queueLock)
+            {
+                _queue.Clear();
+                _senderRunning = false;
+            }
+        }
     }
+
+    private bool HasExited()
+    {
+        try
+        {
+            return _process is { HasExited: true };
+        }
+        catch
+        {
+            // A process object that cannot answer is one that is not there any more.
+            return true;
+        }
+    }
+
+    private void AllowForeground()
+    {
+        try
+        {
+            // ASFW_ANY: every process may take the foreground from this one, once.
+            AllowSetForegroundWindow(unchecked((int)0xFFFFFFFF));
+        }
+        catch
+        {
+            // Without the permission the panel still opens; the keyboard may need one click.
+        }
+    }
+
+    [DllImport("user32.dll")]
+    private static extern bool AllowSetForegroundWindow(int dwProcessId);
 }
 
 internal static class OverlayManager

@@ -38,7 +38,6 @@ internal sealed class Win32WindowStyles
     private const uint SwpNoActivate = 0x0010;
     private const uint SwpFrameChanged = 0x0020;
     private const int SwShownoactivate = 4;
-    private const int SwShow = 5;
 
     public void ApplyOverlayWindowStyle(nint hwnd)
     {
@@ -77,23 +76,13 @@ internal sealed class Win32WindowStyles
     {
         ClipCursor(IntPtr.Zero);
 
-        // AttachThreadInput is required to reliably steal keyboard focus from another
-        // process (e.g. the game). Without it, SetForegroundWindow fails silently on
-        // Windows Vista+ when called from a non-foreground process.
-        var foregroundHwnd = GetForegroundWindow();
-        var foregroundThread = GetWindowThreadProcessId(foregroundHwnd, out _);
-        var currentThread = GetCurrentThreadId();
-        var attached = foregroundThread != currentThread &&
-                       AttachThreadInput(foregroundThread, currentThread, true);
-
-        ShowWindow(hwnd, SwShow);
-        BringWindowToTop(hwnd);
+        // This used to attach the overlay's thread to the input queue of whatever was in the
+        // foreground, which is the game's own window thread. A shared input queue drags the game
+        // and its console down with the overlay the moment anything in the overlay stalls, so the
+        // game instead lends us the foreground right (AllowSetForegroundWindow) and the window
+        // asks for it plainly. A refused request leaves the focus where it was, which is harmless.
         SetForegroundWindow(hwnd);
-        SetActiveWindow(hwnd);
         SetFocus(hwnd);
-
-        if (attached)
-            AttachThreadInput(foregroundThread, currentThread, false);
 
         _logger.Info($"[Win32] FocusWindow hwnd=0x{hwnd:X}");
     }
@@ -172,27 +161,9 @@ internal sealed class Win32WindowStyles
     private static extern nint SetFocus(nint hWnd);
 
     [DllImport("user32.dll")]
-    private static extern nint SetActiveWindow(nint hWnd);
-
-    [DllImport("user32.dll")]
-    private static extern bool BringWindowToTop(nint hWnd);
-
-    [DllImport("user32.dll")]
     private static extern bool ClipCursor(IntPtr lpRect);
 
     [DllImport("user32.dll")]
     private static extern bool ShowWindow(nint hWnd, int nCmdShow);
-
-    [DllImport("user32.dll")]
-    private static extern nint GetForegroundWindow();
-
-    [DllImport("user32.dll")]
-    private static extern uint GetWindowThreadProcessId(nint hWnd, out uint lpdwProcessId);
-
-    [DllImport("kernel32.dll")]
-    private static extern uint GetCurrentThreadId();
-
-    [DllImport("user32.dll")]
-    private static extern bool AttachThreadInput(uint idAttach, uint idAttachTo, bool fAttach);
 }
 
