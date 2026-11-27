@@ -20,6 +20,7 @@ internal sealed class OverlayCoordinator : IDisposable
     private readonly Win32WindowStyles _windowStyles;
     private readonly OverlayPipeServer _pipeServer;
     private readonly IOverlayLogger _logger;
+    private readonly DispatcherTimer _clickThroughGuard;
     private const string DefaultStartupUrl = "about:blank";
 
     /// <summary>If a page never reports that it loaded, the overlay is shown anyway.</summary>
@@ -54,6 +55,11 @@ internal sealed class OverlayCoordinator : IDisposable
         _modeService.UiModeChanged += OnUiModeChanged;
         _tracker.StateChanged += OnTrackerStateChanged;
         _tracker.GameExited += OnGameExited;
+
+        // Avalonia rewrites the window styles every time it shows the window, and a page that is
+        // click-through must never end up holding the mouse or the keyboard.
+        _clickThroughGuard = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+        _clickThroughGuard.Tick += OnClickThroughGuardTick;
     }
 
     public void Start()
@@ -69,6 +75,7 @@ internal sealed class OverlayCoordinator : IDisposable
         _browser.Initialize(DefaultStartupUrl, _tracker.CurrentState.PixelWidth, _tracker.CurrentState.PixelHeight);
         ApplyUiMode(enabled: false);
         _pipeServer.Start();
+        _clickThroughGuard.Start();
 
         _logger.Info($"[Overlay] Started. StartupUrl={DefaultStartupUrl}");
     }
@@ -128,6 +135,8 @@ internal sealed class OverlayCoordinator : IDisposable
             return;
 
         _disposed = true;
+        _clickThroughGuard.Stop();
+        _clickThroughGuard.Tick -= OnClickThroughGuardTick;
         _browser.FrameReady -= OnBrowserFrameReady;
         _browser.DocumentReady -= OnBrowserDocumentReady;
         _modeService.UiModeChanged -= OnUiModeChanged;
@@ -272,11 +281,41 @@ internal sealed class OverlayCoordinator : IDisposable
             _windowStyles.ShowWithoutActivation(handle);
             _windowStyles.EnsureTopmost(handle);
 
+            // Showing the window made Avalonia write its own extended style, which drops the
+            // click-through bits; they have to be set again before the window is used.
+            if (_modeService.UiModeEnabled)
+                _windowStyles.SetClickThrough(handle, enabled: false);
+            else
+                _windowStyles.EnsureClickThrough(handle);
+
             // A click-through page draws state and nothing else, so the game keeps the keyboard
             // even while the HUD is on screen instead of waiting for a click to win it back.
             if (!_modeService.UiModeEnabled)
                 _windowStyles.FocusGameWindow(state.Handle);
         }
+    }
+
+    /// <summary>
+    /// Keeps the HUD click-through for as long as it is on screen. The window is repaired as soon
+    /// as a style rewrite is noticed, and an overlay that somehow got the foreground hands it back
+    /// to the game, which needs it for the truck and for F2.
+    /// </summary>
+    private void OnClickThroughGuardTick(object? sender, EventArgs e)
+    {
+        if (_disposed || !_overlayVisible || _modeService.UiModeEnabled)
+            return;
+
+        var hwnd = _window.GetWindowHandle();
+        if (hwnd == 0)
+            return;
+
+        var repaired = _windowStyles.EnsureClickThrough(hwnd);
+        var gameHandle = _tracker.CurrentState.Handle;
+
+        // Only when the overlay itself holds the foreground: the BepInEx console has to stay
+        // usable even while the HUD is visible.
+        if (repaired || _windowStyles.ForegroundWindow() == hwnd)
+            _windowStyles.FocusGameWindow(gameHandle);
     }
 
     private void ShowOverlay()
@@ -294,6 +333,16 @@ internal sealed class OverlayCoordinator : IDisposable
             return;
 
         ApplyWindowState(_tracker.CurrentState);
+
+        // ApplyWindowState only touches the style when the window was hidden. A HUD that was
+        // already on screen still needs the click-through bits after another show request.
+        if (!_modeService.UiModeEnabled)
+        {
+            var handle = _window.GetWindowHandle();
+            if (handle != 0)
+                _windowStyles.EnsureClickThrough(handle);
+        }
+
         _logger.Info("[Overlay] SHOW");
     }
 
@@ -306,6 +355,12 @@ internal sealed class OverlayCoordinator : IDisposable
 
         if (_window.IsVisible)
             _window.Hide();
+
+        // F2 closes the HUD while the game keeps playing, so the game takes the keyboard back
+        // immediately instead of waiting for a click on its window.
+        if (!_modeService.UiModeEnabled)
+            _windowStyles.FocusGameWindow(_tracker.CurrentState.Handle);
+
         _logger.Info("[Overlay] HIDE");
     }
 

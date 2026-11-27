@@ -72,6 +72,37 @@ internal sealed class Win32WindowStyles
         _logger.Info($"[Win32] Click-through => {(enabled ? "ON" : "OFF")} hwnd=0x{hwnd:X}, noActivate => {(enabled ? "ON" : "OFF")}");
     }
 
+    /// <summary>
+    /// Avalonia rewrites the whole extended window style whenever it shows the window, so the
+    /// bits that make the HUD click-through and non activating are gone the second time the HUD is
+    /// toggled on. The window is then a normal top level window: a right click activates it, the
+    /// game loses the keyboard and its captured cursor, and F2 reaches the overlay instead of the
+    /// game. Puts those bits back and reports whether they were missing.
+    /// </summary>
+    public bool EnsureClickThrough(nint hwnd)
+    {
+        var style = GetWindowLongPtr(hwnd, GwlExStyle).ToInt64();
+        var required = WsExLayered | WsExToolWindow | WsExTransparent | WsExNoActivate;
+        if ((style & required) == required)
+            return false;
+
+        SetClickThrough(hwnd, enabled: true);
+        return true;
+    }
+
+    /// <summary>The window Windows currently sends the mouse and the keyboard to.</summary>
+    public nint ForegroundWindow()
+    {
+        try
+        {
+            return GetForegroundWindow();
+        }
+        catch
+        {
+            return 0;
+        }
+    }
+
     public void FocusWindow(nint hwnd)
     {
         ClipCursor(IntPtr.Zero);
@@ -153,6 +184,9 @@ internal sealed class Win32WindowStyles
 
     [DllImport("dwmapi.dll")]
     private static extern int DwmSetWindowAttribute(nint hwnd, int dwAttribute, ref int pvAttribute, int cbAttribute);
+
+    [DllImport("user32.dll")]
+    private static extern nint GetForegroundWindow();
 
     [DllImport("user32.dll")]
     private static extern bool SetForegroundWindow(nint hWnd);
