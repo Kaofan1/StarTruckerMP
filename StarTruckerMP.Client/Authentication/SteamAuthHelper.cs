@@ -171,9 +171,9 @@ internal static class SteamAuthHelper
                 App.Log.LogWarning("[Auth] Steam - server did not return a public key; UDP encryption will not be established.");
             }
             
-            OverlayManager.SetSessionTokenAndNavigate(
-                body.Token,
-                $"https://{App.ServerAddress.Value}:{App.ServerPort.Value}/overlay");
+            // The token is handed to the overlay process and nothing else happens: the HUD must
+            // not load a page, and must not show a window, until the player presses F2.
+            OverlayManager.SetSessionToken(body.Token);
         }
         catch (Exception ex)
         {

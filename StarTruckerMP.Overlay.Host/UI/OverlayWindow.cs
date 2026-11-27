@@ -23,6 +23,11 @@ internal sealed class OverlayWindow : Window
         SystemDecorations = SystemDecorations.None;
         ShowInTaskbar = false;
         Topmost = true;
+
+        // Showing a window normally activates it, and an overlay that took the foreground from the
+        // game left the player on the title screen unable to press Space. The click-through HUD
+        // never activates; an interactive page is activated explicitly once it is ready.
+        ShowActivated = false;
         CanResize = false;
         IsHitTestVisible = true;
         ExtendClientAreaToDecorationsHint = true;

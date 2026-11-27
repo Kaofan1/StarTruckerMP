@@ -86,8 +86,9 @@ public class Plugin : BasePlugin
 
     private void SetupUI()
     {
+        // Both overlay processes start hidden and stay hidden: the HUD only appears from F2 and
+        // the server browser only from its own button, never from the game loading.
         OverlayManager.Launch();
-        // Navigation is deferred until a session token is obtained from auth.
     }
 
     private void SetupComponents()
@@ -222,9 +223,9 @@ public class Plugin : BasePlugin
                 App.Log.LogWarning("[Auth] Xbox - server did not return a public key; UDP encryption will not be established.");
             }
 
-            OverlayManager.SetSessionTokenAndNavigate(
-                body.Token,
-                $"https://{App.ServerAddress.Value}:{App.ServerPort.Value}/overlay");
+            // The token is handed to the overlay process and nothing else happens: the HUD must
+            // not load a page, and must not show a window, until the player presses F2.
+            OverlayManager.SetSessionToken(body.Token);
         }
         catch (Exception ex)
         {

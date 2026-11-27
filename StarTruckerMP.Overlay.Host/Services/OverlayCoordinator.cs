@@ -271,6 +271,11 @@ internal sealed class OverlayCoordinator : IDisposable
             var handle = EnsureWindowHandle();
             _windowStyles.ShowWithoutActivation(handle);
             _windowStyles.EnsureTopmost(handle);
+
+            // A click-through page draws state and nothing else, so the game keeps the keyboard
+            // even while the HUD is on screen instead of waiting for a click to win it back.
+            if (!_modeService.UiModeEnabled)
+                _windowStyles.FocusGameWindow(state.Handle);
         }
     }
 

@@ -196,14 +196,13 @@ internal sealed class OverlayHandle
     public void Hide() => SendCommand("HIDE");
 
     /// <summary>
-    /// Sends the session token and immediately navigates to the given URL, both in a single pipe
-    /// write so the token is guaranteed to be stored before the navigation request fires.
+    /// Stores the session token in this overlay process. Nothing is loaded or shown here: the HUD
+    /// window appears only when the player asks for it, never on its own while the game boots.
     /// </summary>
-    public void SetSessionTokenAndNavigate(string token, string url)
+    public void SetSessionToken(string token)
     {
-        ForgetPage();
-        SendCommands(PipeTokenDeadlineMs, $"TOKEN:{token}", $"NAVIGATE:{url}");
-        App.Log.LogInfo($"[Overlay] Session token queued, navigating to {url}.");
+        SendCommands(PipeTokenDeadlineMs, $"TOKEN:{token}");
+        App.Log.LogInfo("[Overlay] Session token queued.");
     }
 
     /// <summary>
@@ -517,9 +516,8 @@ internal static class OverlayManager
     /// <summary>Hides the HUD overlay while keeping the window alive.</summary>
     public static void Hide() => HudHandle.Hide();
 
-    /// <summary>Sends the session token to the HUD overlay and navigates to the given URL.</summary>
-    public static void SetSessionTokenAndNavigate(string token, string url) =>
-        HudHandle.SetSessionTokenAndNavigate(token, url);
+    /// <summary>Sends the session token to the HUD overlay without loading or showing a page.</summary>
+    public static void SetSessionToken(string token) => HudHandle.SetSessionToken(token);
 
     /// <summary>Posts a typed message to the HUD page.</summary>
     public static void PostMessage(string type, string? jsonPayload = null) =>
