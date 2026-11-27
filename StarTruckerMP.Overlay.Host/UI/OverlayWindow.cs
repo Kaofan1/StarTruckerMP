@@ -10,6 +10,10 @@ namespace StarTruckerMP.Overlay.Host.UI;
 internal sealed class OverlayWindow : Window
 {
     private readonly Image _image;
+    private PixelPoint _lastPosition;
+    private double _lastWidth;
+    private double _lastHeight;
+    private bool _hasBounds;
 
     public OverlayWindow()
     {
@@ -64,9 +68,26 @@ internal sealed class OverlayWindow : Window
 
     public void UpdateBounds(int left, int top, double dipWidth, double dipHeight)
     {
-        Position = new PixelPoint(left, top);
-        Width = Math.Max(1d, dipWidth);
-        Height = Math.Max(1d, dipHeight);
+        var position = new PixelPoint(left, top);
+        var width = Math.Max(1d, dipWidth);
+        var height = Math.Max(1d, dipHeight);
+
+        // Re-applying the same bounds resizes and repaints the layered window, which shows up as
+        // a blink every time the overlay is unhidden. Only a real change is applied.
+        if (_hasBounds &&
+            position == _lastPosition &&
+            Math.Abs(width - _lastWidth) < 0.5 &&
+            Math.Abs(height - _lastHeight) < 0.5)
+            return;
+
+        _hasBounds = true;
+        _lastPosition = position;
+        _lastWidth = width;
+        _lastHeight = height;
+
+        Position = position;
+        Width = width;
+        Height = height;
     }
 
     public Point ClampToClient(Point point)

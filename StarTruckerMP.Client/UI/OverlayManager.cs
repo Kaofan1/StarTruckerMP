@@ -30,8 +30,12 @@ internal sealed class OverlayHandle
 
     private readonly string _pipeName;
     private readonly string _tag;
+    private readonly object _pageLock = new();
     private Process? _process;
     private bool _launchStarted;
+
+    /// <summary>The page this instance was last told to show, so a repeated show does not reload it.</summary>
+    private string? _pageUrl;
 
     public OverlayHandle(string pipeName, string tag)
     {
@@ -71,13 +75,53 @@ internal sealed class OverlayHandle
     /// <summary>Switches this overlay between click-through and input capture.</summary>
     public void SetInteractiveMode(bool enabled) => SendCommand($"INTERACTIVE:{(enabled ? "1" : "0")}");
 
-    public void RunDiagnostics() => SendCommand("RUNTESTS");
+    public void RunDiagnostics()
+    {
+        ForgetPage();
+        SendCommand("RUNTESTS");
+    }
 
-    public void Navigate(string url) => SendCommand($"NAVIGATE:{url}");
+    public void Navigate(string url)
+    {
+        ForgetPage();
+        SendCommand($"NAVIGATE:{url}");
+    }
 
     /// <summary>Loads raw HTML into the overlay.</summary>
-    public void NavigateToHtml(string html) =>
+    public void NavigateToHtml(string html)
+    {
+        ForgetPage();
         SendCommand($"NAVHTML:{Convert.ToBase64String(Encoding.UTF8.GetBytes(html))}");
+    }
+
+    /// <summary>
+    /// Shows a page and, only the first time, navigates to it. The overlay hides itself until the
+    /// new document is ready, so showing the same page again is an instant unhide without a reload.
+    /// </summary>
+    public void ShowPage(string url, bool interactive = false)
+    {
+        bool navigate;
+        lock (_pageLock)
+        {
+            navigate = !string.Equals(_pageUrl, url, StringComparison.Ordinal);
+            _pageUrl = url;
+        }
+
+        if (navigate && interactive)
+            SendCommands($"NAVIGATE:{url}", "INTERACTIVE:1");
+        else if (navigate)
+            SendCommand($"NAVIGATE:{url}");
+        else if (interactive)
+            SendCommands("SHOW", "INTERACTIVE:1");
+        else
+            SendCommand("SHOW");
+    }
+
+    private void ForgetPage()
+    {
+        lock (_pageLock)
+            _pageUrl = null;
+    }
 
     public void Show() => SendCommand("SHOW");
 
@@ -89,6 +133,7 @@ internal sealed class OverlayHandle
     /// </summary>
     public void SetSessionTokenAndNavigate(string token, string url)
     {
+        ForgetPage();
         SendCommands(PipeTokenDeadlineMs, $"TOKEN:{token}", $"NAVIGATE:{url}");
         App.Log.LogInfo($"[Overlay] Session token queued, navigating to {url}.");
     }
@@ -266,6 +311,9 @@ internal static class OverlayManager
 
     /// <summary>Shows the HUD overlay.</summary>
     public static void Show() => HudHandle.Show();
+
+    /// <summary>Shows the HUD page, navigating only when it is not the page already loaded.</summary>
+    public static void ShowPage(string url) => HudHandle.ShowPage(url);
 
     /// <summary>Hides the HUD overlay while keeping the window alive.</summary>
     public static void Hide() => HudHandle.Hide();

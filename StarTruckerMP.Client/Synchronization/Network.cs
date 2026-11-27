@@ -26,6 +26,14 @@ public class Network
     public static event Action<VoiceDto> OnVoiceReceived;
 
     private static bool _isInitialized;
+    private static bool _reportedOfflineLoad;
+
+    /// <summary>
+    /// Set only when the player presses Connect in the server browser. Loading a save without that
+    /// choice has to stay a single-player session, even when a server address is configured.
+    /// </summary>
+    private static volatile bool _connectRequested;
+
     private static NetManager _client;
     private static NetPeer _server;
     private static bool _handshakeCompleted = false;
@@ -41,6 +49,15 @@ public class Network
 
     /// <summary>True between the protocol welcome and the peer disconnect.</summary>
     public static bool IsConnected => _handshakeCompleted;
+
+    /// <summary>True once the player explicitly picked a server in this game launch.</summary>
+    public static bool IsConnectRequested => _connectRequested;
+
+    /// <summary>
+    /// Arms the connection for the next loaded sector. The server browser only stores the address,
+    /// so this is the one signal that the player actually wants to play online.
+    /// </summary>
+    public static void RequestConnect() => _connectRequested = true;
     
     /// <summary>
     /// This should only run once, on plugin startup.
@@ -50,6 +67,19 @@ public class Network
     {
         GameEventsComponent.ArrivedAtSector += _ =>
         {
+            if (!_connectRequested)
+            {
+                // Loading a save on its own must not connect anywhere: a configured address is a
+                // suggestion until the player presses Connect in the server browser.
+                if (!_reportedOfflineLoad)
+                {
+                    _reportedOfflineLoad = true;
+                    App.Log.LogInfo("[Network] A save was loaded without picking a server, staying offline.");
+                }
+
+                return;
+            }
+
             if (_isInitialized) return;
             
             // Loaded into the map, start server connection

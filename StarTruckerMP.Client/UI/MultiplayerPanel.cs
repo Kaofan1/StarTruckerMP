@@ -11,6 +11,7 @@ using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using StarTruckerMP.Client.Synchronization;
 
 namespace StarTruckerMP.Client.UI;
 
@@ -33,9 +34,9 @@ internal static class MultiplayerPanel
         {
             var url = Page.Publish(BuildHtml());
             HudPanel.SuspendForPanel();
-            OverlayManager.Panel.Show();
-            OverlayManager.Panel.Navigate(url);
-            OverlayManager.Panel.SetInteractiveMode(true);
+            // One pipe write: the page is loaded first and the window only appears when it is
+            // ready, then it takes the keyboard. Sending these separately let the old page show.
+            OverlayManager.Panel.ShowPage(url, interactive: true);
             App.Log.LogInfo("[Multiplayer] Panel opened.");
         }
         catch (Exception exception)
@@ -163,6 +164,10 @@ internal static class MultiplayerPanel
             OverlayManager.Panel.PostMessage("serverSelected", new { error = "Invalid server address." });
             return;
         }
+
+        // Picking a server is the only thing that arms the connection: without it a loaded save
+        // stays a single-player session even though the address is remembered below.
+        Network.RequestConnect();
 
         App.ServerAddress.Value = host;
         App.ServerPort.Value = port.ToString();
@@ -442,10 +447,12 @@ internal static class MultiplayerPanel
     font-family: "Segoe UI", system-ui, sans-serif; color: #f3e7d0;
   }
   .panel {
-    width: min(760px, 92vw); max-height: 86vh; display: flex; flex-direction: column;
+    width: min(760px, 92vw); height: min(380px, 86vh); display: flex; flex-direction: column;
     background: #101823; border: 1px solid #24303f; border-top: 3px solid #f2a33c;
     border-radius: 6px; box-shadow: 0 18px 60px rgb(0 0 0 / 55%);
   }
+  /* The panel keeps one height, so the tabs never move when the tab changes. */
+  .panel > section { flex: 1; min-height: 0; display: flex; flex-direction: column; }
   header { display: flex; align-items: center; gap: 12px; padding: 14px 18px; border-bottom: 1px solid #24303f; }
   h1 { margin: 0; font-size: 15px; letter-spacing: .16em; text-transform: uppercase; color: #f2a33c; flex: 1; }
   .close { background: transparent; color: #93a1af; border: 0; font-size: 20px; cursor: pointer; line-height: 1; }
@@ -473,7 +480,7 @@ internal static class MultiplayerPanel
   .status.error { color: #e2573f; }
   .status.ok { color: #5bc8b0; }
   .hint { padding: 0 18px 10px; font-size: 11.5px; color: #93a1af; }
-  .list { overflow: auto; padding: 0 10px 10px; }
+  .list { flex: 1; overflow: auto; padding: 0 10px 10px; }
   .row {
     display: grid; grid-template-columns: 2rem minmax(0, 1fr) 7.5rem 4.8rem auto; gap: 12px;
     align-items: center; padding: 9px 10px; border-bottom: 1px solid #1b2634;

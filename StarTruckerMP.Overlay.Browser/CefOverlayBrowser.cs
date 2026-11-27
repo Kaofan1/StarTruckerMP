@@ -35,6 +35,12 @@ public sealed class CefOverlayBrowser : IDisposable
 
     public event EventHandler<BrowserFrameReadyEventArgs>? FrameReady;
 
+    /// <summary>
+    /// Raised when the main document finished loading. The host uses it to show the overlay only
+    /// with a rendered page, so the empty white document never reaches the screen.
+    /// </summary>
+    public event EventHandler<DocumentReadyEventArgs>? DocumentReady;
+
     public IBrowserHost? BrowserHost => _browser?.GetBrowserHost();
 
     public int PixelWidth { get; private set; } = 1280;
@@ -215,6 +221,7 @@ public sealed class CefOverlayBrowser : IDisposable
 
         TryMarkMainFrameReady(e.Url);
         ScheduleMainFrameReadyCheck(_navigationVersion, e.Url);
+        DocumentReady?.Invoke(this, new DocumentReadyEventArgs(e.Url));
     }
 
     private void OnJavascriptMessageReceived(object? sender, JavascriptMessageReceivedEventArgs e)
@@ -405,5 +412,12 @@ public sealed class CefOverlayBrowser : IDisposable
             };
         })();
         """;
+}
+
+public sealed class DocumentReadyEventArgs : EventArgs
+{
+    public DocumentReadyEventArgs(string url) => Url = url ?? string.Empty;
+
+    public string Url { get; }
 }
 

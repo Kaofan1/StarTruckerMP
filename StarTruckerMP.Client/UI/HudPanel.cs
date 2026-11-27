@@ -40,9 +40,10 @@ internal static class HudPanel
     {
         try
         {
+            // The page URL is stable while the HTML is unchanged, so turning the HUD off and on
+            // only unhides the loaded page instead of reloading it.
             var url = Page.Publish(HudHtml);
-            OverlayManager.Show();
-            OverlayManager.Navigate(url);
+            OverlayManager.ShowPage(url);
             _visible = true;
             _suspendedForPanel = false;
             App.Log.LogInfo("[Hud] Shown.");
@@ -93,8 +94,8 @@ internal static class HudPanel
 
         try
         {
-            OverlayManager.Show();
-            OverlayManager.Navigate(Page.Publish(HudHtml));
+            // The HUD process still has its page loaded, so this is a plain unhide.
+            OverlayManager.ShowPage(Page.Publish(HudHtml));
             App.Log.LogInfo("[Hud] Restored after the Multiplayer panel closed.");
         }
         catch (Exception exception)

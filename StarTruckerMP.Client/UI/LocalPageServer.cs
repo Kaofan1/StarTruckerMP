@@ -21,38 +21,45 @@ internal sealed class LocalPageServer
     private TcpListener? _listener;
     private int _port;
     private volatile string _html = "";
+    private string _url = "";
+    private int _version;
 
     public LocalPageServer(string threadName) => _threadName = threadName;
 
-    /// <summary>Stores the page and starts the listener on the first call. Returns a cache-busting URL.</summary>
+    /// <summary>
+    /// Stores the page, starts the listener on the first call and returns its URL. The URL only
+    /// changes when the page itself changes, so showing the same page again does not reload it.
+    /// </summary>
     public string Publish(string html)
     {
-        _html = html;
-
-        if (_listener is null)
+        lock (_gate)
         {
-            lock (_gate)
+            if (_listener is null)
             {
-                if (_listener is null)
+                var listener = new TcpListener(IPAddress.Loopback, 0);
+                listener.Start();
+                _port = ((IPEndPoint)listener.LocalEndpoint).Port;
+                _listener = listener;
+
+                var thread = new Thread(() => AcceptLoop(listener))
                 {
-                    var listener = new TcpListener(IPAddress.Loopback, 0);
-                    listener.Start();
-                    _port = ((IPEndPoint)listener.LocalEndpoint).Port;
-                    _listener = listener;
+                    IsBackground = true,
+                    Name = _threadName
+                };
+                thread.Start();
 
-                    var thread = new Thread(() => AcceptLoop(listener))
-                    {
-                        IsBackground = true,
-                        Name = _threadName
-                    };
-                    thread.Start();
-
-                    App.Log.LogInfo($"[Overlay] {_threadName} page served at http://127.0.0.1:{_port}/");
-                }
+                App.Log.LogInfo($"[Overlay] {_threadName} page served at http://127.0.0.1:{_port}/");
             }
-        }
 
-        return $"http://127.0.0.1:{_port}/?v={DateTime.UtcNow.Ticks}";
+            if (_url.Length == 0 || !string.Equals(_html, html, StringComparison.Ordinal))
+            {
+                _html = html;
+                _version++;
+                _url = $"http://127.0.0.1:{_port}/?v={_version}";
+            }
+
+            return _url;
+        }
     }
 
     private void AcceptLoop(TcpListener listener)

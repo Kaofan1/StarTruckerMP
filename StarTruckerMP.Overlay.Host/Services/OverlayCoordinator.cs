@@ -21,8 +21,15 @@ internal sealed class OverlayCoordinator : IDisposable
     private readonly OverlayPipeServer _pipeServer;
     private readonly IOverlayLogger _logger;
     private const string DefaultStartupUrl = "about:blank";
+
+    /// <summary>If a page never reports that it loaded, the overlay is shown anyway.</summary>
+    private const int PageShowFallbackMs = 4000;
+
     private bool _disposed;
-    private bool _overlayVisible = true;
+    private bool _overlayVisible;
+    private bool _pendingShow;
+    private string? _expectedUrl;
+    private int _navigationGate;
 
     public OverlayCoordinator(
         OverlayWindow window,
@@ -43,6 +50,7 @@ internal sealed class OverlayCoordinator : IDisposable
         _pipeServer = pipeServer;
         _logger = logger;
         _browser.FrameReady += OnBrowserFrameReady;
+        _browser.DocumentReady += OnBrowserDocumentReady;
         _modeService.UiModeChanged += OnUiModeChanged;
         _tracker.StateChanged += OnTrackerStateChanged;
         _tracker.GameExited += OnGameExited;
@@ -79,13 +87,11 @@ internal sealed class OverlayCoordinator : IDisposable
                     break;
 
                 case NavigateCommand navigate:
-                    ShowOverlay();
-                    _browser.Navigate(navigate.Url);
+                    BeginGatedNavigation(navigate.Url, () => _browser.Navigate(navigate.Url));
                     break;
 
                 case NavigateHtmlCommand navigateHtml:
-                    ShowOverlay();
-                    _browser.NavigateToHtml(navigateHtml.Html);
+                    BeginGatedNavigation(null, () => _browser.NavigateToHtml(navigateHtml.Html));
                     break;
 
                 case SetTokenCommand token:
@@ -105,8 +111,7 @@ internal sealed class OverlayCoordinator : IDisposable
                     break;
 
                 case RunDiagnosticsCommand:
-                    ShowOverlay();
-                    _browser.Navigate(DefaultStartupUrl);
+                    BeginGatedNavigation(DefaultStartupUrl, () => _browser.Navigate(DefaultStartupUrl));
                     _modeService.EnableUiMode();
                     break;
 
@@ -124,6 +129,7 @@ internal sealed class OverlayCoordinator : IDisposable
 
         _disposed = true;
         _browser.FrameReady -= OnBrowserFrameReady;
+        _browser.DocumentReady -= OnBrowserDocumentReady;
         _modeService.UiModeChanged -= OnUiModeChanged;
         _tracker.StateChanged -= OnTrackerStateChanged;
         _tracker.GameExited -= OnGameExited;
@@ -134,6 +140,62 @@ internal sealed class OverlayCoordinator : IDisposable
     private void OnBrowserFrameReady(object? sender, BrowserFrameReadyEventArgs e)
     {
         Dispatcher.UIThread.Post(() => _renderer.Render(e));
+    }
+
+    private void OnBrowserDocumentReady(object? sender, DocumentReadyEventArgs e)
+    {
+        Dispatcher.UIThread.Post(() =>
+        {
+            if (!_pendingShow)
+                return;
+
+            // A load from the previous navigation can finish after the next one started.
+            if (_expectedUrl != null && !string.Equals(_expectedUrl, e.Url, StringComparison.OrdinalIgnoreCase))
+                return;
+
+            _pendingShow = false;
+            _expectedUrl = null;
+            ShowOverlay();
+
+            if (_modeService.UiModeEnabled)
+                FocusOverlay();
+        });
+    }
+
+    /// <summary>
+    /// Navigates without letting the empty document reach the screen: the window is hidden until
+    /// the page reports that it finished loading. Without this the overlay showed a white frame
+    /// between being switched on and the page being painted.
+    /// </summary>
+    private void BeginGatedNavigation(string? expectedUrl, Action start)
+    {
+        var gate = ++_navigationGate;
+        _pendingShow = true;
+        _expectedUrl = expectedUrl;
+
+        if (_window.IsVisible)
+            _window.Hide();
+
+        start();
+
+        _ = Task.Run(async () =>
+        {
+            await Task.Delay(PageShowFallbackMs).ConfigureAwait(false);
+
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                if (gate != _navigationGate || !_pendingShow)
+                    return;
+
+                _logger.Warn("[Overlay] The page did not report a load; showing it anyway.");
+                _pendingShow = false;
+                _expectedUrl = null;
+                ShowOverlay();
+
+                if (_modeService.UiModeEnabled)
+                    FocusOverlay();
+            });
+        });
     }
 
     private void OnUiModeChanged(object? sender, bool enabled)
@@ -167,10 +229,11 @@ internal sealed class OverlayCoordinator : IDisposable
             ShowOverlay();
             _windowStyles.EnsureTopmost(hwnd);
             _windowStyles.SetClickThrough(hwnd, enabled: false);
-            _browser.SendFocusEvent(true);
-            _window.Activate();
-            _window.Focus();
-            _windowStyles.FocusWindow(hwnd);
+
+            // While a page loads the window is hidden; OnBrowserDocumentReady focuses it once shown.
+            if (!_pendingShow)
+                FocusOverlay();
+
             _logger.Info("[Mode] UI mode ON => overlay captures input");
             return;
         }
@@ -184,6 +247,15 @@ internal sealed class OverlayCoordinator : IDisposable
     private void ApplyWindowState(GameWindowState state)
     {
         _window.UpdateBounds(state.Left, state.Top, state.DipWidth, state.DipHeight);
+
+        // A page is loading: the window stays hidden until the new document is ready, even when
+        // the game window changes size in the meantime.
+        if (_pendingShow)
+        {
+            if (_window.IsVisible)
+                _window.Hide();
+            return;
+        }
 
         if (!_overlayVisible || state.IsMinimized || !state.IsVisible)
         {
@@ -204,7 +276,6 @@ internal sealed class OverlayCoordinator : IDisposable
     private void ShowOverlay()
     {
         _overlayVisible = true;
-        ApplyWindowState(_tracker.CurrentState);
 
         // The in-game HUD is click-through, so it never passes through ApplyUiMode. Re-assert the
         // topmost flag here too, otherwise a full screen game can cover the panel it just opened.
@@ -212,15 +283,33 @@ internal sealed class OverlayCoordinator : IDisposable
         if (hwnd != 0)
             _windowStyles.EnsureTopmost(hwnd);
 
+        // The page is still loading; the window appears from the load notification instead.
+        if (_pendingShow)
+            return;
+
+        ApplyWindowState(_tracker.CurrentState);
         _logger.Info("[Overlay] SHOW");
     }
 
     private void HideOverlay()
     {
         _overlayVisible = false;
+        _pendingShow = false;
+        _expectedUrl = null;
+        _navigationGate++;
+
         if (_window.IsVisible)
             _window.Hide();
         _logger.Info("[Overlay] HIDE");
+    }
+
+    private void FocusOverlay()
+    {
+        var hwnd = EnsureWindowHandle();
+        _browser.SendFocusEvent(true);
+        _window.Activate();
+        _window.Focus();
+        _windowStyles.FocusWindow(hwnd);
     }
 
     private nint EnsureWindowHandle()
